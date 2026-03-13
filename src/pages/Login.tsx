@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,14 +38,11 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginError(null);
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
-      toast({
-        title: 'Error de autenticación',
-        description: 'Email o contraseña incorrectos',
-        variant: 'destructive',
-      });
+      setLoginError(error);
     } else {
       navigate('/dashboard');
     }
@@ -100,6 +98,11 @@ export default function Login() {
                     <Label htmlFor="password">Contraseña</Label>
                     <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
                   </div>
+                  {loginError && (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+                      {loginError}
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                     Ingresar
