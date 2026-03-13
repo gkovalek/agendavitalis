@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Users, Clock, CheckCircle } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface TurnoResumen {
 }
 
 export default function Dashboard() {
+  const { perfil } = useAuth();
   const [totalPacientes, setTotalPacientes] = useState(0);
   const [turnosHoy, setTurnosHoy] = useState<TurnoResumen>({ total: 0, confirmados: 0, pendientes: 0 });
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Panel Principal</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          Bienvenido a Vitalis{perfil ? `, ${perfil.nombre}` : ''}
+        </h1>
         <p className="text-muted-foreground">Resumen del día — {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
 
