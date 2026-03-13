@@ -13,9 +13,26 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://primal-sparkle.lovable.app/reset-password',
+    });
+    setResetLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: 'No se pudo enviar el enlace. Verificá el email.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Enlace enviado', description: 'Revisá tu bandeja de entrada para restablecer tu contraseña.' });
+      setForgotMode(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
