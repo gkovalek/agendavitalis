@@ -18,7 +18,6 @@ interface Profesional {
   dni: string;
   mail: string;
   celular: string;
-  profesion: string;
   activo: boolean;
 }
 
