@@ -21,7 +21,7 @@ interface Profesional {
   activo: boolean;
 }
 
-const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', profesion: '', activo: true };
+const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true };
 
 export default function Profesionales() {
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
