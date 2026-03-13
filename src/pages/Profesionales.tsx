@@ -18,11 +18,10 @@ interface Profesional {
   dni: string;
   mail: string;
   celular: string;
-  profesion: string;
   activo: boolean;
 }
 
-const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', profesion: '', activo: true };
+const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true };
 
 export default function Profesionales() {
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -45,7 +44,7 @@ export default function Profesionales() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: Profesional) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', profesion: p.profesion || '', activo: p.activo });
+    setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', activo: p.activo });
     setDialogOpen(true);
   };
 
@@ -85,19 +84,17 @@ export default function Profesionales() {
                 <TableRow>
                   <TableHead>Apellido</TableHead>
                   <TableHead>Nombre</TableHead>
-                  <TableHead className="hidden md:table-cell">Profesión</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {profesionales.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay profesionales</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay profesionales</TableCell></TableRow>
                 ) : profesionales.map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.apellido}</TableCell>
                     <TableCell>{p.nombre}</TableCell>
-                    <TableCell className="hidden md:table-cell">{p.profesion}</TableCell>
                     <TableCell>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {p.activo ? 'Activo' : 'Inactivo'}
@@ -127,7 +124,7 @@ export default function Profesionales() {
               <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} /></div>
             </div>
             <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
-            <div className="space-y-1"><Label>Profesión</Label><Input value={form.profesion} onChange={e => setForm({...form, profesion: e.target.value})} /></div>
+            
             <div className="flex items-center gap-2">
               <Switch checked={form.activo} onCheckedChange={v => setForm({...form, activo: v})} />
               <Label>Activo</Label>
