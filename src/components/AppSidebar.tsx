@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UserPlus, Calendar, LogOut, Heart } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, Calendar, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +21,13 @@ const menuItems = [
   { title: 'Panel Principal', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Pacientes', url: '/pacientes', icon: Users },
   { title: 'Nuevo Paciente', url: '/pacientes/nuevo', icon: UserPlus },
-  { title: 'Turnos', url: '/turnos', icon: Calendar },
+  { title: 'Profesionales', url: '/profesionales', icon: Stethoscope },
+  { title: 'Obras Sociales', url: '/obras-sociales', icon: Building2 },
+  { title: 'Caja', url: '/caja', icon: DollarSign },
+];
+
+const disabledItems = [
+  { title: 'Historia Clínica', icon: FileText },
 ];
 
 export function AppSidebar() {
@@ -56,13 +62,21 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === '/'}
+                      end={item.url === '/dashboard'}
                       className="hover:bg-sidebar-accent/50"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {disabledItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton disabled className="opacity-40 cursor-not-allowed">
+                    <item.icon className="mr-2 h-4 w-4" />
+                    {!collapsed && <span>{item.title} <span className="text-[10px]">(próximamente)</span></span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

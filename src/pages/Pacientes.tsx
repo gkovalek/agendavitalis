@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { CENTRO_ID } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, UserPlus, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Search, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PacienteProfile } from '@/components/PacienteProfile';
 
 interface Paciente {
   id: string;
@@ -15,24 +17,24 @@ interface Paciente {
   celular: string;
   email: string;
   fecha_nacimiento: string;
-  obra_social: string;
+  obra_social_id: string | null;
 }
 
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchPacientes();
-  }, []);
+  useEffect(() => { fetchPacientes(); }, []);
 
   const fetchPacientes = async () => {
     setLoading(true);
     const { data } = await supabase
       .from('pacientes')
       .select('*')
+      .eq('centro_id', CENTRO_ID)
       .order('apellido', { ascending: true });
     setPacientes(data ?? []);
     setLoading(false);
@@ -47,6 +49,17 @@ export default function Pacientes() {
       (p.celular?.includes(term))
     );
   });
+
+  if (selectedId) {
+    return (
+      <div className="animate-fade-in">
+        <Button variant="ghost" className="mb-4" onClick={() => setSelectedId(null)}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Volver a Pacientes
+        </Button>
+        <PacienteProfile pacienteId={selectedId} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -88,25 +101,23 @@ export default function Pacientes() {
                     <TableHead>DNI</TableHead>
                     <TableHead className="hidden md:table-cell">Celular</TableHead>
                     <TableHead className="hidden lg:table-cell">Email</TableHead>
-                    <TableHead className="hidden lg:table-cell">Obra Social</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         No se encontraron pacientes
                       </TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((p) => (
-                      <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedId(p.id)}>
                         <TableCell className="font-medium">{p.apellido}</TableCell>
                         <TableCell>{p.nombre}</TableCell>
                         <TableCell>{p.dni}</TableCell>
                         <TableCell className="hidden md:table-cell">{p.celular}</TableCell>
                         <TableCell className="hidden lg:table-cell">{p.email}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{p.obra_social}</TableCell>
                       </TableRow>
                     ))
                   )}

@@ -9,6 +9,9 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Pacientes from "@/pages/Pacientes";
 import NuevoPaciente from "@/pages/NuevoPaciente";
+import Profesionales from "@/pages/Profesionales";
+import ObrasSociales from "@/pages/ObrasSociales";
+import Caja from "@/pages/Caja";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import { Loader2 } from "lucide-react";
@@ -50,6 +53,9 @@ function AppRoutes() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/pacientes" element={<ProtectedRoute><Pacientes /></ProtectedRoute>} />
       <Route path="/pacientes/nuevo" element={<ProtectedRoute><NuevoPaciente /></ProtectedRoute>} />
+      <Route path="/profesionales" element={<ProtectedRoute><Profesionales /></ProtectedRoute>} />
+      <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
+      <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
