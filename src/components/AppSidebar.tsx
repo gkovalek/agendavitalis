@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 const menuItems = [
-  { title: 'Panel Principal', url: '/', icon: LayoutDashboard },
+  { title: 'Panel Principal', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Pacientes', url: '/pacientes', icon: Users },
   { title: 'Nuevo Paciente', url: '/pacientes/nuevo', icon: UserPlus },
   { title: 'Turnos', url: '/turnos', icon: Calendar },
