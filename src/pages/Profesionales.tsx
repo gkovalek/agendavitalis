@@ -84,7 +84,6 @@ export default function Profesionales() {
                 <TableRow>
                   <TableHead>Apellido</TableHead>
                   <TableHead>Nombre</TableHead>
-                  <TableHead className="hidden md:table-cell">Profesión</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
