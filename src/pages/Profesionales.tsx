@@ -44,7 +44,7 @@ export default function Profesionales() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: Profesional) => {
     setEditId(p.id);
-    setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', profesion: p.profesion || '', activo: p.activo });
+    setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', activo: p.activo });
     setDialogOpen(true);
   };
 
