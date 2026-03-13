@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Pacientes from "@/pages/Pacientes";
 import NuevoPaciente from "@/pages/NuevoPaciente";
 import NotFound from "@/pages/NotFound";
+import ResetPassword from "@/pages/ResetPassword";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
