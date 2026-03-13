@@ -124,7 +124,7 @@ export default function Profesionales() {
               <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} /></div>
             </div>
             <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
-            <div className="space-y-1"><Label>Profesión</Label><Input value={form.profesion} onChange={e => setForm({...form, profesion: e.target.value})} /></div>
+            
             <div className="flex items-center gap-2">
               <Switch checked={form.activo} onCheckedChange={v => setForm({...form, activo: v})} />
               <Label>Activo</Label>
