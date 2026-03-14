@@ -141,7 +141,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).eq('estado', 'activo'),
       supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('created_at', { ascending: false }),
-      supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('fecha', { ascending: false }).limit(50),
     ]).then(([tratRes, hcRes, histRes]) => {
       setTratamientos((tratRes.data as any[]) ?? []);
