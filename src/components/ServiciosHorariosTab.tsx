@@ -139,7 +139,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
       [entityColumn]: entityId,
     };
     const { error } = await supabase.from('profesional_centro_servicio').insert(payload);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo asignar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio asignado' }); setServicioDialogOpen(false); fetchAll(); }
     setSavingServicio(false);
   };
