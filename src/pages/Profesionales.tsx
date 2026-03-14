@@ -66,31 +66,18 @@ export default function Profesionales() {
 
     const { data: asignaciones } = await supabase
       .from('profesional_centro_servicio')
-      .select('id, servicio_id, capacidad_simultanea')
+      .select('id, servicio_id, capacidad_simultanea, dias_trabajo, hora_inicio, hora_fin')
       .eq('profesional_id', p.id)
       .eq('centro_id', centroId);
 
     if (asignaciones && asignaciones.length > 0) {
-      const ids = asignaciones.map(a => a.id);
-      const { data: horarios } = await supabase
-        .from('horarios_disponibles')
-        .select('*')
-        .in('profesional_centro_servicio_id', ids);
-
       const mapped: InlineServicioAsignado[] = asignaciones.map(a => ({
         id: a.id,
         servicio_id: a.servicio_id,
         capacidad_simultanea: a.capacidad_simultanea,
-        horarios: (horarios ?? [])
-          .filter(h => h.profesional_centro_servicio_id === a.id)
-          .map(h => ({
-            id: h.id,
-            tipo: h.tipo as 'semanal' | 'especifico',
-            dia_semana: h.dia_semana ?? [],
-            fecha_especifica: h.fecha_especifica ? new Date(h.fecha_especifica) : null,
-            hora_inicio: h.hora_inicio,
-            hora_fin: h.hora_fin,
-          })),
+        dias_trabajo: a.dias_trabajo ?? [],
+        hora_inicio: a.hora_inicio,
+        hora_fin: a.hora_fin,
       }));
       setInlineServicios(mapped);
     } else {
