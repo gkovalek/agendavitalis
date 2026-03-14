@@ -62,7 +62,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
         <CardHeader><CardTitle className="text-lg">Historial de Turnos</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Monto</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
             <TableBody>
               {turnos.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
