@@ -43,7 +43,7 @@ export default function Caja() {
   }, [fecha, centroId]);
 
   const totals = useMemo(() => movimientos.reduce(
-    (acc, m) => ({ efectivo: acc.efectivo + (m.monto_efectivo || 0), transferencia: acc.transferencia + (m.monto_transferencia || 0), prepaga: acc.prepaga + (m.monto_prepaga || 0), total: acc.total + (m.total || 0) }),
+    (acc, m) => ({ efectivo: acc.efectivo + (m.monto_efectivo || 0), transferencia: acc.transferencia + (m.monto_transferencia || 0), prepaga: acc.prepaga + (m.monto_prepaga || 0), total: acc.total + (m.monto_total || 0) }),
     { efectivo: 0, transferencia: 0, prepaga: 0, total: 0 }
   ), [movimientos]);
 
