@@ -46,7 +46,7 @@ interface Tratamiento {
   servicio_id: string;
   total_sesiones: number;
   sesiones_consumidas: number;
-  activo: boolean;
+  estado: string;
   servicio?: { nombre: string };
 }
 
