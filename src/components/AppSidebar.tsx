@@ -39,7 +39,7 @@ export function AppSidebar() {
   const { signOut, perfil } = useAuth();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-sidebar-accent">

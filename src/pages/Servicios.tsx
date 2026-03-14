@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Servicio {
   id: string;
@@ -39,6 +40,7 @@ export default function Servicios() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     setLoading(true);
@@ -90,19 +92,49 @@ export default function Servicios() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Servicios</h1>
-          <p className="text-muted-foreground">{servicios.length} servicios registrados</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Servicios</h1>
+          <p className="text-sm text-muted-foreground">{servicios.length} servicios registrados</p>
         </div>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-2" /> Nuevo Servicio</Button>
+        <Button onClick={openNew} className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" /> Nuevo Servicio</Button>
       </div>
 
       <Card className="shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : servicios.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground text-sm">No hay servicios</p>
+          ) : isMobile ? (
+            <div className="divide-y">
+              {servicios.map(s => (
+                <div key={s.id} className="px-4 py-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground">{s.nombre}</p>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(s.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{s.duracion_minutos} min</span>
+                    <span>·</span>
+                    <span>${s.costo_base}</span>
+                    <span>·</span>
+                    {s.es_tratamiento ? (
+                      <Badge variant="secondary" className="text-xs">Tratamiento ({s.sesiones_por_bloque} ses.)</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">Consulta</Badge>
+                    )}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {s.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -116,9 +148,7 @@ export default function Servicios() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {servicios.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay servicios</TableCell></TableRow>
-                ) : servicios.map(s => (
+                {servicios.map(s => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.nombre}</TableCell>
                     <TableCell>{s.duracion_minutos} min</TableCell>
@@ -150,11 +180,11 @@ export default function Servicios() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Servicio</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Duración (minutos)</Label><Input type="number" value={form.duracion_minutos} onChange={e => setForm({ ...form, duracion_minutos: Number(e.target.value) })} /></div>
               <div className="space-y-1"><Label>Costo base</Label><Input type="number" value={form.costo_base} onChange={e => setForm({ ...form, costo_base: Number(e.target.value) })} /></div>
             </div>
@@ -170,11 +200,11 @@ export default function Servicios() {
               <Label>Activo</Label>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} disabled={saving || !form.nombre}>
+              <Button onClick={handleSave} disabled={saving || !form.nombre} className="flex-1 sm:flex-none">
                 {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Guardar
               </Button>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
             </div>
           </div>
         </DialogContent>

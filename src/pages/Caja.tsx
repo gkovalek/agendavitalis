@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Movimiento {
   id: string;
@@ -25,6 +26,7 @@ export default function Caja() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetch = async () => {
@@ -54,22 +56,63 @@ export default function Caja() {
   }, [movimientos]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Caja</h1>
-          <p className="text-muted-foreground">Movimientos del día</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Caja</h1>
+          <p className="text-sm text-muted-foreground">Movimientos del día</p>
         </div>
         <div className="space-y-1">
           <Label>Fecha</Label>
-          <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-44" />
+          <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-full sm:w-44" />
         </div>
+      </div>
+
+      {/* Totals summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card><CardContent className="p-3 text-center">
+          <p className="text-xs text-muted-foreground">Efectivo</p>
+          <p className="text-lg font-bold text-foreground">${totals.efectivo}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3 text-center">
+          <p className="text-xs text-muted-foreground">Transferencia</p>
+          <p className="text-lg font-bold text-foreground">${totals.transferencia}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3 text-center">
+          <p className="text-xs text-muted-foreground">Prepaga</p>
+          <p className="text-lg font-bold text-foreground">${totals.prepaga}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3 text-center">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-lg font-bold text-primary">${totals.total}</p>
+        </CardContent></Card>
       </div>
 
       <Card className="shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : movimientos.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground text-sm">Sin movimientos para esta fecha</p>
+          ) : isMobile ? (
+            <div className="divide-y">
+              {movimientos.map(m => (
+                <div key={m.id} className="px-4 py-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground text-sm">
+                      {m.paciente ? `${m.paciente.apellido}, ${m.paciente.nombre}` : '—'}
+                    </p>
+                    <p className="font-semibold text-foreground">${m.total || 0}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {m.profesional && <span>{m.profesional.apellido}</span>}
+                    {(m.monto_efectivo > 0) && <span>Efec: ${m.monto_efectivo}</span>}
+                    {(m.monto_transferencia > 0) && <span>Transf: ${m.monto_transferencia}</span>}
+                    {(m.monto_prepaga > 0) && <span>Prep: ${m.monto_prepaga}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -84,29 +127,16 @@ export default function Caja() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {movimientos.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Sin movimientos para esta fecha</TableCell></TableRow>
-                  ) : (
-                    <>
-                      {movimientos.map(m => (
-                        <TableRow key={m.id}>
-                          <TableCell>{m.paciente ? `${m.paciente.apellido}, ${m.paciente.nombre}` : '—'}</TableCell>
-                          <TableCell>{m.profesional ? `${m.profesional.apellido}, ${m.profesional.nombre}` : '—'}</TableCell>
-                          <TableCell className="text-right">${m.monto_efectivo || 0}</TableCell>
-                          <TableCell className="text-right">${m.monto_transferencia || 0}</TableCell>
-                          <TableCell className="text-right">${m.monto_prepaga || 0}</TableCell>
-                          <TableCell className="text-right font-semibold">${m.total || 0}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="bg-muted/50 font-semibold">
-                        <TableCell colSpan={2} className="text-right">Totales del día</TableCell>
-                        <TableCell className="text-right">${totals.efectivo}</TableCell>
-                        <TableCell className="text-right">${totals.transferencia}</TableCell>
-                        <TableCell className="text-right">${totals.prepaga}</TableCell>
-                        <TableCell className="text-right">${totals.total}</TableCell>
-                      </TableRow>
-                    </>
-                  )}
+                  {movimientos.map(m => (
+                    <TableRow key={m.id}>
+                      <TableCell>{m.paciente ? `${m.paciente.apellido}, ${m.paciente.nombre}` : '—'}</TableCell>
+                      <TableCell>{m.profesional ? `${m.profesional.apellido}, ${m.profesional.nombre}` : '—'}</TableCell>
+                      <TableCell className="text-right">${m.monto_efectivo || 0}</TableCell>
+                      <TableCell className="text-right">${m.monto_transferencia || 0}</TableCell>
+                      <TableCell className="text-right">${m.monto_prepaga || 0}</TableCell>
+                      <TableCell className="text-right font-semibold">${m.total || 0}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
