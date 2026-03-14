@@ -222,11 +222,13 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       finalTratamientoId = tratamientoId;
     }
 
-    const { error: turnoErr } = await supabase.from('turnos').insert({
-      fecha, hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
+    const turnoPayload = {
+      fecha, hora_inicio: hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
       monto_pagado: montoTotal > 0 ? montoTotal : null, centro_id: centroId,
-    });
+    };
+    console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
+    const { error: turnoErr } = await supabase.from('turnos').insert(turnoPayload);
 
     if (turnoErr) {
       toast({ title: 'Error', description: 'No se pudo guardar el turno. Intentá de nuevo.', variant: 'destructive' });
