@@ -10,6 +10,8 @@ import Dashboard from "@/pages/Dashboard";
 import Pacientes from "@/pages/Pacientes";
 import NuevoPaciente from "@/pages/NuevoPaciente";
 import Profesionales from "@/pages/Profesionales";
+import Equipos from "@/pages/Equipos";
+import Servicios from "@/pages/Servicios";
 import ObrasSociales from "@/pages/ObrasSociales";
 import Caja from "@/pages/Caja";
 import NotFound from "@/pages/NotFound";
