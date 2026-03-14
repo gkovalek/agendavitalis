@@ -28,13 +28,11 @@ interface Turno {
   paciente?: { nombre: string; apellido: string };
 }
 
-interface HorarioDisponible {
-  tipo: 'semanal' | 'especifico';
-  dia_semana: number[] | null;
-  fecha_especifica: string | null;
+interface PCSRecord {
+  profesional_id: string | null;
+  dias_trabajo: number[];
   hora_inicio: string;
   hora_fin: string;
-  profesional_id: string | null;
 }
 
 export default function Dashboard() {
