@@ -178,7 +178,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
     setSavingPatient(false);
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo crear el paciente. Verificá los datos e intentá de nuevo.', variant: 'destructive' });
     } else if (data) {
       selectPaciente(data as any);
       toast({ title: 'Paciente creado' });
