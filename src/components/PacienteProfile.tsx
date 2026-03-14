@@ -65,7 +65,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
             <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
             <TableBody>
               {turnos.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
               ) : turnos.map(t => {
                 const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
                 return (
