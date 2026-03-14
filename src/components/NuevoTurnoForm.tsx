@@ -208,14 +208,17 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (esTratamiento && nuevoTratamiento) {
       const { data: trat, error: tErr } = await supabase.from('tratamientos').insert({
         paciente_id: selectedPaciente.id,
+        profesional_id: profesionalId,
         servicio_id: servicioId,
         total_sesiones: totalSesiones,
         sesiones_consumidas: 0,
-        activo: true,
+        sesiones_restantes: totalSesiones,
+        estado: 'activo',
+        fecha_inicio: fecha,
         centro_id: CENTRO_ID,
       }).select('id').single();
       if (tErr || !trat) {
-        toast({ title: 'Error', description: 'No se pudo crear el tratamiento: ' + (tErr?.message || ''), variant: 'destructive' });
+        toast({ title: 'Error', description: 'No se pudo crear el tratamiento. Contactá al administrador.', variant: 'destructive' });
         setSaving(false);
         return;
       }
