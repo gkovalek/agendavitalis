@@ -69,36 +69,14 @@ export default function Dashboard() {
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
 
-    // Fetch horarios separately (no FK join available)
+    // Fetch availability from profesional_centro_servicio directly
     const { data: pcsData } = await supabase
       .from('profesional_centro_servicio')
-      .select('id, profesional_id')
+      .select('profesional_id, dias_trabajo, hora_inicio, hora_fin')
       .eq('centro_id', centroId)
       .eq('activo', true);
 
-    if (pcsData && pcsData.length > 0) {
-      const pcsIds = pcsData.map(p => p.id);
-      const { data: horariosData } = await supabase
-        .from('horarios_disponibles')
-        .select('tipo, dia_semana, fecha_especifica, hora_inicio, hora_fin, profesional_centro_servicio_id')
-        .in('profesional_centro_servicio_id', pcsIds);
-
-      const pcsMap: Record<string, string> = {};
-      pcsData.forEach(p => { pcsMap[p.id] = p.profesional_id; });
-
-      const flatHorarios: HorarioDisponible[] = (horariosData ?? []).map((h: any) => ({
-        tipo: h.tipo,
-        dia_semana: h.dia_semana,
-        fecha_especifica: h.fecha_especifica,
-        hora_inicio: h.hora_inicio,
-        hora_fin: h.hora_fin,
-        profesional_id: pcsMap[h.profesional_centro_servicio_id] ?? null,
-      }));
-      setHorarios(flatHorarios);
-    } else {
-      setHorarios([]);
-    }
-
+    setPcsRecords((pcsData as PCSRecord[]) ?? []);
     setLoading(false);
   };
 
