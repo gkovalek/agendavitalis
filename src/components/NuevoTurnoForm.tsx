@@ -466,7 +466,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                         <div key={t.id} className="flex items-center justify-between px-2 py-1.5 rounded border text-sm">
                           <div>
                             <span className="text-foreground">{t.fecha}</span>
-                            <span className="text-muted-foreground ml-2">{t.hora}</span>
+                            <span className="text-muted-foreground ml-2">{t.hora_inicio}</span>
                             {t.profesional && <span className="text-muted-foreground ml-2">{(t.profesional as any).apellido}</span>}
                             {t.servicio && <span className="text-muted-foreground ml-2">{(t.servicio as any).nombre}</span>}
                           </div>
