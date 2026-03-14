@@ -1,5 +1,3 @@
-export const CENTRO_ID = 'a1b2c3d4-0000-0000-0000-000000000001';
-
 export const TURNO_ESTADOS = {
   reservado: { label: 'Reservado', color: '#FCD34D', bg: 'bg-yellow-300/20', text: 'text-yellow-600' },
   confirmado: { label: 'Confirmado', color: '#4ADE80', bg: 'bg-green-400/20', text: 'text-green-600' },

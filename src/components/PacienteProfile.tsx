@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CENTRO_ID, TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
+import { TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
@@ -59,20 +59,11 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
           </div>
         </CardContent>
       </Card>
-
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-lg">Historial de Turnos</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Hora</TableHead>
-                <TableHead>Profesional</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Monto</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
             <TableBody>
               {turnos.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
@@ -80,16 +71,10 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
                 const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell>{t.fecha}</TableCell>
-                    <TableCell>{t.hora}</TableCell>
+                    <TableCell>{t.fecha}</TableCell><TableCell>{t.hora}</TableCell>
                     <TableCell>{t.profesional ? `${t.profesional.nombre} ${t.profesional.apellido}` : '—'}</TableCell>
                     <TableCell>{t.monto_pagado != null ? `$${t.monto_pagado}` : '—'}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: est.color }} />
-                        {est.label}
-                      </span>
-                    </TableCell>
+                    <TableCell><span className="inline-flex items-center gap-1.5 text-xs font-medium"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: est.color }} />{est.label}</span></TableCell>
                   </TableRow>
                 );
               })}

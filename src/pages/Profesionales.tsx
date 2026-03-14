@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CENTRO_ID } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,7 @@ interface Profesional {
 const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true };
 
 export default function Profesionales() {
+  const { centroId } = useAuth();
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,13 +43,14 @@ export default function Profesionales() {
   const isMobile = useIsMobile();
 
   const fetchData = async () => {
+    if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase.from('profesionales').select('*').eq('centro_id', CENTRO_ID).order('apellido');
+    const { data } = await supabase.from('profesionales').select('*').eq('centro_id', centroId).order('apellido');
     setProfesionales(data ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [centroId]);
 
   const openNew = () => {
     setEditId(null);
@@ -58,6 +60,7 @@ export default function Profesionales() {
   };
 
   const openEdit = async (p: Profesional) => {
+    if (!centroId) return;
     setEditId(p.id);
     setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', activo: p.activo });
 
@@ -65,7 +68,7 @@ export default function Profesionales() {
       .from('profesional_centro_servicio')
       .select('id, servicio_id, capacidad_simultanea')
       .eq('profesional_id', p.id)
-      .eq('centro_id', CENTRO_ID);
+      .eq('centro_id', centroId);
 
     if (asignaciones && asignaciones.length > 0) {
       const ids = asignaciones.map(a => a.id);
@@ -98,6 +101,7 @@ export default function Profesionales() {
   };
 
   const handleSave = async () => {
+    if (!centroId) return;
     setSaving(true);
     let profesionalId = editId;
 
@@ -105,12 +109,15 @@ export default function Profesionales() {
       const { error } = await supabase.from('profesionales').update(form).eq('id', editId);
       if (error) { toast({ title: 'Error', description: 'No se pudo actualizar el profesional. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
     } else {
-      const { data, error } = await supabase.from('profesionales').insert({ ...form, centro_id: CENTRO_ID }).select('id').single();
+      const { data, error } = await supabase.from('profesionales').insert({ ...form, centro_id: centroId }).select('id').single();
       if (error || !data) { toast({ title: 'Error', description: 'No se pudo crear el profesional. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
       profesionalId = data.id;
     }
 
-    await saveInlineServicios('profesional_id', profesionalId!);
+    const srvError = await saveInlineServicios('profesional_id', profesionalId!);
+    if (srvError) {
+      toast({ title: 'Error', description: srvError, variant: 'destructive' });
+    }
 
     setSaving(false);
     setDialogOpen(false);
@@ -118,28 +125,36 @@ export default function Profesionales() {
     fetchData();
   };
 
-  const saveInlineServicios = async (entityColumn: string, entityId: string) => {
+  const saveInlineServicios = async (entityColumn: string, entityId: string): Promise<string | null> => {
+    if (!centroId) return 'No se pudo determinar el centro.';
+
     const { data: existing } = await supabase
       .from('profesional_centro_servicio')
       .select('id')
       .eq(entityColumn, entityId)
-      .eq('centro_id', CENTRO_ID);
+      .eq('centro_id', centroId);
 
     if (existing && existing.length > 0) {
       const existingIds = existing.map(e => e.id);
       await supabase.from('horarios_disponibles').delete().in('profesional_centro_servicio_id', existingIds);
-      await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
+      const { error: delErr } = await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
+      if (delErr) return 'No se pudieron actualizar los servicios asignados. Verificá los permisos.';
     }
 
     for (const srv of inlineServicios) {
       if (!srv.servicio_id) continue;
-      const { data: asig } = await supabase.from('profesional_centro_servicio').insert({
+      const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert({
         [entityColumn]: entityId,
         servicio_id: srv.servicio_id,
         capacidad_simultanea: srv.capacidad_simultanea,
         activo: true,
-        centro_id: CENTRO_ID,
+        centro_id: centroId,
       }).select('id').single();
+
+      if (insErr) {
+        console.error('Error inserting profesional_centro_servicio:', insErr);
+        return 'No se pudo asignar el servicio. Verificá los permisos en la base de datos.';
+      }
 
       if (asig && srv.horarios.length > 0) {
         const horarioPayloads = srv.horarios.map(h => ({
@@ -153,12 +168,16 @@ export default function Profesionales() {
           hora_fin: h.hora_fin,
           capacidad_simultanea: srv.capacidad_simultanea,
         }));
-        await supabase.from('horarios_disponibles').insert(horarioPayloads);
+        const { error: hErr } = await supabase.from('horarios_disponibles').insert(horarioPayloads);
+        if (hErr) {
+          console.error('Error inserting horarios_disponibles:', hErr);
+          return 'No se pudieron guardar los horarios. Verificá los permisos.';
+        }
       }
     }
+    return null;
   };
 
-  // Mobile: show detail view when a profesional is selected
   if (isMobile && selectedProfesional) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -205,12 +224,11 @@ export default function Profesionales() {
                   <Label>Activo</Label>
                 </div>
                 <div className="border-t pt-3 mt-3">
-                  <InlineServiciosHorarios servicios={inlineServicios} onChange={setInlineServicios} />
+                  <InlineServiciosHorarios centroId={centroId} servicios={inlineServicios} onChange={setInlineServicios} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
-                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Guardar
+                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
                   </Button>
                   <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
                 </div>
@@ -266,11 +284,8 @@ export default function Profesionales() {
                 </TableHeader>
                 <TableBody>
                   {profesionales.map(p => (
-                    <TableRow
-                      key={p.id}
-                      className={`cursor-pointer ${selectedProfesional?.id === p.id ? 'bg-muted' : ''}`}
-                      onClick={() => setSelectedProfesional(p)}
-                    >
+                    <TableRow key={p.id} className={`cursor-pointer ${selectedProfesional?.id === p.id ? 'bg-muted' : ''}`}
+                      onClick={() => setSelectedProfesional(p)}>
                       <TableCell className="font-medium">{p.apellido}</TableCell>
                       <TableCell>{p.nombre}</TableCell>
                       <TableCell>
@@ -291,7 +306,6 @@ export default function Profesionales() {
           </CardContent>
         </Card>
 
-        {/* Desktop detail panel */}
         {!isMobile && (
           <Card className="shadow-sm lg:col-span-2">
             <CardContent className="p-4">
@@ -337,12 +351,11 @@ export default function Profesionales() {
                 <Label>Activo</Label>
               </div>
               <div className="border-t pt-3 mt-3">
-                <InlineServiciosHorarios servicios={inlineServicios} onChange={setInlineServicios} />
+                <InlineServiciosHorarios centroId={centroId} servicios={inlineServicios} onChange={setInlineServicios} />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
-                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Guardar
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
                 </Button>
                 <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
               </div>

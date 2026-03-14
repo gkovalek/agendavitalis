@@ -8,21 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
 interface Turno {
-  id: string;
-  fecha: string;
-  hora: string;
-  estado: TurnoEstado;
-  profesional_id: string;
-  paciente_id: string;
-  monto_pagado: number | null;
-  paciente?: { nombre: string; apellido: string };
+  id: string; fecha: string; hora: string; estado: TurnoEstado; profesional_id: string;
+  paciente_id: string; monto_pagado: number | null; paciente?: { nombre: string; apellido: string };
 }
 
-interface Props {
-  turno: Turno | null;
-  onClose: () => void;
-  onUpdated: () => void;
-}
+interface Props { turno: Turno | null; onClose: () => void; onUpdated: () => void; }
 
 export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const { toast } = useToast();
@@ -37,7 +27,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     const { error } = await supabase.from('turnos').update({ estado }).eq('id', turno.id);
     setSaving(false);
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo actualizar el turno. Intentá de nuevo.', variant: 'destructive' });
     } else {
       toast({ title: 'Turno actualizado' });
       onUpdated();
@@ -49,46 +39,21 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   return (
     <Dialog open={!!turno} onOpenChange={(o) => { if (!o) { onClose(); setEstado(''); } }}>
       <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Detalle del Turno</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Detalle del Turno</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div>
-            <p className="text-sm text-muted-foreground">Paciente</p>
-            <p className="font-semibold text-foreground">
-              {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : '—'}
-            </p>
-          </div>
+          <div><p className="text-sm text-muted-foreground">Paciente</p><p className="font-semibold text-foreground">{turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : '—'}</p></div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-sm text-muted-foreground">Fecha</p>
-              <p className="text-foreground">{turno.fecha}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Hora</p>
-              <p className="text-foreground">{turno.hora}</p>
-            </div>
+            <div><p className="text-sm text-muted-foreground">Fecha</p><p className="text-foreground">{turno.fecha}</p></div>
+            <div><p className="text-sm text-muted-foreground">Hora</p><p className="text-foreground">{turno.hora}</p></div>
           </div>
-          {turno.monto_pagado != null && (
-            <div>
-              <p className="text-sm text-muted-foreground">Monto Pagado</p>
-              <p className="text-foreground">${turno.monto_pagado}</p>
-            </div>
-          )}
+          {turno.monto_pagado != null && (<div><p className="text-sm text-muted-foreground">Monto Pagado</p><p className="text-foreground">${turno.monto_pagado}</p></div>)}
           <div className="space-y-1">
             <Label>Estado</Label>
             <Select value={currentEstado} onValueChange={(v) => setEstado(v as TurnoEstado)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {Object.entries(TURNO_ESTADOS).map(([key, val]) => (
-                  <SelectItem key={key} value={key}>
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: val.color }} />
-                      {val.label}
-                    </span>
-                  </SelectItem>
+                  <SelectItem key={key} value={key}><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: val.color }} />{val.label}</span></SelectItem>
                 ))}
               </SelectContent>
             </Select>

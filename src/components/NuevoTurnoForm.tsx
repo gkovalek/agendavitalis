@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CENTRO_ID, TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
+import { TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -63,9 +64,9 @@ interface TurnoHistorial {
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
 export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, onSuccess, onCancel }: Props) {
+  const { centroId } = useAuth();
   const { toast } = useToast();
 
-  // Patient search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paciente[]>([]);
   const [searching, setSearching] = useState(false);
@@ -75,14 +76,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // New patient form
   const [newPatient, setNewPatient] = useState({
     nombre: '', apellido: '', dni: '', celular: '',
     prepaga_id: null as string | null, prepaga_nombre: '', numero_afiliado: '',
   });
   const [savingPatient, setSavingPatient] = useState(false);
 
-  // Turno form
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicioId, setServicioId] = useState('');
   const [esTratamiento, setEsTratamiento] = useState(false);
@@ -97,31 +96,29 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const [estadoInicial, setEstadoInicial] = useState<'reservado' | 'confirmado'>('reservado');
   const [saving, setSaving] = useState(false);
 
-  // Tabs data
   const [historiaClinica, setHistoriaClinica] = useState<any[]>([]);
   const [historial, setHistorial] = useState<TurnoHistorial[]>([]);
   const [loadingTabs, setLoadingTabs] = useState(false);
 
-  // Load servicios on mount
   useEffect(() => {
+    if (!centroId) return;
     supabase.from('servicios').select('id, nombre, duracion_minutos, costo_base')
-      .eq('centro_id', CENTRO_ID).eq('activo', true).order('nombre')
+      .eq('centro_id', centroId).eq('activo', true).order('nombre')
       .then(({ data }) => setServicios(data ?? []));
-  }, []);
+  }, [centroId]);
 
-  // Search patients (debounced)
   const searchPatients = useCallback(async (q: string) => {
-    if (q.length < 3) { setSearchResults([]); setShowResults(false); return; }
+    if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
     setSearching(true);
     const { data } = await supabase.from('pacientes')
       .select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)')
-      .eq('centro_id', CENTRO_ID)
+      .eq('centro_id', centroId)
       .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%,dni.ilike.%${q}%,celular.ilike.%${q}%`)
       .limit(10);
     setSearchResults((data as any[]) ?? []);
     setShowResults(true);
     setSearching(false);
-  }, []);
+  }, [centroId]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -129,7 +126,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     return () => clearTimeout(debounceRef.current);
   }, [searchQuery, searchPatients]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowResults(false);
@@ -138,23 +134,22 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Load patient-related data when selected
   useEffect(() => {
-    if (!selectedPaciente) return;
+    if (!selectedPaciente || !centroId) return;
     setLoadingTabs(true);
     Promise.all([
       supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
-        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).eq('estado', 'activo'),
-      supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('created_at', { ascending: false }),
+        .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).eq('estado', 'activo'),
+      supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('created_at', { ascending: false }),
       supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
-        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('fecha', { ascending: false }).limit(50),
+        .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('fecha', { ascending: false }).limit(50),
     ]).then(([tratRes, hcRes, histRes]) => {
       setTratamientos((tratRes.data as any[]) ?? []);
       setHistoriaClinica(hcRes.data ?? []);
       setHistorial((histRes.data as any[]) ?? []);
       setLoadingTabs(false);
     });
-  }, [selectedPaciente]);
+  }, [selectedPaciente, centroId]);
 
   const selectPaciente = (p: Paciente) => {
     setSelectedPaciente(p);
@@ -168,13 +163,14 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       toast({ title: 'Error', description: 'Completá los campos obligatorios', variant: 'destructive' });
       return;
     }
+    if (!centroId) return;
     setSavingPatient(true);
     const { data, error } = await supabase.from('pacientes').insert({
       nombre: newPatient.nombre, apellido: newPatient.apellido,
       dni: newPatient.dni, celular: newPatient.celular,
       prepaga_id: newPatient.prepaga_id,
       numero_afiliado: newPatient.numero_afiliado || null,
-      centro_id: CENTRO_ID,
+      centro_id: centroId,
     }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
     setSavingPatient(false);
     if (error) {
@@ -196,7 +192,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const selectedTratamiento = tratamientos.find(t => t.id === tratamientoId);
 
   const handleSave = async () => {
-    if (!selectedPaciente || !servicioId) {
+    if (!selectedPaciente || !servicioId || !centroId) {
       toast({ title: 'Error', description: 'Seleccioná paciente y servicio', variant: 'destructive' });
       return;
     }
@@ -204,7 +200,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
 
     let finalTratamientoId: string | null = null;
 
-    // Create new tratamiento if needed
     if (esTratamiento && nuevoTratamiento) {
       const { data: trat, error: tErr } = await supabase.from('tratamientos').insert({
         paciente_id: selectedPaciente.id,
@@ -215,7 +210,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         sesiones_restantes: totalSesiones,
         estado: 'activo',
         fecha_inicio: fecha,
-        centro_id: CENTRO_ID,
+        centro_id: centroId,
       }).select('id').single();
       if (tErr || !trat) {
         toast({ title: 'Error', description: 'No se pudo crear el tratamiento. Contactá al administrador.', variant: 'destructive' });
@@ -227,16 +222,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       finalTratamientoId = tratamientoId;
     }
 
-    // Insert turno
     const { error: turnoErr } = await supabase.from('turnos').insert({
-      fecha, hora,
-      profesional_id: profesionalId,
-      paciente_id: selectedPaciente.id,
-      servicio_id: servicioId,
-      estado: estadoInicial,
-      tratamiento_id: finalTratamientoId,
-      monto_pagado: montoTotal > 0 ? montoTotal : null,
-      centro_id: CENTRO_ID,
+      fecha, hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
+      servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
+      monto_pagado: montoTotal > 0 ? montoTotal : null, centro_id: centroId,
     });
 
     if (turnoErr) {
@@ -245,21 +234,16 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       return;
     }
 
-    // Insert caja_movimiento if monto > 0
     if (montoTotal > 0) {
       await supabase.from('caja_movimientos').insert({
-        fecha,
-        paciente_id: selectedPaciente.id,
-        profesional_id: profesionalId,
+        fecha, paciente_id: selectedPaciente.id, profesional_id: profesionalId,
         monto_efectivo: formaPago === 'efectivo' || formaPago === 'mixto' ? montoEfectivo : 0,
         monto_transferencia: formaPago === 'transferencia' || formaPago === 'mixto' ? montoTransferencia : 0,
         monto_prepaga: formaPago === 'obra_social' || formaPago === 'mixto' ? montoPrepaga : 0,
-        total: montoTotal,
-        centro_id: CENTRO_ID,
+        total: montoTotal, centro_id: centroId,
       });
     }
 
-    // Update tratamiento sesiones_consumidas
     if (finalTratamientoId && !nuevoTratamiento && selectedTratamiento) {
       const newConsumed = selectedTratamiento.sesiones_consumidas + 1;
       await supabase.from('tratamientos').update({
@@ -278,39 +262,28 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     onSuccess();
   };
 
-  // Stats for historial
   const totalTurnos = historial.length;
   const finalizados = historial.filter(t => t.estado === 'finalizado').length;
   const cancelados = historial.filter(t => t.estado === 'cancelado').length;
 
   return (
     <div className="space-y-4">
-      {/* HEADER */}
       <div className="border-b pb-3">
-        <p className="text-sm text-muted-foreground">
-          {fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}
-        </p>
+        <p className="text-sm text-muted-foreground">{fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
         <p className="text-sm font-medium text-foreground">{profesionalNombre}</p>
       </div>
 
-      {/* STEP 1: PATIENT SEARCH */}
       {!selectedPaciente ? (
         <div className="space-y-3">
           <div className="relative" ref={searchRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar paciente por nombre, apellido, DNI o celular..."
-              className="pl-10 h-11 text-base"
-              autoFocus
-            />
+            <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar paciente por nombre, apellido, DNI o celular..." className="pl-10 h-11 text-base" autoFocus />
             {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
             {showResults && searchResults.length > 0 && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
                 {searchResults.map(p => (
-                  <button key={p.id} type="button" className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent transition-colors border-b last:border-b-0"
-                    onClick={() => selectPaciente(p)}>
+                  <button key={p.id} type="button" className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent transition-colors border-b last:border-b-0" onClick={() => selectPaciente(p)}>
                     <span className="font-semibold text-foreground">{p.apellido}, {p.nombre}</span>
                     <span className="text-muted-foreground"> — DNI {p.dni} — {p.celular}</span>
                     {p.prepaga && <span className="text-primary ml-1">— {(p.prepaga as any).nombre}</span>}
@@ -319,16 +292,13 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               </div>
             )}
             {showResults && searchResults.length === 0 && searchQuery.length >= 3 && !searching && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
-                No se encontraron resultados
-              </div>
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">No se encontraron resultados</div>
             )}
           </div>
 
           <button type="button" onClick={() => setShowNewPatientForm(!showNewPatientForm)}
             className="text-sm text-primary hover:underline flex items-center gap-1">
-            <UserPlus className="h-3.5 w-3.5" />
-            + Paciente no encontrado, crear nuevo
+            <UserPlus className="h-3.5 w-3.5" /> + Paciente no encontrado, crear nuevo
           </button>
 
           {showNewPatientForm && (
@@ -336,34 +306,17 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm font-medium text-foreground">Nuevo Paciente</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nombre *</Label>
-                    <Input value={newPatient.nombre} onChange={e => setNewPatient({ ...newPatient, nombre: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Apellido *</Label>
-                    <Input value={newPatient.apellido} onChange={e => setNewPatient({ ...newPatient, apellido: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">DNI *</Label>
-                    <Input value={newPatient.dni} onChange={e => setNewPatient({ ...newPatient, dni: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Celular *</Label>
-                    <Input value={newPatient.celular} onChange={e => setNewPatient({ ...newPatient, celular: e.target.value })} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Nombre *</Label><Input value={newPatient.nombre} onChange={e => setNewPatient({ ...newPatient, nombre: e.target.value })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Apellido *</Label><Input value={newPatient.apellido} onChange={e => setNewPatient({ ...newPatient, apellido: e.target.value })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">DNI *</Label><Input value={newPatient.dni} onChange={e => setNewPatient({ ...newPatient, dni: e.target.value })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Celular *</Label><Input value={newPatient.celular} onChange={e => setNewPatient({ ...newPatient, celular: e.target.value })} /></div>
                 </div>
-                <PrepagaAutocomplete value={newPatient.prepaga_id}
-                  onSelect={(id, nombre) => setNewPatient({ ...newPatient, prepaga_id: id, prepaga_nombre: nombre })} />
+                <PrepagaAutocomplete value={newPatient.prepaga_id} onSelect={(id, nombre) => setNewPatient({ ...newPatient, prepaga_id: id, prepaga_nombre: nombre })} />
                 {newPatient.prepaga_id && newPatient.prepaga_nombre.toLowerCase() !== 'particular' && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nro. de Afiliado</Label>
-                    <Input value={newPatient.numero_afiliado} onChange={e => setNewPatient({ ...newPatient, numero_afiliado: e.target.value })} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Nro. de Afiliado</Label><Input value={newPatient.numero_afiliado} onChange={e => setNewPatient({ ...newPatient, numero_afiliado: e.target.value })} /></div>
                 )}
                 <Button size="sm" onClick={handleCreatePatient} disabled={savingPatient}>
-                  {savingPatient ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                  Guardar Paciente
+                  {savingPatient ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Paciente
                 </Button>
               </CardContent>
             </Card>
@@ -371,7 +324,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         </div>
       ) : (
         <>
-          {/* Patient summary card */}
           <Card className="bg-secondary/50">
             <CardContent className="p-3 flex items-center justify-between">
               <div>
@@ -381,13 +333,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                   {selectedPaciente.prepaga && <> — <span className="text-primary">{(selectedPaciente.prepaga as any).nombre}</span></>}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => { setSelectedPaciente(null); setSearchQuery(''); }}>
-                Cambiar
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedPaciente(null); setSearchQuery(''); }}>Cambiar</Button>
             </CardContent>
           </Card>
 
-          {/* TABS */}
           <Tabs defaultValue="turno" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="turno">Turno</TabsTrigger>
@@ -396,29 +345,19 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               <TabsTrigger value="historial">Historial</TabsTrigger>
             </TabsList>
 
-            {/* TAB 1: TURNO */}
             <TabsContent value="turno" className="space-y-4 mt-4">
-              {/* Servicio */}
               <div className="space-y-1">
                 <Label>Servicio *</Label>
                 <Select value={servicioId} onValueChange={setServicioId}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar servicio" /></SelectTrigger>
                   <SelectContent>
-                    {servicios.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.nombre} ({s.duracion_minutos} min)
-                      </SelectItem>
-                    ))}
+                    {servicios.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre} ({s.duracion_minutos} min)</SelectItem>))}
                   </SelectContent>
                 </Select>
                 {horaFin && <p className="text-xs text-muted-foreground">Finaliza a las {horaFin}</p>}
               </div>
 
-              {/* Tratamiento */}
-              <div className="flex items-center gap-2">
-                <Switch checked={esTratamiento} onCheckedChange={setEsTratamiento} />
-                <Label>¿Es parte de un tratamiento?</Label>
-              </div>
+              <div className="flex items-center gap-2"><Switch checked={esTratamiento} onCheckedChange={setEsTratamiento} /><Label>¿Es parte de un tratamiento?</Label></div>
 
               {esTratamiento && (
                 <div className="space-y-2 pl-4 border-l-2 border-primary/30">
@@ -427,25 +366,16 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                       <Select value={tratamientoId} onValueChange={(v) => { if (v === '__new') { setNuevoTratamiento(true); } else { setTratamientoId(v); } }}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar tratamiento" /></SelectTrigger>
                         <SelectContent>
-                          {tratamientos.map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {(t.servicio as any)?.nombre} — {t.sesiones_consumidas}/{t.total_sesiones} sesiones
-                            </SelectItem>
-                          ))}
+                          {tratamientos.map(t => (<SelectItem key={t.id} value={t.id}>{(t.servicio as any)?.nombre} — {t.sesiones_consumidas}/{t.total_sesiones} sesiones</SelectItem>))}
                           <SelectItem value="__new">+ Iniciar nuevo tratamiento</SelectItem>
                         </SelectContent>
                       </Select>
-                      {selectedTratamiento && (
-                        <p className="text-sm text-muted-foreground">Sesión nro: <strong>{selectedTratamiento.sesiones_consumidas + 1}</strong></p>
-                      )}
+                      {selectedTratamiento && <p className="text-sm text-muted-foreground">Sesión nro: <strong>{selectedTratamiento.sesiones_consumidas + 1}</strong></p>}
                     </>
                   ) : (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-foreground">Nuevo tratamiento</p>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Total de sesiones</Label>
-                        <Input type="number" value={totalSesiones} onChange={e => setTotalSesiones(Number(e.target.value))} min={1} className="w-32" />
-                      </div>
+                      <div className="space-y-1"><Label className="text-xs">Total de sesiones</Label><Input type="number" value={totalSesiones} onChange={e => setTotalSesiones(Number(e.target.value))} min={1} className="w-32" /></div>
                       <p className="text-sm text-muted-foreground">Sesión nro: <strong>1</strong></p>
                       <Button variant="ghost" size="sm" onClick={() => setNuevoTratamiento(false)}>← Seleccionar existente</Button>
                     </div>
@@ -453,85 +383,50 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                 </div>
               )}
 
-              {/* Forma de pago */}
               <div className="space-y-2">
                 <Label>Forma de pago *</Label>
                 <div className="flex flex-wrap gap-1">
                   {(['efectivo', 'transferencia', 'obra_social', 'mixto'] as FormaPago[]).map(fp => (
-                    <Button key={fp} type="button" size="sm" variant={formaPago === fp ? 'default' : 'outline'}
-                      onClick={() => setFormaPago(fp)}>
+                    <Button key={fp} type="button" size="sm" variant={formaPago === fp ? 'default' : 'outline'} onClick={() => setFormaPago(fp)}>
                       {fp === 'efectivo' ? 'Efectivo' : fp === 'transferencia' ? 'Transferencia' : fp === 'obra_social' ? 'Obra Social' : 'Mixto'}
                     </Button>
                   ))}
                 </div>
               </div>
 
-              {/* Monto fields */}
               <div className="grid grid-cols-2 gap-3">
-                {(formaPago === 'efectivo' || formaPago === 'mixto') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Monto efectivo</Label>
-                    <Input type="number" value={montoEfectivo} onChange={e => setMontoEfectivo(Number(e.target.value))} min={0} />
-                  </div>
-                )}
-                {(formaPago === 'transferencia' || formaPago === 'mixto') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Monto transferencia</Label>
-                    <Input type="number" value={montoTransferencia} onChange={e => setMontoTransferencia(Number(e.target.value))} min={0} />
-                  </div>
-                )}
-                {(formaPago === 'obra_social' || formaPago === 'mixto') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Monto prepaga</Label>
-                    <Input type="number" value={montoPrepaga} onChange={e => setMontoPrepaga(Number(e.target.value))} min={0} />
-                  </div>
-                )}
+                {(formaPago === 'efectivo' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto efectivo</Label><Input type="number" value={montoEfectivo} onChange={e => setMontoEfectivo(Number(e.target.value))} min={0} /></div>)}
+                {(formaPago === 'transferencia' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto transferencia</Label><Input type="number" value={montoTransferencia} onChange={e => setMontoTransferencia(Number(e.target.value))} min={0} /></div>)}
+                {(formaPago === 'obra_social' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto prepaga</Label><Input type="number" value={montoPrepaga} onChange={e => setMontoPrepaga(Number(e.target.value))} min={0} /></div>)}
               </div>
-              {formaPago === 'mixto' && (
-                <p className="text-sm font-medium text-foreground">Total: ${montoTotal}</p>
-              )}
+              {formaPago === 'mixto' && <p className="text-sm font-medium text-foreground">Total: ${montoTotal}</p>}
 
-              {/* Estado */}
               <div className="space-y-1">
                 <Label>Estado inicial</Label>
                 <Select value={estadoInicial} onValueChange={v => setEstadoInicial(v as any)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="reservado">Reservado</SelectItem>
-                    <SelectItem value="confirmado">Confirmado</SelectItem>
-                  </SelectContent>
+                  <SelectContent><SelectItem value="reservado">Reservado</SelectItem><SelectItem value="confirmado">Confirmado</SelectItem></SelectContent>
                 </Select>
               </div>
 
-              {/* Save */}
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                  Guardar Turno
-                </Button>
+                <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Turno</Button>
                 <Button variant="outline" onClick={onCancel}>Cancelar</Button>
               </div>
             </TabsContent>
 
-            {/* TAB 2: HISTORIA CLÍNICA */}
             <TabsContent value="hc" className="mt-4">
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : historiaClinica.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Aún no hay historia clínica para este paciente</p>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-auto">
                   {historiaClinica.map((hc: any) => (
-                    <Card key={hc.id}>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">{hc.created_at?.slice(0, 10)}</p>
-                        <p className="text-sm text-foreground">{hc.comentario_evolucion || '—'}</p>
-                      </CardContent>
-                    </Card>
+                    <Card key={hc.id}><CardContent className="p-3"><p className="text-xs text-muted-foreground">{hc.created_at?.slice(0, 10)}</p><p className="text-sm text-foreground">{hc.comentario_evolucion || '—'}</p></CardContent></Card>
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            {/* TAB 3: SESIONES */}
             <TabsContent value="sesiones" className="mt-4">
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : tratamientos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Este paciente no tiene tratamientos activos</p>
@@ -540,46 +435,27 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                   {tratamientos.map(t => {
                     const pct = Math.round((t.sesiones_consumidas / t.total_sesiones) * 100);
                     return (
-                      <Card key={t.id}>
-                        <CardContent className="p-3 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <p className="text-sm font-medium text-foreground">{(t.servicio as any)?.nombre}</p>
-                            <Badge variant="secondary">{t.sesiones_consumidas}/{t.total_sesiones}</Badge>
-                          </div>
-                          <Progress value={pct} className="h-2" />
-                          <p className="text-xs text-muted-foreground">
-                            Restantes: {t.total_sesiones - t.sesiones_consumidas}
-                          </p>
-                        </CardContent>
-                      </Card>
+                      <Card key={t.id}><CardContent className="p-3 space-y-2">
+                        <div className="flex justify-between items-center"><p className="text-sm font-medium text-foreground">{(t.servicio as any)?.nombre}</p><Badge variant="secondary">{t.sesiones_consumidas}/{t.total_sesiones}</Badge></div>
+                        <Progress value={pct} className="h-2" />
+                        <p className="text-xs text-muted-foreground">Restantes: {t.total_sesiones - t.sesiones_consumidas}</p>
+                      </CardContent></Card>
                     );
                   })}
                 </div>
               )}
             </TabsContent>
 
-            {/* TAB 4: HISTORIAL */}
             <TabsContent value="historial" className="mt-4">
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : historial.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No hay turnos previos</p>
               ) : (
                 <div className="space-y-3">
-                  {/* Stats */}
                   <div className="grid grid-cols-3 gap-2">
-                    <Card><CardContent className="p-2 text-center">
-                      <p className="text-lg font-bold text-foreground">{totalTurnos}</p>
-                      <p className="text-xs text-muted-foreground">Total</p>
-                    </CardContent></Card>
-                    <Card><CardContent className="p-2 text-center">
-                      <p className="text-lg font-bold text-foreground">{totalTurnos > 0 ? Math.round(finalizados / totalTurnos * 100) : 0}%</p>
-                      <p className="text-xs text-muted-foreground">Finalizados</p>
-                    </CardContent></Card>
-                    <Card><CardContent className="p-2 text-center">
-                      <p className="text-lg font-bold text-foreground">{totalTurnos > 0 ? Math.round(cancelados / totalTurnos * 100) : 0}%</p>
-                      <p className="text-xs text-muted-foreground">Cancelados</p>
-                    </CardContent></Card>
+                    <Card><CardContent className="p-2 text-center"><p className="text-lg font-bold text-foreground">{totalTurnos}</p><p className="text-xs text-muted-foreground">Total</p></CardContent></Card>
+                    <Card><CardContent className="p-2 text-center"><p className="text-lg font-bold text-foreground">{totalTurnos > 0 ? Math.round(finalizados / totalTurnos * 100) : 0}%</p><p className="text-xs text-muted-foreground">Finalizados</p></CardContent></Card>
+                    <Card><CardContent className="p-2 text-center"><p className="text-lg font-bold text-foreground">{totalTurnos > 0 ? Math.round(cancelados / totalTurnos * 100) : 0}%</p><p className="text-xs text-muted-foreground">Cancelados</p></CardContent></Card>
                   </div>
-
                   <div className="max-h-48 overflow-auto space-y-1">
                     {historial.map(t => {
                       const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
@@ -593,9 +469,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                           </div>
                           <div className="flex items-center gap-2">
                             {t.monto_pagado != null && <span className="text-xs text-muted-foreground">${t.monto_pagado}</span>}
-                            <Badge variant="outline" style={{ borderColor: est.color, color: est.color }} className="text-xs">
-                              {est.label}
-                            </Badge>
+                            <Badge variant="outline" style={{ borderColor: est.color, color: est.color }} className="text-xs">{est.label}</Badge>
                           </div>
                         </div>
                       );

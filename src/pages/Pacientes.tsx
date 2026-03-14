@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CENTRO_ID } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +22,7 @@ interface Paciente {
 }
 
 export default function Pacientes() {
+  const { centroId } = useAuth();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,27 +30,19 @@ export default function Pacientes() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  useEffect(() => { fetchPacientes(); }, []);
+  useEffect(() => { fetchPacientes(); }, [centroId]);
 
   const fetchPacientes = async () => {
+    if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('pacientes')
-      .select('*')
-      .eq('centro_id', CENTRO_ID)
-      .order('apellido', { ascending: true });
+    const { data } = await supabase.from('pacientes').select('*').eq('centro_id', centroId).order('apellido', { ascending: true });
     setPacientes(data ?? []);
     setLoading(false);
   };
 
   const filtered = pacientes.filter((p) => {
     const term = search.toLowerCase();
-    return (
-      (p.nombre?.toLowerCase().includes(term)) ||
-      (p.apellido?.toLowerCase().includes(term)) ||
-      (p.dni?.includes(term)) ||
-      (p.celular?.includes(term))
-    );
+    return (p.nombre?.toLowerCase().includes(term)) || (p.apellido?.toLowerCase().includes(term)) || (p.dni?.includes(term)) || (p.celular?.includes(term));
   });
 
   if (selectedId) {
@@ -71,8 +64,7 @@ export default function Pacientes() {
           <p className="text-sm text-muted-foreground">{pacientes.length} pacientes registrados</p>
         </div>
         <Button onClick={() => navigate('/pacientes/nuevo')} className="w-full sm:w-auto">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Paciente
+          <UserPlus className="h-4 w-4 mr-2" /> Nuevo Paciente
         </Button>
       </div>
 
@@ -80,30 +72,18 @@ export default function Pacientes() {
         <CardHeader className="pb-3 px-3 sm:px-6">
           <div className="relative w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, DNI o celular..."
-              className="pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <Input placeholder="Buscar por nombre, DNI o celular..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </CardHeader>
         <CardContent className="p-0 sm:px-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
+            <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : filtered.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground text-sm">No se encontraron pacientes</p>
           ) : isMobile ? (
-            /* Mobile: card layout */
             <div className="divide-y">
               {filtered.map((p) => (
-                <button
-                  key={p.id}
-                  className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
-                  onClick={() => setSelectedId(p.id)}
-                >
+                <button key={p.id} className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors" onClick={() => setSelectedId(p.id)}>
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{p.apellido}, {p.nombre}</p>
                     <p className="text-xs text-muted-foreground">DNI {p.dni} · {p.celular}</p>
@@ -113,18 +93,9 @@ export default function Pacientes() {
               ))}
             </div>
           ) : (
-            /* Desktop: table layout */
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Apellido</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>DNI</TableHead>
-                    <TableHead className="hidden md:table-cell">Celular</TableHead>
-                    <TableHead className="hidden lg:table-cell">Email</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Apellido</TableHead><TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead className="hidden md:table-cell">Celular</TableHead><TableHead className="hidden lg:table-cell">Email</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filtered.map((p) => (
                     <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedId(p.id)}>
