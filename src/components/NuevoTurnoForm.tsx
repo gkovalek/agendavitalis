@@ -54,7 +54,7 @@ interface Tratamiento {
 interface TurnoHistorial {
   id: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string;
   estado: TurnoEstado;
   monto_pagado: number | null;
   profesional?: { nombre: string; apellido: string };
@@ -141,7 +141,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).eq('estado', 'activo'),
       supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('created_at', { ascending: false }),
-      supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('fecha', { ascending: false }).limit(50),
     ]).then(([tratRes, hcRes, histRes]) => {
       setTratamientos((tratRes.data as any[]) ?? []);
@@ -222,14 +222,17 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       finalTratamientoId = tratamientoId;
     }
 
-    const { error: turnoErr } = await supabase.from('turnos').insert({
-      fecha, hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
+    const turnoPayload = {
+      fecha, hora_inicio: hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
       monto_pagado: montoTotal > 0 ? montoTotal : null, centro_id: centroId,
-    });
+    };
+    console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
+    const { error: turnoErr } = await supabase.from('turnos').insert(turnoPayload);
 
     if (turnoErr) {
-      toast({ title: 'Error', description: 'No se pudo guardar el turno. Intentá de nuevo.', variant: 'destructive' });
+      console.error('[NuevoTurnoForm] Turno insert error:', turnoErr.message, turnoErr.code, turnoErr.details);
+      toast({ title: 'Error', description: `No se pudo guardar el turno: ${turnoErr.message}`, variant: 'destructive' });
       setSaving(false);
       return;
     }
@@ -463,7 +466,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                         <div key={t.id} className="flex items-center justify-between px-2 py-1.5 rounded border text-sm">
                           <div>
                             <span className="text-foreground">{t.fecha}</span>
-                            <span className="text-muted-foreground ml-2">{t.hora}</span>
+                            <span className="text-muted-foreground ml-2">{t.hora_inicio}</span>
                             {t.profesional && <span className="text-muted-foreground ml-2">{(t.profesional as any).apellido}</span>}
                             {t.servicio && <span className="text-muted-foreground ml-2">{(t.servicio as any).nombre}</span>}
                           </div>

@@ -20,7 +20,7 @@ interface Profesional {
 interface Turno {
   id: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string;
   estado: TurnoEstado;
   profesional_id: string;
   paciente_id: string;
@@ -65,7 +65,7 @@ export default function Dashboard() {
 
     const [profRes, turnosRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('turnos').select('id, fecha, hora, estado, profesional_id, paciente_id, monto_pagado, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, monto_pagado, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
     ]);
 
     setProfesionales(profRes.data ?? []);
@@ -109,7 +109,7 @@ export default function Dashboard() {
 
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno> = {};
-    turnos.forEach(t => { map[`${t.profesional_id}-${t.hora}`] = t; });
+    turnos.forEach(t => { map[`${t.profesional_id}-${t.hora_inicio}`] = t; });
     return map;
   }, [turnos]);
 

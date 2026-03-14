@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
 interface Turno {
-  id: string; fecha: string; hora: string; estado: TurnoEstado; profesional_id: string;
+  id: string; fecha: string; hora_inicio: string; estado: TurnoEstado; profesional_id: string;
   paciente_id: string; monto_pagado: number | null; paciente?: { nombre: string; apellido: string };
 }
 
@@ -44,7 +44,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
           <div><p className="text-sm text-muted-foreground">Paciente</p><p className="font-semibold text-foreground">{turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : '—'}</p></div>
           <div className="grid grid-cols-2 gap-3">
             <div><p className="text-sm text-muted-foreground">Fecha</p><p className="text-foreground">{turno.fecha}</p></div>
-            <div><p className="text-sm text-muted-foreground">Hora</p><p className="text-foreground">{turno.hora}</p></div>
+            <div><p className="text-sm text-muted-foreground">Hora</p><p className="text-foreground">{turno.hora_inicio}</p></div>
           </div>
           {turno.monto_pagado != null && (<div><p className="text-sm text-muted-foreground">Monto Pagado</p><p className="text-foreground">${turno.monto_pagado}</p></div>)}
           <div className="space-y-1">
