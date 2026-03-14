@@ -91,7 +91,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     const payload = {
       servicio_id: form.servicio_id, capacidad_simultanea: form.capacidad_simultanea,
       activo: form.activo, centro_id: centroId, [entityColumn]: entityId,
-      dias_trabajo: form.dias_trabajo, hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
+      dias_trabajo: normalizeDiasTrabajo(form.dias_trabajo), hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
     };
 
     if (editId) {
