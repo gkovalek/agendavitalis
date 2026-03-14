@@ -91,34 +91,31 @@ export default function Dashboard() {
 
   const availabilityMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
-    const profHorarios: Record<string, HorarioDisponible[]> = {};
-    horarios.forEach(h => {
-      if (!h.profesional_id) return;
-      if (!profHorarios[h.profesional_id]) profHorarios[h.profesional_id] = [];
-      profHorarios[h.profesional_id].push(h);
+    const profRecords: Record<string, PCSRecord[]> = {};
+    pcsRecords.forEach(r => {
+      if (!r.profesional_id) return;
+      if (!profRecords[r.profesional_id]) profRecords[r.profesional_id] = [];
+      profRecords[r.profesional_id].push(r);
     });
 
     profesionales.forEach(p => {
-      const pHorarios = profHorarios[p.id] ?? [];
-      if (pHorarios.length === 0) {
+      const records = profRecords[p.id] ?? [];
+      if (records.length === 0) {
         map[p.id] = new Set(TIME_SLOTS);
         return;
       }
       const available = new Set<string>();
-      pHorarios.forEach(h => {
-        let applies = false;
-        if (h.tipo === 'semanal' && h.dia_semana && h.dia_semana.includes(dayOfWeek)) applies = true;
-        else if (h.tipo === 'especifico' && h.fecha_especifica === dateStr) applies = true;
-        if (applies) {
+      records.forEach(r => {
+        if (r.dias_trabajo && r.dias_trabajo.includes(dayOfWeek)) {
           TIME_SLOTS.forEach(slot => {
-            if (slot >= h.hora_inicio && slot < h.hora_fin) available.add(slot);
+            if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
           });
         }
       });
       map[p.id] = available;
     });
     return map;
-  }, [horarios, profesionales, dayOfWeek, dateStr]);
+  }, [pcsRecords, profesionales, dayOfWeek]);
 
   const isSlotAvailable = (profId: string, hora: string): boolean => {
     const avail = availabilityMap[profId];
