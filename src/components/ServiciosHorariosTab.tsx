@@ -119,10 +119,17 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
   };
 
   const toggleDia = (dia: number, checked: boolean) => {
-    setForm(prev => ({
-      ...prev,
-      dias_trabajo: checked ? [...prev.dias_trabajo, dia] : prev.dias_trabajo.filter(d => d !== dia),
-    }));
+    setForm(prev => {
+      const diasActuales = normalizeDiasTrabajo(prev.dias_trabajo);
+      const diasActualizados = checked
+        ? [...diasActuales, dia]
+        : diasActuales.filter(d => d !== dia);
+
+      return {
+        ...prev,
+        dias_trabajo: normalizeDiasTrabajo(diasActualizados),
+      };
+    });
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
