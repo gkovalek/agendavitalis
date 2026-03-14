@@ -30,7 +30,7 @@ interface Turno {
 
 interface PCSRecord {
   profesional_id: string | null;
-  dias_trabajo: number[];
+  dias_trabajo: string[];
   hora_inicio: string;
   hora_fin: string;
 }
