@@ -105,6 +105,9 @@ export default function Profesionales() {
     setSaving(true);
     let profesionalId = editId;
 
+    console.log('[handleSave] Starting save. centroId:', centroId, 'editId:', editId);
+    console.log('[handleSave] inlineServicios state:', JSON.stringify(inlineServicios, null, 2));
+
     if (editId) {
       const { error } = await supabase.from('profesionales').update(form).eq('id', editId);
       if (error) { toast({ title: 'Error', description: 'No se pudo actualizar el profesional. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
@@ -114,9 +117,11 @@ export default function Profesionales() {
       profesionalId = data.id;
     }
 
+    console.log('[handleSave] profesionalId for services:', profesionalId);
+
     const srvError = await saveInlineServicios('profesional_id', profesionalId!);
     if (srvError) {
-      toast({ title: 'Error', description: srvError, variant: 'destructive' });
+      toast({ title: 'Error guardando servicios', description: srvError, variant: 'destructive' });
     }
 
     setSaving(false);
