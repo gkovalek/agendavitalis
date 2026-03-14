@@ -202,7 +202,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
 
   const handleDeleteHorario = async (id: string) => {
     const { error } = await supabase.from('horarios_disponibles').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el horario. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Horario eliminado' }); fetchAll(); }
   };
 
