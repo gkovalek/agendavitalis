@@ -231,7 +231,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     const { error: turnoErr } = await supabase.from('turnos').insert(turnoPayload);
 
     if (turnoErr) {
-      toast({ title: 'Error', description: 'No se pudo guardar el turno. Intentá de nuevo.', variant: 'destructive' });
+      console.error('[NuevoTurnoForm] Turno insert error:', turnoErr.message, turnoErr.code, turnoErr.details);
+      toast({ title: 'Error', description: `No se pudo guardar el turno: ${turnoErr.message}`, variant: 'destructive' });
       setSaving(false);
       return;
     }
