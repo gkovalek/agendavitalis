@@ -261,11 +261,16 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
 
     // Update tratamiento sesiones_consumidas
     if (finalTratamientoId && !nuevoTratamiento && selectedTratamiento) {
+      const newConsumed = selectedTratamiento.sesiones_consumidas + 1;
       await supabase.from('tratamientos').update({
-        sesiones_consumidas: selectedTratamiento.sesiones_consumidas + 1,
+        sesiones_consumidas: newConsumed,
+        sesiones_restantes: selectedTratamiento.total_sesiones - newConsumed,
       }).eq('id', finalTratamientoId);
     } else if (finalTratamientoId && nuevoTratamiento) {
-      await supabase.from('tratamientos').update({ sesiones_consumidas: 1 }).eq('id', finalTratamientoId);
+      await supabase.from('tratamientos').update({
+        sesiones_consumidas: 1,
+        sesiones_restantes: totalSesiones - 1,
+      }).eq('id', finalTratamientoId);
     }
 
     setSaving(false);
