@@ -190,7 +190,7 @@ export default function Dashboard() {
 
       {/* New appointment dialog */}
       <Dialog open={!!newTurnoSlot} onOpenChange={(o) => !o && setNewTurnoSlot(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nuevo Turno</DialogTitle>
           </DialogHeader>
