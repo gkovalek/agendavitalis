@@ -40,7 +40,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [horarios, setHorarios] = useState<HorarioDisponible[]>([]);
+  const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
