@@ -225,7 +225,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       fecha, hora_inicio: hora, hora_fin: horaFin || hora,
       profesional_id: profesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
-      monto_pagado: montoTotal > 0 ? montoTotal : null, forma_pago: formaPago,
+      forma_pago: formaPago,
       centro_id: centroId,
     };
     console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));

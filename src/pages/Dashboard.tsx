@@ -201,7 +201,7 @@ export default function Dashboard() {
                                   <p className="font-semibold text-foreground truncate">
                                     {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
                                   </p>
-                                  {turno.monto_pagado != null && <p className="text-muted-foreground">${turno.monto_pagado}</p>}
+                                  
                                   <p style={{ color: estado!.color }} className="font-medium">{estado!.label}</p>
                                 </div>
                               ) : !available ? <div className="h-6" /> : null}

@@ -46,7 +46,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
             <div><p className="text-sm text-muted-foreground">Fecha</p><p className="text-foreground">{turno.fecha}</p></div>
             <div><p className="text-sm text-muted-foreground">Hora</p><p className="text-foreground">{turno.hora_inicio}</p></div>
           </div>
-          {turno.monto_pagado != null && (<div><p className="text-sm text-muted-foreground">Monto Pagado</p><p className="text-foreground">${turno.monto_pagado}</p></div>)}
+          
           <div className="space-y-1">
             <Label>Estado</Label>
             <Select value={currentEstado} onValueChange={(v) => setEstado(v as TurnoEstado)}>
