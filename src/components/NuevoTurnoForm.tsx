@@ -143,8 +143,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (!selectedPaciente) return;
     setLoadingTabs(true);
     Promise.all([
-      supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, activo, servicio:servicios(nombre)')
-        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).eq('activo', true),
+      supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
+        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).eq('estado', 'activo'),
       supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('created_at', { ascending: false }),
       supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('fecha', { ascending: false }).limit(50),
