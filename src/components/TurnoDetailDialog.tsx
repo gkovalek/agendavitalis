@@ -9,7 +9,7 @@ import { useState } from 'react';
 
 interface Turno {
   id: string; fecha: string; hora_inicio: string; estado: TurnoEstado; profesional_id: string;
-  paciente_id: string; monto_pagado: number | null; paciente?: { nombre: string; apellido: string };
+  paciente_id: string; paciente?: { nombre: string; apellido: string };
 }
 
 interface Props { turno: Turno | null; onClose: () => void; onUpdated: () => void; }
@@ -46,7 +46,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
             <div><p className="text-sm text-muted-foreground">Fecha</p><p className="text-foreground">{turno.fecha}</p></div>
             <div><p className="text-sm text-muted-foreground">Hora</p><p className="text-foreground">{turno.hora_inicio}</p></div>
           </div>
-          {turno.monto_pagado != null && (<div><p className="text-sm text-muted-foreground">Monto Pagado</p><p className="text-foreground">${turno.monto_pagado}</p></div>)}
+          
           <div className="space-y-1">
             <Label>Estado</Label>
             <Select value={currentEstado} onValueChange={(v) => setEstado(v as TurnoEstado)}>

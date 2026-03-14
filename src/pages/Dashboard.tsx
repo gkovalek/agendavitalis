@@ -24,7 +24,6 @@ interface Turno {
   estado: TurnoEstado;
   profesional_id: string;
   paciente_id: string;
-  monto_pagado: number | null;
   paciente?: { nombre: string; apellido: string };
 }
 
@@ -60,7 +59,7 @@ export default function Dashboard() {
 
     const [profRes, turnosRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, monto_pagado, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
     ]);
 
     setProfesionales(profRes.data ?? []);
@@ -202,7 +201,7 @@ export default function Dashboard() {
                                   <p className="font-semibold text-foreground truncate">
                                     {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
                                   </p>
-                                  {turno.monto_pagado != null && <p className="text-muted-foreground">${turno.monto_pagado}</p>}
+                                  
                                   <p style={{ color: estado!.color }} className="font-medium">{estado!.label}</p>
                                 </div>
                               ) : !available ? <div className="h-6" /> : null}

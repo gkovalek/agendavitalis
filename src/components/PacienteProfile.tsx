@@ -20,7 +20,6 @@ interface TurnoHistorial {
   fecha: string;
   hora_inicio: string;
   estado: TurnoEstado;
-  monto_pagado: number | null;
   profesional?: { nombre: string; apellido: string };
 }
 
@@ -33,7 +32,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
     const fetch = async () => {
       const [pacRes, turnosRes] = await Promise.all([
         supabase.from('pacientes').select('*').eq('id', pacienteId).single(),
-        supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
+        supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
       ]);
       setPaciente(pacRes.data);
       setTurnos((turnosRes.data as any[]) ?? []);
@@ -63,17 +62,16 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
         <CardHeader><CardTitle className="text-lg">Historial de Turnos</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Monto</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Hora</TableHead><TableHead>Profesional</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
             <TableBody>
               {turnos.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Sin turnos registrados</TableCell></TableRow>
               ) : turnos.map(t => {
                 const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
                 return (
                   <TableRow key={t.id}>
                     <TableCell>{t.fecha}</TableCell><TableCell>{t.hora_inicio}</TableCell>
                     <TableCell>{t.profesional ? `${t.profesional.nombre} ${t.profesional.apellido}` : '—'}</TableCell>
-                    <TableCell>{t.monto_pagado != null ? `$${t.monto_pagado}` : '—'}</TableCell>
                     <TableCell><span className="inline-flex items-center gap-1.5 text-xs font-medium"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: est.color }} />{est.label}</span></TableCell>
                   </TableRow>
                 );

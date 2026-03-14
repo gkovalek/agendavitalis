@@ -56,7 +56,6 @@ interface TurnoHistorial {
   fecha: string;
   hora_inicio: string;
   estado: TurnoEstado;
-  monto_pagado: number | null;
   profesional?: { nombre: string; apellido: string };
   servicio?: { nombre: string };
 }
@@ -141,7 +140,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).eq('estado', 'activo'),
       supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('created_at', { ascending: false }),
-      supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', centroId).order('fecha', { ascending: false }).limit(50),
     ]).then(([tratRes, hcRes, histRes]) => {
       setTratamientos((tratRes.data as any[]) ?? []);
@@ -226,7 +225,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       fecha, hora_inicio: hora, hora_fin: horaFin || hora,
       profesional_id: profesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
-      monto_pagado: montoTotal > 0 ? montoTotal : null, forma_pago: formaPago,
+      forma_pago: formaPago,
       centro_id: centroId,
     };
     console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
@@ -473,7 +472,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                             {t.servicio && <span className="text-muted-foreground ml-2">{(t.servicio as any).nombre}</span>}
                           </div>
                           <div className="flex items-center gap-2">
-                            {t.monto_pagado != null && <span className="text-xs text-muted-foreground">${t.monto_pagado}</span>}
                             <Badge variant="outline" style={{ borderColor: est.color, color: est.color }} className="text-xs">{est.label}</Badge>
                           </div>
                         </div>
