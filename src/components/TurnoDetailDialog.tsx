@@ -9,7 +9,7 @@ import { useState } from 'react';
 
 interface Turno {
   id: string; fecha: string; hora_inicio: string; estado: TurnoEstado; profesional_id: string;
-  paciente_id: string; monto_pagado: number | null; paciente?: { nombre: string; apellido: string };
+  paciente_id: string; paciente?: { nombre: string; apellido: string };
 }
 
 interface Props { turno: Turno | null; onClose: () => void; onUpdated: () => void; }
