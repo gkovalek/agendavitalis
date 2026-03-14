@@ -110,7 +110,7 @@ export default function Equipos() {
       const { error: insErr } = await supabase.from('profesional_centro_servicio').insert({
         [entityColumn]: entityId, servicio_id: srv.servicio_id, capacidad_simultanea: srv.capacidad_simultanea,
         activo: true, centro_id: centroId,
-        dias_trabajo: srv.dias_trabajo,
+        dias_trabajo: normalizeDiasTrabajo(srv.dias_trabajo),
         hora_inicio: srv.hora_inicio,
         hora_fin: srv.hora_fin,
       }).select('id').single();

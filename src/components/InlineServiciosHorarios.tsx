@@ -103,7 +103,7 @@ export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props
             <div className="flex flex-wrap gap-2">
               {DIAS_SEMANA.map(d => (
                 <label key={d.value} className="flex items-center gap-1 text-xs">
-                  <Checkbox checked={srv.dias_trabajo.includes(d.value)}
+                  <Checkbox checked={normalizeDiasTrabajo(srv.dias_trabajo).includes(d.value)}
                     onCheckedChange={(checked) => toggleDia(sIdx, d.value, !!checked)} />
                   {d.label}
                 </label>

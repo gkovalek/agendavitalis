@@ -195,7 +195,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
               <div className="flex flex-wrap gap-3">
                 {DIAS_SEMANA.map(d => (
                   <label key={d.value} className="flex items-center gap-1.5 text-sm">
-                    <Checkbox checked={form.dias_trabajo.includes(d.value)}
+                    <Checkbox checked={normalizeDiasTrabajo(form.dias_trabajo).includes(d.value)}
                       onCheckedChange={(checked) => toggleDia(d.value, !!checked)} />
                     {d.label}
                   </label>

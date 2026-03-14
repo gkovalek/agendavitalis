@@ -14,3 +14,15 @@ for (let h = 8; h <= 20; h++) {
   TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`);
   TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
 }
+
+export const normalizeDiasTrabajo = (dias: unknown): number[] => {
+  if (!Array.isArray(dias)) return [];
+
+  return Array.from(
+    new Set(
+      dias
+        .map((dia) => Number(dia))
+        .filter((dia) => Number.isInteger(dia) && dia >= 1 && dia <= 7)
+    )
+  ).sort((a, b) => a - b);
+};

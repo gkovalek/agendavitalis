@@ -146,7 +146,7 @@ export default function Profesionales() {
         capacidad_simultanea: srv.capacidad_simultanea,
         activo: true,
         centro_id: centroId,
-        dias_trabajo: srv.dias_trabajo,
+        dias_trabajo: normalizeDiasTrabajo(srv.dias_trabajo),
         hora_inicio: srv.hora_inicio,
         hora_fin: srv.hora_fin,
       };
