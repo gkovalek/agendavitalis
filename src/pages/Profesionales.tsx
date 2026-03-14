@@ -146,10 +146,15 @@ export default function Profesionales() {
       if (delErr) return 'No se pudieron actualizar los servicios asignados. Verificá los permisos.';
     }
 
+    console.log('[saveInlineServicios] Total servicios to save:', inlineServicios.length);
+
     for (const srv of inlineServicios) {
-      if (!srv.servicio_id) continue;
+      if (!srv.servicio_id) {
+        console.log('[saveInlineServicios] Skipping service with empty servicio_id');
+        continue;
+      }
       const firstHorario = srv.horarios[0];
-      const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert({
+      const insertPayload = {
         [entityColumn]: entityId,
         servicio_id: srv.servicio_id,
         capacidad_simultanea: srv.capacidad_simultanea,
@@ -157,11 +162,16 @@ export default function Profesionales() {
         centro_id: centroId,
         hora_inicio: firstHorario?.hora_inicio ?? '08:00',
         hora_fin: firstHorario?.hora_fin ?? '18:00',
-      }).select('id').single();
+      };
+      console.log('[saveInlineServicios] Inserting profesional_centro_servicio:', JSON.stringify(insertPayload));
+
+      const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert(insertPayload).select('id').single();
+
+      console.log('[saveInlineServicios] Insert result - data:', asig, 'error:', insErr);
 
       if (insErr) {
-        console.error('Error inserting profesional_centro_servicio:', insErr);
-        return 'No se pudo asignar el servicio. Verificá los permisos en la base de datos.';
+        console.error('[saveInlineServicios] ERROR inserting profesional_centro_servicio:', insErr.message, insErr.code, insErr.details);
+        return `Error al asignar servicio: ${insErr.message}`;
       }
 
       if (asig && srv.horarios.length > 0) {
@@ -176,11 +186,13 @@ export default function Profesionales() {
           hora_fin: h.hora_fin,
           capacidad_simultanea: srv.capacidad_simultanea,
         }));
+        console.log('[saveInlineServicios] Inserting horarios:', JSON.stringify(horarioPayloads));
         const { error: hErr } = await supabase.from('horarios_disponibles').insert(horarioPayloads);
         if (hErr) {
-          console.error('Error inserting horarios_disponibles:', hErr);
-          return 'No se pudieron guardar los horarios. Verificá los permisos.';
+          console.error('[saveInlineServicios] ERROR inserting horarios:', hErr.message, hErr.code);
+          return `Error al guardar horarios: ${hErr.message}`;
         }
+        console.log('[saveInlineServicios] Horarios inserted OK');
       }
     }
     return null;
