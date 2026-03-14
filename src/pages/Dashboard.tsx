@@ -52,10 +52,7 @@ export default function Dashboard() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, [selectedDate]);
 
-  const dayOfWeek = useMemo(() => {
-    const jsDay = selectedDate.getDay();
-    return jsDay === 0 ? 7 : jsDay;
-  }, [selectedDate]);
+  const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
 
   const fetchData = async () => {
     if (!centroId) return;
