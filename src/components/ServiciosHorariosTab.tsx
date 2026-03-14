@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface Props {
   entityType: 'profesional' | 'equipo';
@@ -60,7 +61,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     setServiciosDisponibles(serviciosRes.data ?? []);
     const asigs = (asignacionesRes.data ?? []).map((a: any) => ({
       id: a.id, servicio_id: a.servicio_id, capacidad_simultanea: a.capacidad_simultanea,
-      activo: a.activo, dias_trabajo: a.dias_trabajo ?? [], hora_inicio: a.hora_inicio,
+      activo: a.activo, dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo), hora_inicio: a.hora_inicio,
       hora_fin: a.hora_fin, servicio: a.servicio,
     }));
     setAsignaciones(asigs);
@@ -79,7 +80,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     setEditId(a.id);
     setForm({
       servicio_id: a.servicio_id, capacidad_simultanea: a.capacidad_simultanea, activo: a.activo,
-      dias_trabajo: a.dias_trabajo, hora_inicio: a.hora_inicio, hora_fin: a.hora_fin,
+      dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo), hora_inicio: a.hora_inicio, hora_fin: a.hora_fin,
     });
     setDialogOpen(true);
   };
@@ -90,7 +91,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     const payload = {
       servicio_id: form.servicio_id, capacidad_simultanea: form.capacidad_simultanea,
       activo: form.activo, centro_id: centroId, [entityColumn]: entityId,
-      dias_trabajo: form.dias_trabajo, hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
+      dias_trabajo: normalizeDiasTrabajo(form.dias_trabajo), hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
     };
 
     if (editId) {
@@ -118,10 +119,17 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
   };
 
   const toggleDia = (dia: number, checked: boolean) => {
-    setForm(prev => ({
-      ...prev,
-      dias_trabajo: checked ? [...prev.dias_trabajo, dia] : prev.dias_trabajo.filter(d => d !== dia),
-    }));
+    setForm(prev => {
+      const diasActuales = normalizeDiasTrabajo(prev.dias_trabajo);
+      const diasActualizados = checked
+        ? [...diasActuales, dia]
+        : diasActuales.filter(d => d !== dia);
+
+      return {
+        ...prev,
+        dias_trabajo: normalizeDiasTrabajo(diasActualizados),
+      };
+    });
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -156,7 +164,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-3 h-3" />
               <span>
-                {(a.dias_trabajo ?? []).map(d => DIAS_SEMANA.find(ds => ds.value === d)?.label).filter(Boolean).join(', ') || 'Sin días'}
+                {normalizeDiasTrabajo(a.dias_trabajo).map(d => DIAS_SEMANA.find(ds => ds.value === d)?.label).filter(Boolean).join(', ') || 'Sin días'}
               </span>
               <span>|</span>
               <span>{a.hora_inicio} - {a.hora_fin}</span>
@@ -187,7 +195,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
               <div className="flex flex-wrap gap-3">
                 {DIAS_SEMANA.map(d => (
                   <label key={d.value} className="flex items-center gap-1.5 text-sm">
-                    <Checkbox checked={form.dias_trabajo.includes(d.value)}
+                    <Checkbox checked={normalizeDiasTrabajo(form.dias_trabajo).includes(d.value)}
                       onCheckedChange={(checked) => toggleDia(d.value, !!checked)} />
                     {d.label}
                   </label>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado } from '@/lib/constants';
+import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado, normalizeDiasTrabajo } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,7 +76,7 @@ export default function Dashboard() {
       .eq('centro_id', centroId)
       .eq('activo', true);
 
-    setPcsRecords((pcsData as PCSRecord[]) ?? []);
+    setPcsRecords(((pcsData as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
     setLoading(false);
   };
 
@@ -106,7 +106,7 @@ export default function Dashboard() {
       }
       const available = new Set<string>();
       records.forEach(r => {
-        if (r.dias_trabajo && r.dias_trabajo.includes(dayOfWeek)) {
+        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayOfWeek)) {
           TIME_SLOTS.forEach(slot => {
             if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
           });

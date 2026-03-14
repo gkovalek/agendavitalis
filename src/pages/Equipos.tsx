@@ -16,6 +16,7 @@ import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/componen
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface Equipo {
   id: string;
@@ -63,7 +64,7 @@ export default function Equipos() {
     if (asignaciones && asignaciones.length > 0) {
       const mapped: InlineServicioAsignado[] = asignaciones.map(a => ({
         id: a.id, servicio_id: a.servicio_id, capacidad_simultanea: a.capacidad_simultanea,
-        dias_trabajo: a.dias_trabajo ?? [], hora_inicio: a.hora_inicio, hora_fin: a.hora_fin,
+        dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo), hora_inicio: a.hora_inicio, hora_fin: a.hora_fin,
       }));
       setInlineServicios(mapped);
     } else { setInlineServicios([]); }
@@ -109,7 +110,7 @@ export default function Equipos() {
       const { error: insErr } = await supabase.from('profesional_centro_servicio').insert({
         [entityColumn]: entityId, servicio_id: srv.servicio_id, capacidad_simultanea: srv.capacidad_simultanea,
         activo: true, centro_id: centroId,
-        dias_trabajo: srv.dias_trabajo,
+        dias_trabajo: normalizeDiasTrabajo(srv.dias_trabajo),
         hora_inicio: srv.hora_inicio,
         hora_fin: srv.hora_fin,
       }).select('id').single();

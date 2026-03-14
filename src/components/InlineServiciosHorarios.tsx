@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2 } from 'lucide-react';
+import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface ServicioOption {
   id: string;
@@ -59,8 +60,9 @@ export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props
 
   const toggleDia = (idx: number, dia: number, checked: boolean) => {
     const srv = servicios[idx];
-    const newDias = checked ? [...srv.dias_trabajo, dia] : srv.dias_trabajo.filter(d => d !== dia);
-    updateServicio(idx, { dias_trabajo: newDias });
+    const diasActuales = normalizeDiasTrabajo(srv.dias_trabajo);
+    const newDias = checked ? [...diasActuales, dia] : diasActuales.filter(d => d !== dia);
+    updateServicio(idx, { dias_trabajo: normalizeDiasTrabajo(newDias) });
   };
 
   return (
@@ -101,7 +103,7 @@ export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props
             <div className="flex flex-wrap gap-2">
               {DIAS_SEMANA.map(d => (
                 <label key={d.value} className="flex items-center gap-1 text-xs">
-                  <Checkbox checked={srv.dias_trabajo.includes(d.value)}
+                  <Checkbox checked={normalizeDiasTrabajo(srv.dias_trabajo).includes(d.value)}
                     onCheckedChange={(checked) => toggleDia(sIdx, d.value, !!checked)} />
                   {d.label}
                 </label>
