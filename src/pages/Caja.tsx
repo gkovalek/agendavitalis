@@ -96,7 +96,7 @@ export default function Caja() {
                       <TableCell className="text-right">${m.monto_efectivo || 0}</TableCell>
                       <TableCell className="text-right">${m.monto_transferencia || 0}</TableCell>
                       <TableCell className="text-right">${m.monto_prepaga || 0}</TableCell>
-                      <TableCell className="text-right font-semibold">${m.total || 0}</TableCell>
+                      <TableCell className="text-right font-semibold">${m.monto_total || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
