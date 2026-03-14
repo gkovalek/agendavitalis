@@ -146,7 +146,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
 
   const handleDeleteAsignacion = async (id: string) => {
     const { error } = await supabase.from('profesional_centro_servicio').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo desasignar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio desasignado' }); fetchAll(); }
   };
 
