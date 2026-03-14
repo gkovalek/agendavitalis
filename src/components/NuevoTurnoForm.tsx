@@ -345,12 +345,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                     <Input value={newPatient.celular} onChange={e => setNewPatient({ ...newPatient, celular: e.target.value })} />
                   </div>
                 </div>
-                <PrepagaAutocomplete value={newPatient.obra_social_id}
-                  onSelect={(id, nombre) => setNewPatient({ ...newPatient, obra_social_id: id, obra_social_nombre: nombre })} />
-                {newPatient.obra_social_id && newPatient.obra_social_nombre.toLowerCase() !== 'particular' && (
+                <PrepagaAutocomplete value={newPatient.prepaga_id}
+                  onSelect={(id, nombre) => setNewPatient({ ...newPatient, prepaga_id: id, prepaga_nombre: nombre })} />
+                {newPatient.prepaga_id && newPatient.prepaga_nombre.toLowerCase() !== 'particular' && (
                   <div className="space-y-1">
                     <Label className="text-xs">Nro. de Afiliado</Label>
-                    <Input value={newPatient.nro_afiliado} onChange={e => setNewPatient({ ...newPatient, nro_afiliado: e.target.value })} />
+                    <Input value={newPatient.numero_afiliado} onChange={e => setNewPatient({ ...newPatient, numero_afiliado: e.target.value })} />
                   </div>
                 )}
                 <Button size="sm" onClick={handleCreatePatient} disabled={savingPatient}>
