@@ -55,11 +55,11 @@ export default function Profesionales() {
     setSaving(true);
     if (editId) {
       const { error } = await supabase.from('profesionales').update(form).eq('id', editId);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo actualizar el profesional. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Profesional actualizado' });
     } else {
       const { error } = await supabase.from('profesionales').insert({ ...form, centro_id: CENTRO_ID });
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo crear el profesional. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Profesional creado' });
     }
     setSaving(false);

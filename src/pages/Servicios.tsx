@@ -85,7 +85,7 @@ export default function Servicios() {
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('servicios').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio eliminado' }); fetchData(); }
   };
 

@@ -66,7 +66,7 @@ export default function Equipos() {
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('equipos').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el equipo. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Equipo eliminado' }); fetchData(); if (selectedEquipo?.id === id) setSelectedEquipo(null); }
   };
 
