@@ -29,9 +29,8 @@ interface Paciente {
   apellido: string;
   dni: string;
   celular: string;
-  obra_social_id: string | null;
-  obra_social_nombre?: string;
-  nro_afiliado?: string;
+  prepaga_id: string | null;
+  numero_afiliado?: string;
   prepaga?: { nombre: string } | null;
 }
 
@@ -79,7 +78,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   // New patient form
   const [newPatient, setNewPatient] = useState({
     nombre: '', apellido: '', dni: '', celular: '',
-    obra_social_id: null as string | null, obra_social_nombre: '', nro_afiliado: '',
+    prepaga_id: null as string | null, prepaga_nombre: '', numero_afiliado: '',
   });
   const [savingPatient, setSavingPatient] = useState(false);
 
@@ -115,10 +114,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (q.length < 3) { setSearchResults([]); setShowResults(false); return; }
     setSearching(true);
     const { data } = await supabase.from('pacientes')
-      .select('id, nombre, apellido, dni, celular, obra_social_id, nro_afiliado, prepaga:prepagas(nombre)')
+      .select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)')
       .eq('centro_id', CENTRO_ID)
       .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%,dni.ilike.%${q}%,celular.ilike.%${q}%`)
-      .limit(8);
+      .limit(10);
     setSearchResults((data as any[]) ?? []);
     setShowResults(true);
     setSearching(false);
@@ -173,10 +172,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     const { data, error } = await supabase.from('pacientes').insert({
       nombre: newPatient.nombre, apellido: newPatient.apellido,
       dni: newPatient.dni, celular: newPatient.celular,
-      obra_social_id: newPatient.obra_social_id,
-      nro_afiliado: newPatient.nro_afiliado || null,
+      prepaga_id: newPatient.prepaga_id,
+      numero_afiliado: newPatient.numero_afiliado || null,
       centro_id: CENTRO_ID,
-    }).select('id, nombre, apellido, dni, celular, obra_social_id, nro_afiliado, prepaga:prepagas(nombre)').single();
+    }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
     setSavingPatient(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -346,12 +345,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                     <Input value={newPatient.celular} onChange={e => setNewPatient({ ...newPatient, celular: e.target.value })} />
                   </div>
                 </div>
-                <PrepagaAutocomplete value={newPatient.obra_social_id}
-                  onSelect={(id, nombre) => setNewPatient({ ...newPatient, obra_social_id: id, obra_social_nombre: nombre })} />
-                {newPatient.obra_social_id && newPatient.obra_social_nombre.toLowerCase() !== 'particular' && (
+                <PrepagaAutocomplete value={newPatient.prepaga_id}
+                  onSelect={(id, nombre) => setNewPatient({ ...newPatient, prepaga_id: id, prepaga_nombre: nombre })} />
+                {newPatient.prepaga_id && newPatient.prepaga_nombre.toLowerCase() !== 'particular' && (
                   <div className="space-y-1">
                     <Label className="text-xs">Nro. de Afiliado</Label>
-                    <Input value={newPatient.nro_afiliado} onChange={e => setNewPatient({ ...newPatient, nro_afiliado: e.target.value })} />
+                    <Input value={newPatient.numero_afiliado} onChange={e => setNewPatient({ ...newPatient, numero_afiliado: e.target.value })} />
                   </div>
                 )}
                 <Button size="sm" onClick={handleCreatePatient} disabled={savingPatient}>
