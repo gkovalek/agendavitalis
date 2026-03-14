@@ -14,7 +14,7 @@ interface Movimiento {
   monto_efectivo: number;
   monto_transferencia: number;
   monto_prepaga: number;
-  total: number;
+  monto_total: number;
   paciente?: { nombre: string; apellido: string };
   profesional?: { nombre: string; apellido: string };
 }
