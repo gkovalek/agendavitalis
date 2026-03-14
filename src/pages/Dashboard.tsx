@@ -4,9 +4,11 @@ import { CENTRO_ID, TURNO_ESTADOS, TIME_SLOTS, TurnoEstado } from '@/lib/constan
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Profesional {
   id: string;
@@ -32,6 +34,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
+  const [mobileColIndex, setMobileColIndex] = useState(0);
+  const isMobile = useIsMobile();
 
   const dateStr = useMemo(() => {
     const d = selectedDate;
@@ -51,6 +55,9 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, [dateStr]);
 
+  // Reset mobile column index when profesionales change
+  useEffect(() => { setMobileColIndex(0); }, [profesionales]);
+
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno> = {};
     turnos.forEach(t => { map[`${t.profesional_id}-${t.hora}`] = t; });
@@ -68,9 +75,15 @@ export default function Dashboard() {
     }
   };
 
+  const visibleProfesionales = isMobile && profesionales.length > 0
+    ? [profesionales[mobileColIndex]]
+    : profesionales;
+
+  const currentMobileProf = profesionales[mobileColIndex];
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <h1 className="text-2xl font-bold text-foreground">Panel Principal</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-foreground">Panel Principal</h1>
       <div className="flex gap-4 flex-col lg:flex-row">
         {/* Sidebar calendar */}
         <div className="shrink-0">
@@ -102,60 +115,82 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="border rounded-lg overflow-auto bg-card">
-              <table className="w-full border-collapse min-w-[600px]">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="p-2 text-xs font-medium text-muted-foreground w-16 text-left sticky left-0 bg-muted/50">Hora</th>
-                    {profesionales.map(p => (
-                      <th key={p.id} className="p-2 text-xs font-medium text-foreground text-center min-w-[160px]">
-                        {p.nombre} {p.apellido}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {TIME_SLOTS.map(hora => (
-                    <tr key={hora} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="p-1 px-2 text-xs text-muted-foreground font-mono sticky left-0 bg-card">{hora}</td>
-                      {profesionales.map(p => {
-                        const turno = turnoMap[`${p.id}-${hora}`];
-                        const estado = turno ? TURNO_ESTADOS[turno.estado] || TURNO_ESTADOS.reservado : null;
-                        return (
-                          <td
-                            key={p.id}
-                            className="p-1 cursor-pointer hover:bg-primary/5 transition-colors"
-                            onClick={() => handleSlotClick(p.id, hora)}
-                          >
-                            {turno && (
-                              <div
-                                className="rounded-md px-2 py-1 text-xs border-l-4"
-                                style={{ borderLeftColor: estado!.color, backgroundColor: `${estado!.color}15` }}
-                              >
-                                <p className="font-semibold text-foreground truncate">
-                                  {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
-                                </p>
-                                {turno.monto_pagado != null && (
-                                  <p className="text-muted-foreground">${turno.monto_pagado}</p>
-                                )}
-                                <p style={{ color: estado!.color }} className="font-medium">{estado!.label}</p>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
+            <>
+              {/* Mobile professional selector */}
+              {isMobile && profesionales.length > 1 && (
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8"
+                    disabled={mobileColIndex === 0}
+                    onClick={() => setMobileColIndex(i => i - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium text-foreground">
+                    {currentMobileProf?.nombre} {currentMobileProf?.apellido}
+                    <span className="text-muted-foreground ml-1 text-xs">({mobileColIndex + 1}/{profesionales.length})</span>
+                  </span>
+                  <Button variant="outline" size="icon" className="h-8 w-8"
+                    disabled={mobileColIndex === profesionales.length - 1}
+                    onClick={() => setMobileColIndex(i => i + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="border rounded-lg overflow-auto bg-card">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-xs font-medium text-muted-foreground w-16 text-left sticky left-0 bg-muted/50">Hora</th>
+                      {visibleProfesionales.map(p => (
+                        <th key={p.id} className="p-2 text-xs font-medium text-foreground text-center min-w-[140px] sm:min-w-[160px]">
+                          {isMobile ? '' : `${p.nombre} ${p.apellido}`}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {TIME_SLOTS.map(hora => (
+                      <tr key={hora} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="p-1 px-2 text-xs text-muted-foreground font-mono sticky left-0 bg-card">{hora}</td>
+                        {visibleProfesionales.map(p => {
+                          const turno = turnoMap[`${p.id}-${hora}`];
+                          const estado = turno ? TURNO_ESTADOS[turno.estado] || TURNO_ESTADOS.reservado : null;
+                          return (
+                            <td
+                              key={p.id}
+                              className="p-1 cursor-pointer hover:bg-primary/5 transition-colors"
+                              onClick={() => handleSlotClick(p.id, hora)}
+                            >
+                              {turno && (
+                                <div
+                                  className="rounded-md px-2 py-1 text-xs border-l-4"
+                                  style={{ borderLeftColor: estado!.color, backgroundColor: `${estado!.color}15` }}
+                                >
+                                  <p className="font-semibold text-foreground truncate">
+                                    {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
+                                  </p>
+                                  {turno.monto_pagado != null && (
+                                    <p className="text-muted-foreground">${turno.monto_pagado}</p>
+                                  )}
+                                  <p style={{ color: estado!.color }} className="font-medium">{estado!.label}</p>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
 
       {/* New appointment dialog */}
       <Dialog open={!!newTurnoSlot} onOpenChange={(o) => !o && setNewTurnoSlot(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Nuevo Turno</DialogTitle>
           </DialogHeader>

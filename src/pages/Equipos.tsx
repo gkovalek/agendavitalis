@@ -9,12 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Equipo {
   id: string;
@@ -35,6 +36,7 @@ export default function Equipos() {
   const [saving, setSaving] = useState(false);
   const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     setLoading(true);
@@ -105,7 +107,6 @@ export default function Equipos() {
       equipoId = data.id;
     }
 
-    // Save inline servicios y horarios
     await saveInlineServicios('equipo_id', equipoId!);
 
     setSaving(false);
@@ -160,21 +161,96 @@ export default function Equipos() {
     else { toast({ title: 'Equipo eliminado' }); fetchData(); if (selectedEquipo?.id === id) setSelectedEquipo(null); }
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Equipos</h1>
-          <p className="text-muted-foreground">{equipos.length} equipos registrados</p>
+  // Mobile detail view
+  if (isMobile && selectedEquipo) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <Button variant="ghost" size="sm" onClick={() => setSelectedEquipo(null)}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+        </Button>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-foreground">{selectedEquipo.nombre}</h2>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => openEdit(selectedEquipo)}><Pencil className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => { handleDelete(selectedEquipo.id); setSelectedEquipo(null); }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+          </div>
         </div>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-2" /> Nuevo Equipo</Button>
+        <Tabs defaultValue="info">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="servicios">Servicios</TabsTrigger>
+          </TabsList>
+          <TabsContent value="info" className="space-y-3 pt-4">
+            <p><strong>Nombre:</strong> {selectedEquipo.nombre}</p>
+            <p><strong>Descripción:</strong> {selectedEquipo.descripcion || '—'}</p>
+            <p><strong>Estado:</strong> {selectedEquipo.activo ? 'Activo' : 'Inactivo'}</p>
+          </TabsContent>
+          <TabsContent value="servicios">
+            <ServiciosHorariosTab entityType="equipo" entityId={selectedEquipo.id} />
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Equipo</DialogTitle></DialogHeader>
+            <ScrollArea className="max-h-[70vh] pr-3">
+              <div className="space-y-3">
+                <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
+                <div className="space-y-1"><Label>Descripción</Label><Input value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} /></div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} />
+                  <Label>Activo</Label>
+                </div>
+                <div className="border-t pt-3 mt-3">
+                  <InlineServiciosHorarios servicios={inlineServicios} onChange={setInlineServicios} />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={handleSave} disabled={saving || !form.nombre} className="flex-1 sm:flex-none">
+                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Guardar
+                  </Button>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
+                </div>
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Equipos</h1>
+          <p className="text-sm text-muted-foreground">{equipos.length} equipos registrados</p>
+        </div>
+        <Button onClick={openNew} className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" /> Nuevo Equipo</Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="shadow-sm lg:col-span-1">
           <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : equipos.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">No hay equipos</p>
+            ) : isMobile ? (
+              <div className="divide-y">
+                {equipos.map(e => (
+                  <button key={e.id} className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                    onClick={() => setSelectedEquipo(e)}>
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground truncate">{e.nombre}</p>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${e.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {e.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
+                  </button>
+                ))}
+              </div>
             ) : (
               <Table>
                 <TableHeader>
@@ -185,9 +261,7 @@ export default function Equipos() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {equipos.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No hay equipos</TableCell></TableRow>
-                  ) : equipos.map(e => (
+                  {equipos.map(e => (
                     <TableRow
                       key={e.id}
                       className={`cursor-pointer ${selectedEquipo?.id === e.id ? 'bg-muted' : ''}`}
@@ -213,34 +287,36 @@ export default function Equipos() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm lg:col-span-2">
-          <CardContent className="p-4">
-            {selectedEquipo ? (
-              <Tabs defaultValue="info">
-                <TabsList>
-                  <TabsTrigger value="info">Información</TabsTrigger>
-                  <TabsTrigger value="servicios">Servicios y Horarios</TabsTrigger>
-                </TabsList>
-                <TabsContent value="info" className="space-y-3 pt-4">
-                  <p><strong>Nombre:</strong> {selectedEquipo.nombre}</p>
-                  <p><strong>Descripción:</strong> {selectedEquipo.descripcion || '—'}</p>
-                  <p><strong>Estado:</strong> {selectedEquipo.activo ? 'Activo' : 'Inactivo'}</p>
-                </TabsContent>
-                <TabsContent value="servicios">
-                  <ServiciosHorariosTab entityType="equipo" entityId={selectedEquipo.id} />
-                </TabsContent>
-              </Tabs>
-            ) : (
-              <p className="text-muted-foreground text-center py-12">Seleccioná un equipo para ver sus detalles</p>
-            )}
-          </CardContent>
-        </Card>
+        {!isMobile && (
+          <Card className="shadow-sm lg:col-span-2">
+            <CardContent className="p-4">
+              {selectedEquipo ? (
+                <Tabs defaultValue="info">
+                  <TabsList>
+                    <TabsTrigger value="info">Información</TabsTrigger>
+                    <TabsTrigger value="servicios">Servicios y Horarios</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="info" className="space-y-3 pt-4">
+                    <p><strong>Nombre:</strong> {selectedEquipo.nombre}</p>
+                    <p><strong>Descripción:</strong> {selectedEquipo.descripcion || '—'}</p>
+                    <p><strong>Estado:</strong> {selectedEquipo.activo ? 'Activo' : 'Inactivo'}</p>
+                  </TabsContent>
+                  <TabsContent value="servicios">
+                    <ServiciosHorariosTab entityType="equipo" entityId={selectedEquipo.id} />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <p className="text-muted-foreground text-center py-12">Seleccioná un equipo para ver sus detalles</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Equipo</DialogTitle></DialogHeader>
-          <ScrollArea className="flex-1 pr-3">
+          <ScrollArea className="max-h-[70vh] pr-3">
             <div className="space-y-3">
               <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
               <div className="space-y-1"><Label>Descripción</Label><Input value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} /></div>
@@ -248,17 +324,15 @@ export default function Equipos() {
                 <Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} />
                 <Label>Activo</Label>
               </div>
-
               <div className="border-t pt-3 mt-3">
                 <InlineServiciosHorarios servicios={inlineServicios} onChange={setInlineServicios} />
               </div>
-
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving || !form.nombre}>
+                <Button onClick={handleSave} disabled={saving || !form.nombre} className="flex-1 sm:flex-none">
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Guardar
                 </Button>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
               </div>
             </div>
           </ScrollArea>
