@@ -71,7 +71,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
                 const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell>{t.fecha}</TableCell><TableCell>{t.hora}</TableCell>
+                    <TableCell>{t.fecha}</TableCell><TableCell>{t.hora_inicio}</TableCell>
                     <TableCell>{t.profesional ? `${t.profesional.nombre} ${t.profesional.apellido}` : '—'}</TableCell>
                     <TableCell>{t.monto_pagado != null ? `$${t.monto_pagado}` : '—'}</TableCell>
                     <TableCell><span className="inline-flex items-center gap-1.5 text-xs font-medium"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: est.color }} />{est.label}</span></TableCell>
