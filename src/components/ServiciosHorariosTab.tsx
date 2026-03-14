@@ -61,7 +61,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     setServiciosDisponibles(serviciosRes.data ?? []);
     const asigs = (asignacionesRes.data ?? []).map((a: any) => ({
       id: a.id, servicio_id: a.servicio_id, capacidad_simultanea: a.capacidad_simultanea,
-      activo: a.activo, dias_trabajo: a.dias_trabajo ?? [], hora_inicio: a.hora_inicio,
+      activo: a.activo, dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo), hora_inicio: a.hora_inicio,
       hora_fin: a.hora_fin, servicio: a.servicio,
     }));
     setAsignaciones(asigs);
