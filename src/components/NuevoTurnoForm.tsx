@@ -78,7 +78,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   // New patient form
   const [newPatient, setNewPatient] = useState({
     nombre: '', apellido: '', dni: '', celular: '',
-    obra_social_id: null as string | null, obra_social_nombre: '', nro_afiliado: '',
+    prepaga_id: null as string | null, prepaga_nombre: '', numero_afiliado: '',
   });
   const [savingPatient, setSavingPatient] = useState(false);
 
