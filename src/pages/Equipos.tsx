@@ -52,11 +52,11 @@ export default function Equipos() {
     setSaving(true);
     if (editId) {
       const { error } = await supabase.from('equipos').update(form).eq('id', editId);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo actualizar el equipo. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Equipo actualizado' });
     } else {
       const { error } = await supabase.from('equipos').insert({ ...form, centro_id: CENTRO_ID });
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo crear el equipo. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Equipo creado' });
     }
     setSaving(false);
