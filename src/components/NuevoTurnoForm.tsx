@@ -54,7 +54,7 @@ interface Tratamiento {
 interface TurnoHistorial {
   id: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string;
   estado: TurnoEstado;
   monto_pagado: number | null;
   profesional?: { nombre: string; apellido: string };
