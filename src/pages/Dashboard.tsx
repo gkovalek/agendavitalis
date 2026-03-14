@@ -164,6 +164,7 @@ export default function Dashboard() {
               fecha={newTurnoSlot.fecha}
               hora={newTurnoSlot.hora}
               profesionalId={newTurnoSlot.profesional_id}
+              profesionalNombre={newTurnoSlot.profesional_nombre}
               onSuccess={() => { setNewTurnoSlot(null); fetchData(); }}
               onCancel={() => setNewTurnoSlot(null)}
             />
