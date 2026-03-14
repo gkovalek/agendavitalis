@@ -76,7 +76,7 @@ export default function Dashboard() {
       .eq('centro_id', centroId)
       .eq('activo', true);
 
-    setPcsRecords((pcsData as PCSRecord[]) ?? []);
+    setPcsRecords(((pcsData as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
     setLoading(false);
   };
 
