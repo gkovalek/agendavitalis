@@ -12,6 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
+import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
+import { format } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Equipo {
   id: string;
@@ -28,6 +31,7 @@ export default function Equipos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [inlineServicios, setInlineServicios] = useState<InlineServicioAsignado[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null);
   const { toast } = useToast();
@@ -41,32 +45,118 @@ export default function Equipos() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
-  const openEdit = (e: Equipo) => {
+  const openNew = () => {
+    setEditId(null);
+    setForm(emptyForm);
+    setInlineServicios([]);
+    setDialogOpen(true);
+  };
+
+  const openEdit = async (e: Equipo) => {
     setEditId(e.id);
     setForm({ nombre: e.nombre, descripcion: e.descripcion || '', activo: e.activo });
+
+    const { data: asignaciones } = await supabase
+      .from('profesional_centro_servicio')
+      .select('id, servicio_id, capacidad_simultanea')
+      .eq('equipo_id', e.id)
+      .eq('centro_id', CENTRO_ID);
+
+    if (asignaciones && asignaciones.length > 0) {
+      const ids = asignaciones.map(a => a.id);
+      const { data: horarios } = await supabase
+        .from('horarios_disponibles')
+        .select('*')
+        .in('profesional_centro_servicio_id', ids);
+
+      const mapped: InlineServicioAsignado[] = asignaciones.map(a => ({
+        id: a.id,
+        servicio_id: a.servicio_id,
+        capacidad_simultanea: a.capacidad_simultanea,
+        horarios: (horarios ?? [])
+          .filter(h => h.profesional_centro_servicio_id === a.id)
+          .map(h => ({
+            id: h.id,
+            tipo: h.tipo as 'semanal' | 'especifico',
+            dia_semana: h.dia_semana ?? [],
+            fecha_especifica: h.fecha_especifica ? new Date(h.fecha_especifica) : null,
+            hora_inicio: h.hora_inicio,
+            hora_fin: h.hora_fin,
+          })),
+      }));
+      setInlineServicios(mapped);
+    } else {
+      setInlineServicios([]);
+    }
+
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
+    let equipoId = editId;
+
     if (editId) {
       const { error } = await supabase.from('equipos').update(form).eq('id', editId);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Equipo actualizado' });
+      if (error) { toast({ title: 'Error', description: 'No se pudo actualizar el equipo. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
     } else {
-      const { error } = await supabase.from('equipos').insert({ ...form, centro_id: CENTRO_ID });
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Equipo creado' });
+      const { data, error } = await supabase.from('equipos').insert({ ...form, centro_id: CENTRO_ID }).select('id').single();
+      if (error || !data) { toast({ title: 'Error', description: 'No se pudo crear el equipo. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
+      equipoId = data.id;
     }
+
+    // Save inline servicios y horarios
+    await saveInlineServicios('equipo_id', equipoId!);
+
     setSaving(false);
     setDialogOpen(false);
+    toast({ title: editId ? 'Equipo actualizado' : 'Equipo creado' });
     fetchData();
+  };
+
+  const saveInlineServicios = async (entityColumn: string, entityId: string) => {
+    const { data: existing } = await supabase
+      .from('profesional_centro_servicio')
+      .select('id')
+      .eq(entityColumn, entityId)
+      .eq('centro_id', CENTRO_ID);
+
+    if (existing && existing.length > 0) {
+      const existingIds = existing.map(e => e.id);
+      await supabase.from('horarios_disponibles').delete().in('profesional_centro_servicio_id', existingIds);
+      await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
+    }
+
+    for (const srv of inlineServicios) {
+      if (!srv.servicio_id) continue;
+      const { data: asig } = await supabase.from('profesional_centro_servicio').insert({
+        [entityColumn]: entityId,
+        servicio_id: srv.servicio_id,
+        capacidad_simultanea: srv.capacidad_simultanea,
+        activo: true,
+        centro_id: CENTRO_ID,
+      }).select('id').single();
+
+      if (asig && srv.horarios.length > 0) {
+        const horarioPayloads = srv.horarios.map(h => ({
+          profesional_centro_servicio_id: asig.id,
+          tipo: h.tipo,
+          dia_semana: h.tipo === 'semanal' ? h.dia_semana : null,
+          fecha_especifica: h.tipo === 'especifico' && h.fecha_especifica
+            ? format(h.fecha_especifica, 'yyyy-MM-dd')
+            : null,
+          hora_inicio: h.hora_inicio,
+          hora_fin: h.hora_fin,
+          capacidad_simultanea: srv.capacidad_simultanea,
+        }));
+        await supabase.from('horarios_disponibles').insert(horarioPayloads);
+      }
+    }
   };
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('equipos').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el equipo. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Equipo eliminado' }); fetchData(); if (selectedEquipo?.id === id) setSelectedEquipo(null); }
   };
 
@@ -148,23 +238,30 @@ export default function Equipos() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Equipo</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Descripción</Label><Input value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} /></div>
-            <div className="flex items-center gap-2">
-              <Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} />
-              <Label>Activo</Label>
+          <ScrollArea className="flex-1 pr-3">
+            <div className="space-y-3">
+              <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
+              <div className="space-y-1"><Label>Descripción</Label><Input value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} /></div>
+              <div className="flex items-center gap-2">
+                <Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} />
+                <Label>Activo</Label>
+              </div>
+
+              <div className="border-t pt-3 mt-3">
+                <InlineServiciosHorarios servicios={inlineServicios} onChange={setInlineServicios} />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleSave} disabled={saving || !form.nombre}>
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Guardar
+                </Button>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+              </div>
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} disabled={saving || !form.nombre}>
-                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Guardar
-              </Button>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            </div>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>

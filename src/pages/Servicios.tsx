@@ -71,11 +71,11 @@ export default function Servicios() {
     };
     if (editId) {
       const { error } = await supabase.from('servicios').update(payload).eq('id', editId);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo actualizar el servicio. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Servicio actualizado' });
     } else {
       const { error } = await supabase.from('servicios').insert({ ...payload, centro_id: CENTRO_ID });
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo crear el servicio. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Servicio creado' });
     }
     setSaving(false);
@@ -85,7 +85,7 @@ export default function Servicios() {
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('servicios').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio eliminado' }); fetchData(); }
   };
 

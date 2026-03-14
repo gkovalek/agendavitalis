@@ -139,14 +139,14 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
       [entityColumn]: entityId,
     };
     const { error } = await supabase.from('profesional_centro_servicio').insert(payload);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo asignar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio asignado' }); setServicioDialogOpen(false); fetchAll(); }
     setSavingServicio(false);
   };
 
   const handleDeleteAsignacion = async (id: string) => {
     const { error } = await supabase.from('profesional_centro_servicio').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo desasignar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio desasignado' }); fetchAll(); }
   };
 
@@ -188,11 +188,11 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
 
     if (editHorarioId) {
       const { error } = await supabase.from('horarios_disponibles').update(payload).eq('id', editHorarioId);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo actualizar el horario. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Horario actualizado' });
     } else {
       const { error } = await supabase.from('horarios_disponibles').insert(payload);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      if (error) toast({ title: 'Error', description: 'No se pudo crear el horario. Intentá de nuevo.', variant: 'destructive' });
       else toast({ title: 'Horario creado' });
     }
     setSavingHorario(false);
@@ -202,7 +202,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
 
   const handleDeleteHorario = async (id: string) => {
     const { error } = await supabase.from('horarios_disponibles').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el horario. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Horario eliminado' }); fetchAll(); }
   };
 

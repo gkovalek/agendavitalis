@@ -46,7 +46,7 @@ interface Tratamiento {
   servicio_id: string;
   total_sesiones: number;
   sesiones_consumidas: number;
-  activo: boolean;
+  estado: string;
   servicio?: { nombre: string };
 }
 
@@ -143,8 +143,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (!selectedPaciente) return;
     setLoadingTabs(true);
     Promise.all([
-      supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, activo, servicio:servicios(nombre)')
-        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).eq('activo', true),
+      supabase.from('tratamientos').select('id, servicio_id, total_sesiones, sesiones_consumidas, estado, servicio:servicios(nombre)')
+        .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).eq('estado', 'activo'),
       supabase.from('historia_clinica').select('*').eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('created_at', { ascending: false }),
       supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', selectedPaciente.id).eq('centro_id', CENTRO_ID).order('fecha', { ascending: false }).limit(50),
@@ -178,7 +178,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
     setSavingPatient(false);
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo crear el paciente. Verificá los datos e intentá de nuevo.', variant: 'destructive' });
     } else if (data) {
       selectPaciente(data as any);
       toast({ title: 'Paciente creado' });
@@ -208,14 +208,17 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (esTratamiento && nuevoTratamiento) {
       const { data: trat, error: tErr } = await supabase.from('tratamientos').insert({
         paciente_id: selectedPaciente.id,
+        profesional_id: profesionalId,
         servicio_id: servicioId,
         total_sesiones: totalSesiones,
         sesiones_consumidas: 0,
-        activo: true,
+        sesiones_restantes: totalSesiones,
+        estado: 'activo',
+        fecha_inicio: fecha,
         centro_id: CENTRO_ID,
       }).select('id').single();
       if (tErr || !trat) {
-        toast({ title: 'Error', description: 'No se pudo crear el tratamiento: ' + (tErr?.message || ''), variant: 'destructive' });
+        toast({ title: 'Error', description: 'No se pudo crear el tratamiento. Contactá al administrador.', variant: 'destructive' });
         setSaving(false);
         return;
       }
@@ -237,7 +240,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     });
 
     if (turnoErr) {
-      toast({ title: 'Error', description: 'No se pudo crear el turno: ' + turnoErr.message, variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo guardar el turno. Intentá de nuevo.', variant: 'destructive' });
       setSaving(false);
       return;
     }
@@ -258,11 +261,16 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
 
     // Update tratamiento sesiones_consumidas
     if (finalTratamientoId && !nuevoTratamiento && selectedTratamiento) {
+      const newConsumed = selectedTratamiento.sesiones_consumidas + 1;
       await supabase.from('tratamientos').update({
-        sesiones_consumidas: selectedTratamiento.sesiones_consumidas + 1,
+        sesiones_consumidas: newConsumed,
+        sesiones_restantes: selectedTratamiento.total_sesiones - newConsumed,
       }).eq('id', finalTratamientoId);
     } else if (finalTratamientoId && nuevoTratamiento) {
-      await supabase.from('tratamientos').update({ sesiones_consumidas: 1 }).eq('id', finalTratamientoId);
+      await supabase.from('tratamientos').update({
+        sesiones_consumidas: 1,
+        sesiones_restantes: totalSesiones - 1,
+      }).eq('id', finalTratamientoId);
     }
 
     setSaving(false);
