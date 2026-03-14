@@ -60,8 +60,9 @@ export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props
 
   const toggleDia = (idx: number, dia: number, checked: boolean) => {
     const srv = servicios[idx];
-    const newDias = checked ? [...srv.dias_trabajo, dia] : srv.dias_trabajo.filter(d => d !== dia);
-    updateServicio(idx, { dias_trabajo: newDias });
+    const diasActuales = normalizeDiasTrabajo(srv.dias_trabajo);
+    const newDias = checked ? [...diasActuales, dia] : diasActuales.filter(d => d !== dia);
+    updateServicio(idx, { dias_trabajo: normalizeDiasTrabajo(newDias) });
   };
 
   return (
