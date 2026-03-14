@@ -223,9 +223,11 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     }
 
     const turnoPayload = {
-      fecha, hora_inicio: hora, profesional_id: profesionalId, paciente_id: selectedPaciente.id,
+      fecha, hora_inicio: hora, hora_fin: horaFin || hora,
+      profesional_id: profesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
-      monto_pagado: montoTotal > 0 ? montoTotal : null, centro_id: centroId,
+      monto_pagado: montoTotal > 0 ? montoTotal : null, forma_pago: formaPago,
+      centro_id: centroId,
     };
     console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
     const { error: turnoErr } = await supabase.from('turnos').insert(turnoPayload);

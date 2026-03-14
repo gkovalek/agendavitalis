@@ -33,7 +33,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
     const fetch = async () => {
       const [pacRes, turnosRes] = await Promise.all([
         supabase.from('pacientes').select('*').eq('id', pacienteId).single(),
-        supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
+        supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
       ]);
       setPaciente(pacRes.data);
       setTurnos((turnosRes.data as any[]) ?? []);
