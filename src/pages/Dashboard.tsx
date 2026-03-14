@@ -62,7 +62,9 @@ export default function Dashboard() {
     if (existing) {
       setSelectedTurno(existing);
     } else {
-      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId });
+      const prof = profesionales.find(p => p.id === profId);
+      const profNombre = prof ? `${prof.nombre} ${prof.apellido}` : '';
+      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: profNombre });
     }
   };
 
