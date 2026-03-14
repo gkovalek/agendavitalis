@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CENTRO_ID } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +34,7 @@ export interface InlineServicioAsignado {
 }
 
 interface Props {
+  centroId: string | null;
   servicios: InlineServicioAsignado[];
   onChange: (servicios: InlineServicioAsignado[]) => void;
 }
@@ -48,13 +48,14 @@ const DIAS_SEMANA = [
   { value: 6, label: 'Sáb' },
 ];
 
-export function InlineServiciosHorarios({ servicios, onChange }: Props) {
+export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props) {
   const [serviciosDisponibles, setServiciosDisponibles] = useState<ServicioOption[]>([]);
 
   useEffect(() => {
-    supabase.from('servicios').select('id, nombre').eq('centro_id', CENTRO_ID).eq('activo', true).order('nombre')
+    if (!centroId) return;
+    supabase.from('servicios').select('id, nombre').eq('centro_id', centroId).eq('activo', true).order('nombre')
       .then(({ data }) => setServiciosDisponibles(data ?? []));
-  }, []);
+  }, [centroId]);
 
   const addServicio = () => {
     onChange([...servicios, { servicio_id: '', capacidad_simultanea: 1, horarios: [] }]);
@@ -72,32 +73,20 @@ export function InlineServiciosHorarios({ servicios, onChange }: Props) {
     const updated = [...servicios];
     updated[sIdx] = {
       ...updated[sIdx],
-      horarios: [...updated[sIdx].horarios, {
-        tipo: 'semanal',
-        dia_semana: [],
-        fecha_especifica: null,
-        hora_inicio: '08:00',
-        hora_fin: '12:00',
-      }],
+      horarios: [...updated[sIdx].horarios, { tipo: 'semanal', dia_semana: [], fecha_especifica: null, hora_inicio: '08:00', hora_fin: '12:00' }],
     };
     onChange(updated);
   };
 
   const removeHorario = (sIdx: number, hIdx: number) => {
     const updated = [...servicios];
-    updated[sIdx] = {
-      ...updated[sIdx],
-      horarios: updated[sIdx].horarios.filter((_, i) => i !== hIdx),
-    };
+    updated[sIdx] = { ...updated[sIdx], horarios: updated[sIdx].horarios.filter((_, i) => i !== hIdx) };
     onChange(updated);
   };
 
   const updateHorario = (sIdx: number, hIdx: number, updates: Partial<InlineHorario>) => {
     const updated = [...servicios];
-    updated[sIdx] = {
-      ...updated[sIdx],
-      horarios: updated[sIdx].horarios.map((h, i) => i === hIdx ? { ...h, ...updates } : h),
-    };
+    updated[sIdx] = { ...updated[sIdx], horarios: updated[sIdx].horarios.map((h, i) => i === hIdx ? { ...h, ...updates } : h) };
     onChange(updated);
   };
 
@@ -110,9 +99,7 @@ export function InlineServiciosHorarios({ servicios, onChange }: Props) {
         </Button>
       </div>
 
-      {servicios.length === 0 && (
-        <p className="text-xs text-muted-foreground">Sin servicios asignados</p>
-      )}
+      {servicios.length === 0 && <p className="text-xs text-muted-foreground">Sin servicios asignados</p>}
 
       {servicios.map((srv, sIdx) => (
         <div key={sIdx} className="border rounded-md p-3 space-y-3 bg-muted/30">
@@ -122,9 +109,7 @@ export function InlineServiciosHorarios({ servicios, onChange }: Props) {
               <Select value={srv.servicio_id} onValueChange={v => updateServicio(sIdx, { servicio_id: v })}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                 <SelectContent>
-                  {serviciosDisponibles.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                  ))}
+                  {serviciosDisponibles.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -138,7 +123,6 @@ export function InlineServiciosHorarios({ servicios, onChange }: Props) {
             </Button>
           </div>
 
-          {/* Horarios */}
           <div className="pl-3 border-l-2 border-primary/20 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">Horarios</span>
@@ -179,16 +163,12 @@ export function InlineServiciosHorarios({ servicios, onChange }: Props) {
                   <div className="flex flex-wrap gap-2">
                     {DIAS_SEMANA.map(d => (
                       <label key={d.value} className="flex items-center gap-1 text-xs">
-                        <Checkbox
-                          checked={h.dia_semana.includes(d.value)}
+                        <Checkbox checked={h.dia_semana.includes(d.value)}
                           onCheckedChange={(checked) => {
                             updateHorario(sIdx, hIdx, {
-                              dia_semana: checked
-                                ? [...h.dia_semana, d.value]
-                                : h.dia_semana.filter(v => v !== d.value),
+                              dia_semana: checked ? [...h.dia_semana, d.value] : h.dia_semana.filter(v => v !== d.value),
                             });
-                          }}
-                        />
+                          }} />
                         {d.label}
                       </label>
                     ))}

@@ -11,12 +11,14 @@ interface UsuarioPerfil {
   nombre: string;
   mail: string;
   activo: boolean;
+  rol_nombre: string | null;
 }
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   perfil: UsuarioPerfil | null;
+  centroId: string | null;
   loading: boolean;
   perfilError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -28,13 +30,31 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function fetchPerfil(userId: string): Promise<{ perfil: UsuarioPerfil | null; error: string | null }> {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo')
+    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo, rol:roles(nombre)')
     .eq('auth_user_id', userId)
     .maybeSingle();
 
-  if (error) return { perfil: null, error: error.message };
+  if (error) return { perfil: null, error: 'No se pudo cargar tu perfil. Intentá de nuevo.' };
   if (!data) return { perfil: null, error: 'Tu cuenta existe en autenticación, pero no tiene perfil asignado en Vitalis.' };
-  return { perfil: data as UsuarioPerfil, error: null };
+
+  const rolData = data.rol as any;
+  const perfil: UsuarioPerfil = {
+    id: data.id,
+    auth_user_id: data.auth_user_id,
+    centro_id: data.centro_id,
+    rol_id: data.rol_id,
+    profesional_id: data.profesional_id,
+    nombre: data.nombre,
+    mail: data.mail,
+    activo: data.activo,
+    rol_nombre: rolData?.nombre ?? null,
+  };
+
+  if (!perfil.centro_id) {
+    return { perfil, error: 'Tu usuario no está asociado a ningún centro. Contactá al administrador.' };
+  }
+
+  return { perfil, error: null };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -91,8 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPerfilError(null);
   };
 
+  const centroId = perfil?.centro_id ?? null;
+
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, perfil, loading, perfilError, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, perfil, centroId, loading, perfilError, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
