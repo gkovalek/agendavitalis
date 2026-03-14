@@ -172,10 +172,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     const { data, error } = await supabase.from('pacientes').insert({
       nombre: newPatient.nombre, apellido: newPatient.apellido,
       dni: newPatient.dni, celular: newPatient.celular,
-      obra_social_id: newPatient.obra_social_id,
-      nro_afiliado: newPatient.nro_afiliado || null,
+      prepaga_id: newPatient.prepaga_id,
+      numero_afiliado: newPatient.numero_afiliado || null,
       centro_id: CENTRO_ID,
-    }).select('id, nombre, apellido, dni, celular, obra_social_id, nro_afiliado, prepaga:prepagas(nombre)').single();
+    }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
     setSavingPatient(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
