@@ -114,10 +114,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (q.length < 3) { setSearchResults([]); setShowResults(false); return; }
     setSearching(true);
     const { data } = await supabase.from('pacientes')
-      .select('id, nombre, apellido, dni, celular, obra_social_id, nro_afiliado, prepaga:prepagas(nombre)')
+      .select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)')
       .eq('centro_id', CENTRO_ID)
       .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%,dni.ilike.%${q}%,celular.ilike.%${q}%`)
-      .limit(8);
+      .limit(10);
     setSearchResults((data as any[]) ?? []);
     setShowResults(true);
     setSearching(false);
