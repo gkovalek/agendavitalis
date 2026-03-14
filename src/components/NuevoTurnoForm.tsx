@@ -240,7 +240,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     });
 
     if (turnoErr) {
-      toast({ title: 'Error', description: 'No se pudo crear el turno: ' + turnoErr.message, variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo guardar el turno. Intentá de nuevo.', variant: 'destructive' });
       setSaving(false);
       return;
     }
