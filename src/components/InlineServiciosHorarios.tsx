@@ -17,7 +17,7 @@ export interface InlineServicioAsignado {
   id?: string;
   servicio_id: string;
   capacidad_simultanea: number;
-  dias_trabajo: number[];
+  dias_trabajo: string[];
   hora_inicio: string;
   hora_fin: string;
 }
@@ -29,12 +29,12 @@ interface Props {
 }
 
 const DIAS_SEMANA = [
-  { value: 1, label: 'Lun' },
-  { value: 2, label: 'Mar' },
-  { value: 3, label: 'Mié' },
-  { value: 4, label: 'Jue' },
-  { value: 5, label: 'Vie' },
-  { value: 6, label: 'Sáb' },
+  { value: 'lunes', label: 'Lun' },
+  { value: 'martes', label: 'Mar' },
+  { value: 'miercoles', label: 'Mié' },
+  { value: 'jueves', label: 'Jue' },
+  { value: 'viernes', label: 'Vie' },
+  { value: 'sabado', label: 'Sáb' },
 ];
 
 export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props) {
@@ -58,7 +58,7 @@ export function InlineServiciosHorarios({ centroId, servicios, onChange }: Props
     onChange(servicios.map((s, i) => i === idx ? { ...s, ...updates } : s));
   };
 
-  const toggleDia = (idx: number, dia: number, checked: boolean) => {
+  const toggleDia = (idx: number, dia: string, checked: boolean) => {
     const srv = servicios[idx];
     const diasActuales = normalizeDiasTrabajo(srv.dias_trabajo);
     const newDias = checked ? [...diasActuales, dia] : diasActuales.filter(d => d !== dia);

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -23,18 +23,20 @@ interface Servicio { id: string; nombre: string; }
 
 interface AsignacionServicio {
   id: string; servicio_id: string; capacidad_simultanea: number; activo: boolean;
-  dias_trabajo: number[]; hora_inicio: string; hora_fin: string;
+  dias_trabajo: string[]; hora_inicio: string; hora_fin: string;
   servicio?: Servicio;
 }
 
 const DIAS_SEMANA = [
-  { value: 1, label: 'Lunes' }, { value: 2, label: 'Martes' }, { value: 3, label: 'Miércoles' },
-  { value: 4, label: 'Jueves' }, { value: 5, label: 'Viernes' }, { value: 6, label: 'Sábado' },
+  { value: 'lunes', label: 'Lunes' }, { value: 'martes', label: 'Martes' }, { value: 'miercoles', label: 'Miércoles' },
+  { value: 'jueves', label: 'Jueves' }, { value: 'viernes', label: 'Viernes' }, { value: 'sabado', label: 'Sábado' },
 ];
+
+const DIAS_LABEL_MAP: Record<string, string> = Object.fromEntries(DIAS_SEMANA.map(d => [d.value, d.label]));
 
 const emptyForm = {
   servicio_id: '', capacidad_simultanea: 1, activo: true,
-  dias_trabajo: [] as number[], hora_inicio: '08:00', hora_fin: '18:00',
+  dias_trabajo: [] as string[], hora_inicio: '08:00', hora_fin: '18:00',
 };
 
 export function ServiciosHorariosTab({ entityType, entityId }: Props) {
@@ -70,11 +72,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
 
   useEffect(() => { fetchAll(); }, [entityId, centroId]);
 
-  const openNew = () => {
-    setEditId(null);
-    setForm(emptyForm);
-    setDialogOpen(true);
-  };
+  const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
 
   const openEdit = (a: AsignacionServicio) => {
     setEditId(a.id);
@@ -118,17 +116,13 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     else { toast({ title: 'Servicio desasignado' }); fetchAll(); }
   };
 
-  const toggleDia = (dia: number, checked: boolean) => {
+  const toggleDia = (dia: string, checked: boolean) => {
     setForm(prev => {
       const diasActuales = normalizeDiasTrabajo(prev.dias_trabajo);
       const diasActualizados = checked
         ? [...diasActuales, dia]
         : diasActuales.filter(d => d !== dia);
-
-      return {
-        ...prev,
-        dias_trabajo: normalizeDiasTrabajo(diasActualizados),
-      };
+      return { ...prev, dias_trabajo: normalizeDiasTrabajo(diasActualizados) };
     });
   };
 
@@ -164,7 +158,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-3 h-3" />
               <span>
-                {normalizeDiasTrabajo(a.dias_trabajo).map(d => DIAS_SEMANA.find(ds => ds.value === d)?.label).filter(Boolean).join(', ') || 'Sin días'}
+                {normalizeDiasTrabajo(a.dias_trabajo).map(d => DIAS_LABEL_MAP[d] ?? d).join(', ') || 'Sin días'}
               </span>
               <span>|</span>
               <span>{a.hora_inicio} - {a.hora_fin}</span>

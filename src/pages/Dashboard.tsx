@@ -112,7 +112,7 @@ export default function Dashboard() {
       map[p.id] = available;
     });
     return map;
-  }, [pcsRecords, profesionales, dayOfWeek]);
+  }, [pcsRecords, profesionales, dayName]);
 
   const isSlotAvailable = (profId: string, hora: string): boolean => {
     const avail = availabilityMap[profId];
