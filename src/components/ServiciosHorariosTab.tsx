@@ -164,7 +164,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-3 h-3" />
               <span>
-                {(a.dias_trabajo ?? []).map(d => DIAS_SEMANA.find(ds => ds.value === d)?.label).filter(Boolean).join(', ') || 'Sin días'}
+                {normalizeDiasTrabajo(a.dias_trabajo).map(d => DIAS_SEMANA.find(ds => ds.value === d)?.label).filter(Boolean).join(', ') || 'Sin días'}
               </span>
               <span>|</span>
               <span>{a.hora_inicio} - {a.hora_fin}</span>
