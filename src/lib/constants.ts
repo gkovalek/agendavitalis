@@ -15,14 +15,27 @@ for (let h = 8; h <= 20; h++) {
   TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
 }
 
-export const normalizeDiasTrabajo = (dias: unknown): number[] => {
-  if (!Array.isArray(dias)) return [];
+export const DIAS_NOMBRES: string[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 
-  return Array.from(
-    new Set(
-      dias
-        .map((dia) => Number(dia))
-        .filter((dia) => Number.isInteger(dia) && dia >= 1 && dia <= 7)
-    )
-  ).sort((a, b) => a - b);
+// Map JS getDay() (0=Sun) to Spanish name
+const JS_DAY_TO_NAME: Record<number, string> = {
+  0: 'domingo', 1: 'lunes', 2: 'martes', 3: 'miercoles',
+  4: 'jueves', 5: 'viernes', 6: 'sabado',
+};
+
+export const getDayName = (jsDay: number): string => JS_DAY_TO_NAME[jsDay] ?? '';
+
+export const normalizeDiasTrabajo = (dias: unknown): string[] => {
+  if (!Array.isArray(dias)) return [];
+  const VALID = new Set(DIAS_NOMBRES);
+  // Map legacy numbers (1=lunes..7=domingo) to names
+  const NUM_TO_NAME: Record<number, string> = {
+    1: 'lunes', 2: 'martes', 3: 'miercoles', 4: 'jueves',
+    5: 'viernes', 6: 'sabado', 7: 'domingo',
+  };
+  return [...new Set(
+    dias
+      .map(d => typeof d === 'string' ? d.toLowerCase() : NUM_TO_NAME[Number(d)])
+      .filter((d): d is string => !!d && VALID.has(d))
+  )];
 };

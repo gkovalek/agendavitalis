@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado, normalizeDiasTrabajo } from '@/lib/constants';
+import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado, normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,7 +30,7 @@ interface Turno {
 
 interface PCSRecord {
   profesional_id: string | null;
-  dias_trabajo: number[];
+  dias_trabajo: string[];
   hora_inicio: string;
   hora_fin: string;
 }
@@ -52,10 +52,7 @@ export default function Dashboard() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, [selectedDate]);
 
-  const dayOfWeek = useMemo(() => {
-    const jsDay = selectedDate.getDay();
-    return jsDay === 0 ? 7 : jsDay;
-  }, [selectedDate]);
+  const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
 
   const fetchData = async () => {
     if (!centroId) return;
@@ -106,7 +103,7 @@ export default function Dashboard() {
       }
       const available = new Set<string>();
       records.forEach(r => {
-        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayOfWeek)) {
+        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
           TIME_SLOTS.forEach(slot => {
             if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
           });
@@ -115,7 +112,7 @@ export default function Dashboard() {
       map[p.id] = available;
     });
     return map;
-  }, [pcsRecords, profesionales, dayOfWeek]);
+  }, [pcsRecords, profesionales, dayName]);
 
   const isSlotAvailable = (profId: string, hora: string): boolean => {
     const avail = availabilityMap[profId];
