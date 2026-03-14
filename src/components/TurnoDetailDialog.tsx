@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
 interface Turno {
-  id: string; fecha: string; hora: string; estado: TurnoEstado; profesional_id: string;
+  id: string; fecha: string; hora_inicio: string; estado: TurnoEstado; profesional_id: string;
   paciente_id: string; monto_pagado: number | null; paciente?: { nombre: string; apellido: string };
 }
 
