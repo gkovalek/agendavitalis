@@ -472,7 +472,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                             {t.servicio && <span className="text-muted-foreground ml-2">{(t.servicio as any).nombre}</span>}
                           </div>
                           <div className="flex items-center gap-2">
-                            {t.monto_pagado != null && <span className="text-xs text-muted-foreground">${t.monto_pagado}</span>}
                             <Badge variant="outline" style={{ borderColor: est.color, color: est.color }} className="text-xs">{est.label}</Badge>
                           </div>
                         </div>
