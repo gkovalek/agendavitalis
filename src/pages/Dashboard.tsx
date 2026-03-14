@@ -103,7 +103,7 @@ export default function Dashboard() {
       }
       const available = new Set<string>();
       records.forEach(r => {
-        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayOfWeek)) {
+        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
           TIME_SLOTS.forEach(slot => {
             if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
           });
