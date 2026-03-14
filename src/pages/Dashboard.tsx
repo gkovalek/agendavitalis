@@ -65,7 +65,7 @@ export default function Dashboard() {
 
     const [profRes, turnosRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('turnos').select('id, fecha, hora, estado, profesional_id, paciente_id, monto_pagado, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
+      supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, monto_pagado, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
     ]);
 
     setProfesionales(profRes.data ?? []);
