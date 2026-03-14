@@ -29,9 +29,8 @@ interface Paciente {
   apellido: string;
   dni: string;
   celular: string;
-  obra_social_id: string | null;
-  obra_social_nombre?: string;
-  nro_afiliado?: string;
+  prepaga_id: string | null;
+  numero_afiliado?: string;
   prepaga?: { nombre: string } | null;
 }
 
