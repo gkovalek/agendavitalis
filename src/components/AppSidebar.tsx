@@ -22,6 +22,8 @@ const menuItems = [
   { title: 'Pacientes', url: '/pacientes', icon: Users },
   { title: 'Nuevo Paciente', url: '/pacientes/nuevo', icon: UserPlus },
   { title: 'Profesionales', url: '/profesionales', icon: Stethoscope },
+  { title: 'Equipos', url: '/equipos', icon: UsersRound },
+  { title: 'Servicios', url: '/servicios', icon: Wrench },
   { title: 'Obras Sociales', url: '/obras-sociales', icon: Building2 },
   { title: 'Caja', url: '/caja', icon: DollarSign },
 ];

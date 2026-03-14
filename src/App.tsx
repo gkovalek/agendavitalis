@@ -56,6 +56,8 @@ function AppRoutes() {
       <Route path="/pacientes" element={<ProtectedRoute><Pacientes /></ProtectedRoute>} />
       <Route path="/pacientes/nuevo" element={<ProtectedRoute><NuevoPaciente /></ProtectedRoute>} />
       <Route path="/profesionales" element={<ProtectedRoute><Profesionales /></ProtectedRoute>} />
+      <Route path="/equipos" element={<ProtectedRoute><Equipos /></ProtectedRoute>} />
+      <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
       <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
