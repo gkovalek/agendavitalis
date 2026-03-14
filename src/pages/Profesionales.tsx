@@ -16,6 +16,7 @@ import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/componen
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface Profesional {
   id: string;

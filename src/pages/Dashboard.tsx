@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado } from '@/lib/constants';
+import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado, normalizeDiasTrabajo } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';

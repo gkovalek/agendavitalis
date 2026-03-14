@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface Props {
   entityType: 'profesional' | 'equipo';
