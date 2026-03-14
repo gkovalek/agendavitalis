@@ -229,23 +229,28 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       centro_id: centroId,
     };
     console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
-    const { error: turnoErr } = await supabase.from('turnos').insert(turnoPayload);
+    const { data: newTurno, error: turnoErr } = await supabase.from('turnos').insert(turnoPayload).select('id').single();
 
-    if (turnoErr) {
-      console.error('[NuevoTurnoForm] Turno insert error:', turnoErr.message, turnoErr.code, turnoErr.details);
-      toast({ title: 'Error', description: `No se pudo guardar el turno: ${turnoErr.message}`, variant: 'destructive' });
+    if (turnoErr || !newTurno) {
+      console.error('[NuevoTurnoForm] Turno insert error:', turnoErr?.message, turnoErr?.code, turnoErr?.details);
+      toast({ title: 'Error', description: `No se pudo guardar el turno: ${turnoErr?.message}`, variant: 'destructive' });
       setSaving(false);
       return;
     }
 
     if (montoTotal > 0) {
-      await supabase.from('caja_movimientos').insert({
-        fecha, paciente_id: selectedPaciente.id, profesional_id: profesionalId,
+      const { error: cajaErr } = await supabase.from('caja_movimientos').insert({
+        turno_id: newTurno.id,
+        centro_id: centroId,
+        paciente_id: selectedPaciente.id,
+        profesional_id: profesionalId,
+        equipo_id: null,
+        fecha,
         monto_efectivo: formaPago === 'efectivo' || formaPago === 'mixto' ? montoEfectivo : 0,
         monto_transferencia: formaPago === 'transferencia' || formaPago === 'mixto' ? montoTransferencia : 0,
         monto_prepaga: formaPago === 'obra_social' || formaPago === 'mixto' ? montoPrepaga : 0,
-        total: montoTotal, centro_id: centroId,
       });
+      if (cajaErr) console.error('[NuevoTurnoForm] Caja insert error:', cajaErr.message, cajaErr.details);
     }
 
     if (finalTratamientoId && !nuevoTratamiento && selectedTratamiento) {
