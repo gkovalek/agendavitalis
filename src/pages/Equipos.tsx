@@ -110,9 +110,12 @@ export default function Equipos() {
 
     for (const srv of inlineServicios) {
       if (!srv.servicio_id) continue;
+      const firstHorario = srv.horarios[0];
       const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert({
         [entityColumn]: entityId, servicio_id: srv.servicio_id, capacidad_simultanea: srv.capacidad_simultanea,
         activo: true, centro_id: centroId,
+        hora_inicio: firstHorario?.hora_inicio ?? '08:00',
+        hora_fin: firstHorario?.hora_fin ?? '18:00',
       }).select('id').single();
 
       if (insErr) {
