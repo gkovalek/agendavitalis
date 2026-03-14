@@ -14,7 +14,7 @@ interface Movimiento {
   monto_efectivo: number;
   monto_transferencia: number;
   monto_prepaga: number;
-  total: number;
+  monto_total: number;
   paciente?: { nombre: string; apellido: string };
   profesional?: { nombre: string; apellido: string };
 }
@@ -43,7 +43,7 @@ export default function Caja() {
   }, [fecha, centroId]);
 
   const totals = useMemo(() => movimientos.reduce(
-    (acc, m) => ({ efectivo: acc.efectivo + (m.monto_efectivo || 0), transferencia: acc.transferencia + (m.monto_transferencia || 0), prepaga: acc.prepaga + (m.monto_prepaga || 0), total: acc.total + (m.total || 0) }),
+    (acc, m) => ({ efectivo: acc.efectivo + (m.monto_efectivo || 0), transferencia: acc.transferencia + (m.monto_transferencia || 0), prepaga: acc.prepaga + (m.monto_prepaga || 0), total: acc.total + (m.monto_total || 0) }),
     { efectivo: 0, transferencia: 0, prepaga: 0, total: 0 }
   ), [movimientos]);
 
@@ -73,7 +73,7 @@ export default function Caja() {
                 <div key={m.id} className="px-4 py-3 space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-foreground text-sm">{m.paciente ? `${m.paciente.apellido}, ${m.paciente.nombre}` : '—'}</p>
-                    <p className="font-semibold text-foreground">${m.total || 0}</p>
+                    <p className="font-semibold text-foreground">${m.monto_total || 0}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                     {m.profesional && <span>{m.profesional.apellido}</span>}
@@ -96,7 +96,7 @@ export default function Caja() {
                       <TableCell className="text-right">${m.monto_efectivo || 0}</TableCell>
                       <TableCell className="text-right">${m.monto_transferencia || 0}</TableCell>
                       <TableCell className="text-right">${m.monto_prepaga || 0}</TableCell>
-                      <TableCell className="text-right font-semibold">${m.total || 0}</TableCell>
+                      <TableCell className="text-right font-semibold">${m.monto_total || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
