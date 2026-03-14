@@ -96,6 +96,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     const { error } = await supabase.from('profesional_centro_servicio').insert({
       servicio_id: servicioForm.servicio_id, capacidad_simultanea: servicioForm.capacidad_simultanea,
       activo: servicioForm.activo, centro_id: centroId, [entityColumn]: entityId,
+      hora_inicio: '08:00', hora_fin: '18:00',
     });
     if (error) toast({ title: 'Error', description: 'No se pudo asignar el servicio. Verificá los permisos.', variant: 'destructive' });
     else { toast({ title: 'Servicio asignado' }); setServicioDialogOpen(false); fetchAll(); }
