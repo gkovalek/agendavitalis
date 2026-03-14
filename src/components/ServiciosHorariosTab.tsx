@@ -93,13 +93,18 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
   const handleAddServicio = async () => {
     if (!centroId) return;
     setSavingServicio(true);
-    const { error } = await supabase.from('profesional_centro_servicio').insert({
+    const insertPayload = {
       servicio_id: servicioForm.servicio_id, capacidad_simultanea: servicioForm.capacidad_simultanea,
       activo: servicioForm.activo, centro_id: centroId, [entityColumn]: entityId,
       hora_inicio: '08:00', hora_fin: '18:00',
-    });
-    if (error) toast({ title: 'Error', description: 'No se pudo asignar el servicio. Verificá los permisos.', variant: 'destructive' });
-    else { toast({ title: 'Servicio asignado' }); setServicioDialogOpen(false); fetchAll(); }
+    };
+    console.log('[ServiciosHorariosTab] Inserting profesional_centro_servicio:', JSON.stringify(insertPayload));
+    const { error } = await supabase.from('profesional_centro_servicio').insert(insertPayload);
+    console.log('[ServiciosHorariosTab] Insert result - error:', error);
+    if (error) {
+      console.error('[ServiciosHorariosTab] ERROR:', error.message, error.code, error.details);
+      toast({ title: 'Error', description: `No se pudo asignar el servicio: ${error.message}`, variant: 'destructive' });
+    } else { toast({ title: 'Servicio asignado' }); setServicioDialogOpen(false); fetchAll(); }
     setSavingServicio(false);
   };
 
