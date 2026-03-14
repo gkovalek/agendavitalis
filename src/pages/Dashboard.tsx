@@ -81,7 +81,10 @@ export default function Dashboard() {
 
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno> = {};
-    turnos.forEach(t => { map[`${t.profesional_id}-${t.hora_inicio}`] = t; });
+    turnos.forEach(t => { 
+      const hora = t.hora_inicio?.substring(0, 5) || t.hora_inicio;
+      map[`${t.profesional_id}-${hora}`] = t; 
+    });
     return map;
   }, [turnos]);
 
