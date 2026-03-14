@@ -18,7 +18,7 @@ interface Paciente {
 interface TurnoHistorial {
   id: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string;
   estado: TurnoEstado;
   monto_pagado: number | null;
   profesional?: { nombre: string; apellido: string };
@@ -33,7 +33,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
     const fetch = async () => {
       const [pacRes, turnosRes] = await Promise.all([
         supabase.from('pacientes').select('*').eq('id', pacienteId).single(),
-        supabase.from('turnos').select('id, fecha, hora, estado, monto_pagado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
+        supabase.from('turnos').select('id, fecha, hora_inicio, estado, monto_pagado, profesional:profesionales(nombre, apellido)').eq('paciente_id', pacienteId).order('fecha', { ascending: false }),
       ]);
       setPaciente(pacRes.data);
       setTurnos((turnosRes.data as any[]) ?? []);
@@ -71,7 +71,7 @@ export function PacienteProfile({ pacienteId }: { pacienteId: string }) {
                 const est = TURNO_ESTADOS[t.estado] || TURNO_ESTADOS.reservado;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell>{t.fecha}</TableCell><TableCell>{t.hora}</TableCell>
+                    <TableCell>{t.fecha}</TableCell><TableCell>{t.hora_inicio}</TableCell>
                     <TableCell>{t.profesional ? `${t.profesional.nombre} ${t.profesional.apellido}` : '—'}</TableCell>
                     <TableCell>{t.monto_pagado != null ? `$${t.monto_pagado}` : '—'}</TableCell>
                     <TableCell><span className="inline-flex items-center gap-1.5 text-xs font-medium"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: est.color }} />{est.label}</span></TableCell>
