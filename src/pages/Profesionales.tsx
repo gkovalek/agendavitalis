@@ -13,7 +13,7 @@ import { Loader2, Plus, Pencil, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
-import { format } from 'date-fns';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -66,31 +66,18 @@ export default function Profesionales() {
 
     const { data: asignaciones } = await supabase
       .from('profesional_centro_servicio')
-      .select('id, servicio_id, capacidad_simultanea')
+      .select('id, servicio_id, capacidad_simultanea, dias_trabajo, hora_inicio, hora_fin')
       .eq('profesional_id', p.id)
       .eq('centro_id', centroId);
 
     if (asignaciones && asignaciones.length > 0) {
-      const ids = asignaciones.map(a => a.id);
-      const { data: horarios } = await supabase
-        .from('horarios_disponibles')
-        .select('*')
-        .in('profesional_centro_servicio_id', ids);
-
       const mapped: InlineServicioAsignado[] = asignaciones.map(a => ({
         id: a.id,
         servicio_id: a.servicio_id,
         capacidad_simultanea: a.capacidad_simultanea,
-        horarios: (horarios ?? [])
-          .filter(h => h.profesional_centro_servicio_id === a.id)
-          .map(h => ({
-            id: h.id,
-            tipo: h.tipo as 'semanal' | 'especifico',
-            dia_semana: h.dia_semana ?? [],
-            fecha_especifica: h.fecha_especifica ? new Date(h.fecha_especifica) : null,
-            hora_inicio: h.hora_inicio,
-            hora_fin: h.hora_fin,
-          })),
+        dias_trabajo: a.dias_trabajo ?? [],
+        hora_inicio: a.hora_inicio,
+        hora_fin: a.hora_fin,
       }));
       setInlineServicios(mapped);
     } else {
@@ -141,7 +128,6 @@ export default function Profesionales() {
 
     if (existing && existing.length > 0) {
       const existingIds = existing.map(e => e.id);
-      await supabase.from('horarios_disponibles').delete().in('profesional_centro_servicio_id', existingIds);
       const { error: delErr } = await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
       if (delErr) return 'No se pudieron actualizar los servicios asignados. Verificá los permisos.';
     }
@@ -153,15 +139,15 @@ export default function Profesionales() {
         console.log('[saveInlineServicios] Skipping service with empty servicio_id');
         continue;
       }
-      const firstHorario = srv.horarios[0];
       const insertPayload = {
         [entityColumn]: entityId,
         servicio_id: srv.servicio_id,
         capacidad_simultanea: srv.capacidad_simultanea,
         activo: true,
         centro_id: centroId,
-        hora_inicio: firstHorario?.hora_inicio ?? '08:00',
-        hora_fin: firstHorario?.hora_fin ?? '18:00',
+        dias_trabajo: srv.dias_trabajo,
+        hora_inicio: srv.hora_inicio,
+        hora_fin: srv.hora_fin,
       };
       console.log('[saveInlineServicios] Inserting profesional_centro_servicio:', JSON.stringify(insertPayload));
 
@@ -170,29 +156,8 @@ export default function Profesionales() {
       console.log('[saveInlineServicios] Insert result - data:', asig, 'error:', insErr);
 
       if (insErr) {
-        console.error('[saveInlineServicios] ERROR inserting profesional_centro_servicio:', insErr.message, insErr.code, insErr.details);
+        console.error('[saveInlineServicios] ERROR:', insErr.message, insErr.code, insErr.details);
         return `Error al asignar servicio: ${insErr.message}`;
-      }
-
-      if (asig && srv.horarios.length > 0) {
-        const horarioPayloads = srv.horarios.map(h => ({
-          profesional_centro_servicio_id: asig.id,
-          tipo: h.tipo,
-          dia_semana: h.tipo === 'semanal' ? h.dia_semana : null,
-          fecha_especifica: h.tipo === 'especifico' && h.fecha_especifica
-            ? format(h.fecha_especifica, 'yyyy-MM-dd')
-            : null,
-          hora_inicio: h.hora_inicio,
-          hora_fin: h.hora_fin,
-          capacidad_simultanea: srv.capacidad_simultanea,
-        }));
-        console.log('[saveInlineServicios] Inserting horarios:', JSON.stringify(horarioPayloads));
-        const { error: hErr } = await supabase.from('horarios_disponibles').insert(horarioPayloads);
-        if (hErr) {
-          console.error('[saveInlineServicios] ERROR inserting horarios:', hErr.message, hErr.code);
-          return `Error al guardar horarios: ${hErr.message}`;
-        }
-        console.log('[saveInlineServicios] Horarios inserted OK');
       }
     }
     return null;
