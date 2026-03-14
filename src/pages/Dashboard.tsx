@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string } | null>(null);
+  const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
 
   const dateStr = useMemo(() => {
