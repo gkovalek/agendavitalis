@@ -13,7 +13,7 @@ import { Loader2, Plus, Pencil, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
-import { format } from 'date-fns';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
 
