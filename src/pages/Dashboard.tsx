@@ -24,7 +24,6 @@ interface Turno {
   estado: TurnoEstado;
   profesional_id: string;
   paciente_id: string;
-  monto_pagado: number | null;
   paciente?: { nombre: string; apellido: string };
 }
 
