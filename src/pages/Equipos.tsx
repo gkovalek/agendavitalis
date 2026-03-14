@@ -100,35 +100,23 @@ export default function Equipos() {
 
     if (existing && existing.length > 0) {
       const existingIds = existing.map(e => e.id);
-      await supabase.from('horarios_disponibles').delete().in('profesional_centro_servicio_id', existingIds);
       const { error: delErr } = await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
       if (delErr) return 'No se pudieron actualizar los servicios asignados. Verificá los permisos.';
     }
 
     for (const srv of inlineServicios) {
       if (!srv.servicio_id) continue;
-      const firstHorario = srv.horarios[0];
-      const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert({
+      const { error: insErr } = await supabase.from('profesional_centro_servicio').insert({
         [entityColumn]: entityId, servicio_id: srv.servicio_id, capacidad_simultanea: srv.capacidad_simultanea,
         activo: true, centro_id: centroId,
-        hora_inicio: firstHorario?.hora_inicio ?? '08:00',
-        hora_fin: firstHorario?.hora_fin ?? '18:00',
+        dias_trabajo: srv.dias_trabajo,
+        hora_inicio: srv.hora_inicio,
+        hora_fin: srv.hora_fin,
       }).select('id').single();
 
       if (insErr) {
         console.error('Error inserting profesional_centro_servicio:', insErr);
-        return 'No se pudo asignar el servicio. Verificá los permisos en la base de datos.';
-      }
-
-      if (asig && srv.horarios.length > 0) {
-        const horarioPayloads = srv.horarios.map(h => ({
-          profesional_centro_servicio_id: asig.id, tipo: h.tipo,
-          dia_semana: h.tipo === 'semanal' ? h.dia_semana : null,
-          fecha_especifica: h.tipo === 'especifico' && h.fecha_especifica ? format(h.fecha_especifica, 'yyyy-MM-dd') : null,
-          hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, capacidad_simultanea: srv.capacidad_simultanea,
-        }));
-        const { error: hErr } = await supabase.from('horarios_disponibles').insert(horarioPayloads);
-        if (hErr) return 'No se pudieron guardar los horarios. Verificá los permisos.';
+        return `Error al asignar servicio: ${insErr.message}`;
       }
     }
     return null;
