@@ -20,7 +20,7 @@ interface Profesional {
 interface Turno {
   id: string;
   fecha: string;
-  hora: string;
+  hora_inicio: string;
   estado: TurnoEstado;
   profesional_id: string;
   paciente_id: string;
