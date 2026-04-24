@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,8 @@ const menuItems = [
   { title: 'Profesionales', url: '/profesionales', icon: Stethoscope },
   { title: 'Equipos', url: '/equipos', icon: UsersRound },
   { title: 'Servicios', url: '/servicios', icon: Wrench },
+  { title: 'Tratamientos', url: '/tratamientos', icon: Activity },
+  { title: 'Recordatorios', url: '/recordatorios', icon: Bell },
   { title: 'Obras Sociales', url: '/obras-sociales', icon: Building2 },
   { title: 'Caja', url: '/caja', icon: DollarSign },
 ];

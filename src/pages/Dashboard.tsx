@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -32,6 +32,7 @@ interface PCSRecord {
   dias_trabajo: string[];
   hora_inicio: string;
   hora_fin: string;
+  capacidad_simultanea: number;
 }
 
 export default function Dashboard() {
@@ -57,36 +58,44 @@ export default function Dashboard() {
     if (!centroId) return;
     setLoading(true);
 
-    const [profRes, turnosRes] = await Promise.all([
+    const [profRes, turnosRes, pcsRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
+      supabase.from('profesional_centro_servicio').select('profesional_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea').eq('centro_id', centroId).eq('activo', true),
     ]);
 
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
-
-    // Fetch availability from profesional_centro_servicio directly
-    const { data: pcsData } = await supabase
-      .from('profesional_centro_servicio')
-      .select('profesional_id, dias_trabajo, hora_inicio, hora_fin')
-      .eq('centro_id', centroId)
-      .eq('activo', true);
-
-    setPcsRecords(((pcsData as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+    setPcsRecords(((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
   useEffect(() => { setMobileColIndex(0); }, [profesionales]);
 
+  // profId-hora → array de turnos (soporta múltiples pacientes por slot)
   const turnoMap = useMemo(() => {
-    const map: Record<string, Turno> = {};
-    turnos.forEach(t => { 
+    const map: Record<string, Turno[]> = {};
+    turnos.forEach(t => {
       const hora = t.hora_inicio?.substring(0, 5) || t.hora_inicio;
-      map[`${t.profesional_id}-${hora}`] = t; 
+      const key = `${t.profesional_id}-${hora}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
     });
     return map;
   }, [turnos]);
+
+  // profId → capacidad máxima del día (de PCS records activos para ese día)
+  const capacityMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    pcsRecords.forEach(r => {
+      if (!r.profesional_id) return;
+      if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
+        map[r.profesional_id] = Math.max(map[r.profesional_id] ?? 1, r.capacidad_simultanea ?? 1);
+      }
+    });
+    return map;
+  }, [pcsRecords, dayName]);
 
   const availabilityMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
@@ -121,14 +130,26 @@ export default function Dashboard() {
     return avail ? avail.has(hora) : true;
   };
 
+  const isSlotFull = (profId: string, hora: string): boolean => {
+    const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
+    const capacity = capacityMap[profId] ?? 1;
+    return slotTurnos.length >= capacity;
+  };
+
   const handleSlotClick = (profId: string, hora: string) => {
-    const existing = turnoMap[`${profId}-${hora}`];
-    if (existing) {
-      setSelectedTurno(existing);
-    } else if (isSlotAvailable(profId, hora)) {
+    const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
+    const available = isSlotAvailable(profId, hora);
+    const full = isSlotFull(profId, hora);
+
+    if (slotTurnos.length === 0) {
+      if (available) {
+        const prof = profesionales.find(p => p.id === profId);
+        setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
+      }
+    } else if (!full && available) {
+      // Slot con espacio → nuevo turno
       const prof = profesionales.find(p => p.id === profId);
-      const profNombre = prof ? `${prof.nombre} ${prof.apellido}` : '';
-      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: profNombre });
+      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
     }
   };
 
@@ -180,11 +201,23 @@ export default function Dashboard() {
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="p-2 text-xs font-medium text-muted-foreground w-16 text-left sticky left-0 bg-muted/50">Hora</th>
-                      {visibleProfesionales.map(p => (
-                        <th key={p.id} className="p-2 text-xs font-medium text-foreground text-center min-w-[140px] sm:min-w-[160px]">
-                          {isMobile ? '' : `${p.nombre} ${p.apellido}`}
-                        </th>
-                      ))}
+                      {visibleProfesionales.map(p => {
+                        const cap = capacityMap[p.id] ?? 1;
+                        return (
+                          <th key={p.id} className="p-2 text-xs font-medium text-foreground text-center min-w-[140px] sm:min-w-[160px]">
+                            {!isMobile && (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span>{p.nombre} {p.apellido}</span>
+                                {cap > 1 && (
+                                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-normal">
+                                    <Users className="h-3 w-3" /> {cap} asientos
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -192,22 +225,49 @@ export default function Dashboard() {
                       <tr key={hora} className="border-b border-border/50">
                         <td className="p-1 px-2 text-xs text-muted-foreground font-mono sticky left-0 bg-card">{hora}</td>
                         {visibleProfesionales.map(p => {
-                          const turno = turnoMap[`${p.id}-${hora}`];
-                          const estado = turno ? TURNO_ESTADOS[turno.estado] || TURNO_ESTADOS.reservado : null;
+                          const slotTurnos = turnoMap[`${p.id}-${hora}`] ?? [];
                           const available = isSlotAvailable(p.id, hora);
+                          const full = isSlotFull(p.id, hora);
+                          const capacity = capacityMap[p.id] ?? 1;
+
                           return (
-                            <td key={p.id}
-                              className={`p-1 transition-colors ${available ? 'cursor-pointer hover:bg-primary/5' : turno ? 'cursor-pointer' : 'bg-muted/40 cursor-not-allowed'}`}
-                              onClick={() => handleSlotClick(p.id, hora)}>
-                              {turno ? (
-                                <div className="rounded-md px-2 py-1 text-xs border-l-4" style={{ borderLeftColor: estado!.color, backgroundColor: `${estado!.color}15` }}>
-                                  <p className="font-semibold text-foreground truncate">
-                                    {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
+                            <td
+                              key={p.id}
+                              className={`p-1 align-top transition-colors ${
+                                available && !full
+                                  ? 'cursor-pointer hover:bg-primary/5'
+                                  : !available && slotTurnos.length === 0
+                                  ? 'bg-muted/40 cursor-not-allowed'
+                                  : full
+                                  ? 'cursor-default'
+                                  : 'cursor-pointer hover:bg-primary/5'
+                              }`}
+                              onClick={() => handleSlotClick(p.id, hora)}
+                            >
+                              <div className="space-y-0.5">
+                                {slotTurnos.map(turno => {
+                                  const estado = TURNO_ESTADOS[turno.estado] ?? TURNO_ESTADOS.reservado;
+                                  return (
+                                    <div
+                                      key={turno.id}
+                                      className="rounded-md px-2 py-1 text-xs border-l-4 cursor-pointer hover:brightness-95"
+                                      style={{ borderLeftColor: estado.color, backgroundColor: `${estado.color}20` }}
+                                      onClick={e => { e.stopPropagation(); setSelectedTurno(turno); }}
+                                    >
+                                      <p className="font-semibold text-foreground truncate leading-tight">
+                                        {turno.paciente ? `${turno.paciente.apellido}, ${turno.paciente.nombre}` : 'Paciente'}
+                                      </p>
+                                      <p className="font-medium leading-tight" style={{ color: estado.color }}>{estado.label}</p>
+                                    </div>
+                                  );
+                                })}
+                                {/* Indicador de capacidad cuando hay más de 1 asiento */}
+                                {capacity > 1 && slotTurnos.length > 0 && (
+                                  <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                    {slotTurnos.length}/{capacity}
                                   </p>
-                                  
-                                  <p style={{ color: estado!.color }} className="font-medium">{estado!.label}</p>
-                                </div>
-                              ) : !available ? <div className="h-6" /> : null}
+                                )}
+                              </div>
                             </td>
                           );
                         })}
@@ -225,8 +285,14 @@ export default function Dashboard() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuevo Turno</DialogTitle></DialogHeader>
           {newTurnoSlot && (
-            <NuevoTurnoForm fecha={newTurnoSlot.fecha} hora={newTurnoSlot.hora} profesionalId={newTurnoSlot.profesional_id}
-              profesionalNombre={newTurnoSlot.profesional_nombre} onSuccess={() => { setNewTurnoSlot(null); fetchData(); }} onCancel={() => setNewTurnoSlot(null)} />
+            <NuevoTurnoForm
+              fecha={newTurnoSlot.fecha}
+              hora={newTurnoSlot.hora}
+              profesionalId={newTurnoSlot.profesional_id}
+              profesionalNombre={newTurnoSlot.profesional_nombre}
+              onSuccess={() => { setNewTurnoSlot(null); fetchData(); }}
+              onCancel={() => setNewTurnoSlot(null)}
+            />
           )}
         </DialogContent>
       </Dialog>

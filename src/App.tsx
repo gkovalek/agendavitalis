@@ -14,6 +14,8 @@ import Equipos from "@/pages/Equipos";
 import Servicios from "@/pages/Servicios";
 import ObrasSociales from "@/pages/ObrasSociales";
 import Caja from "@/pages/Caja";
+import Tratamientos from "@/pages/Tratamientos";
+import Recordatorios from "@/pages/Recordatorios";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import { Loader2 } from "lucide-react";
@@ -60,6 +62,8 @@ function AppRoutes() {
       <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
       <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
+      <Route path="/tratamientos" element={<ProtectedRoute><Tratamientos /></ProtectedRoute>} />
+      <Route path="/recordatorios" element={<ProtectedRoute><Recordatorios /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
