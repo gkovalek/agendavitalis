@@ -34,6 +34,7 @@ interface PCSRecord {
   hora_inicio: string;
   hora_fin: string;
   capacidad_simultanea: number;
+  servicio?: { duracion_minutos: number } | null;
 }
 
 function generateTimeSlots(inicio: string, fin: string, intervalo: number): string[] {
@@ -69,12 +70,32 @@ export default function Dashboard() {
 
   const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
 
-  const timeSlots = useMemo(() => {
-    const intervalo = getNumber('intervalo_turnos') || 30;
-    const inicio = get('hora_inicio_agenda') || '08:00';
-    const fin = get('hora_fin_agenda') || '20:00';
-    return generateTimeSlots(inicio, fin, intervalo);
-  }, [configLoading, centroId]);
+  // Per-professional slot map: profId → Set of valid slot times based on each service duration
+  const profSlotMap = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    pcsRecords.forEach(r => {
+      if (!r.profesional_id) return;
+      if (!normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) return;
+      const duracion = r.servicio?.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
+      const slots = generateTimeSlots(r.hora_inicio, r.hora_fin, duracion);
+      if (!map[r.profesional_id]) map[r.profesional_id] = new Set();
+      slots.forEach(s => map[r.profesional_id!].add(s));
+    });
+    return map;
+  }, [pcsRecords, dayName, configLoading]);
+
+  // Union of all professional slots, sorted — used as the table's time axis
+  const timeAxis = useMemo(() => {
+    const all = new Set<string>();
+    Object.values(profSlotMap).forEach(slots => slots.forEach(s => all.add(s)));
+    if (all.size === 0) {
+      const intervalo = getNumber('intervalo_turnos') ?? 30;
+      const inicio = get('hora_inicio_agenda') ?? '08:00';
+      const fin = get('hora_fin_agenda') ?? '20:00';
+      generateTimeSlots(inicio, fin, intervalo).forEach(s => all.add(s));
+    }
+    return Array.from(all).sort();
+  }, [profSlotMap, configLoading]);
 
   const fetchData = async () => {
     if (!centroId) return;
@@ -83,7 +104,7 @@ export default function Dashboard() {
     const [profRes, turnosRes, pcsRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select('id, fecha, hora_inicio, estado, profesional_id, paciente_id, paciente:pacientes(nombre, apellido)').eq('fecha', dateStr).eq('centro_id', centroId),
-      supabase.from('profesional_centro_servicio').select('profesional_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('profesional_centro_servicio').select('profesional_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, servicio:servicios(duracion_minutos)').eq('centro_id', centroId).eq('activo', true),
     ]);
 
     setProfesionales(profRes.data ?? []);
@@ -119,37 +140,9 @@ export default function Dashboard() {
     return map;
   }, [pcsRecords, dayName]);
 
-  const availabilityMap = useMemo(() => {
-    const map: Record<string, Set<string>> = {};
-    const profRecords: Record<string, PCSRecord[]> = {};
-    pcsRecords.forEach(r => {
-      if (!r.profesional_id) return;
-      if (!profRecords[r.profesional_id]) profRecords[r.profesional_id] = [];
-      profRecords[r.profesional_id].push(r);
-    });
-
-    profesionales.forEach(p => {
-      const records = profRecords[p.id] ?? [];
-      if (records.length === 0) {
-        map[p.id] = new Set(TIME_SLOTS);
-        return;
-      }
-      const available = new Set<string>();
-      records.forEach(r => {
-        if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
-          timeSlots.forEach(slot => {
-            if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
-          });
-        }
-      });
-      map[p.id] = available;
-    });
-    return map;
-  }, [pcsRecords, profesionales, dayName]);
-
   const isSlotAvailable = (profId: string, hora: string): boolean => {
-    const avail = availabilityMap[profId];
-    return avail ? avail.has(hora) : true;
+    const slots = profSlotMap[profId];
+    return slots ? slots.has(hora) : true;
   };
 
   const isSlotFull = (profId: string, hora: string): boolean => {
@@ -243,7 +236,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {timeSlots.map(hora => (
+                    {timeAxis.map(hora => (
                       <tr key={hora} className="border-b border-border/50">
                         <td className="p-1 px-2 text-xs text-muted-foreground font-mono sticky left-0 bg-card">{hora}</td>
                         {visibleProfesionales.map(p => {

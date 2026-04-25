@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -150,8 +151,18 @@ export default function Servicios() {
           <div className="space-y-3">
             <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Duración (minutos)</Label><Input type="number" value={form.duracion_minutos} onChange={e => setForm({ ...form, duracion_minutos: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Costo base</Label><Input type="number" value={form.costo_base} onChange={e => setForm({ ...form, costo_base: Number(e.target.value) })} /></div>
+              <div className="space-y-1">
+                <Label>Duración del turno</Label>
+                <Select value={String(form.duracion_minutos)} onValueChange={v => setForm({ ...form, duracion_minutos: Number(v) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (i + 1) * 5).map(m => (
+                      <SelectItem key={m} value={String(m)}>{m} min</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1"><Label>Costo base ($)</Label><Input type="number" value={form.costo_base} onChange={e => setForm({ ...form, costo_base: Number(e.target.value) })} /></div>
             </div>
             <div className="flex items-center gap-2"><Switch checked={form.es_tratamiento} onCheckedChange={v => setForm({ ...form, es_tratamiento: v })} /><Label>Es tratamiento</Label></div>
             {form.es_tratamiento && (<div className="space-y-1"><Label>Sesiones por bloque</Label><Input type="number" value={form.sesiones_por_bloque ?? ''} onChange={e => setForm({ ...form, sesiones_por_bloque: Number(e.target.value) })} /></div>)}
