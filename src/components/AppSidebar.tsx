@@ -1,6 +1,5 @@
-import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell, BarChart2, ClipboardList, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar,
@@ -25,19 +24,18 @@ const menuItems = [
   { title: 'Equipos', url: '/equipos', icon: UsersRound },
   { title: 'Servicios', url: '/servicios', icon: Wrench },
   { title: 'Tratamientos', url: '/tratamientos', icon: Activity },
+  { title: 'Historia Clínica', url: '/historia-clinica', icon: FileText },
+  { title: 'Pedidos Médicos', url: '/pedidos-medicos', icon: ClipboardList },
   { title: 'Recordatorios', url: '/recordatorios', icon: Bell },
   { title: 'Obras Sociales', url: '/obras-sociales', icon: Building2 },
   { title: 'Caja', url: '/caja', icon: DollarSign },
-];
-
-const disabledItems = [
-  { title: 'Historia Clínica', icon: FileText },
+  { title: 'Reportes', url: '/reportes', icon: BarChart2 },
+  { title: 'Configuración', url: '/configuracion', icon: Settings },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const location = useLocation();
   const { signOut, perfil } = useAuth();
 
   return (
@@ -73,14 +71,6 @@ export function AppSidebar() {
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {disabledItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton disabled className="opacity-40 cursor-not-allowed">
-                    <item.icon className="mr-2 h-4 w-4" />
-                    {!collapsed && <span>{item.title} <span className="text-[10px]">(próximamente)</span></span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

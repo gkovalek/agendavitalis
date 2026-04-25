@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Plus, Pencil, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
@@ -39,6 +40,8 @@ export default function Profesionales() {
   const [form, setForm] = useState(emptyForm);
   const [inlineServicios, setInlineServicios] = useState<InlineServicioAsignado[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [selectedProfesional, setSelectedProfesional] = useState<Profesional | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -164,6 +167,16 @@ export default function Profesionales() {
     return null;
   };
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    const { error } = await supabase.from('profesionales').update({ activo: false }).eq('id', deleteId);
+    setDeleting(false);
+    setDeleteId(null);
+    if (error) toast({ title: 'Error', description: 'No se pudo desactivar el profesional.', variant: 'destructive' });
+    else { toast({ title: 'Profesional desactivado' }); if (selectedProfesional?.id === deleteId) setSelectedProfesional(null); fetchData(); }
+  };
+
   if (isMobile && selectedProfesional) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -280,9 +293,16 @@ export default function Profesionales() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          {p.activo && (
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -349,6 +369,16 @@ export default function Profesionales() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="¿Desactivar profesional?"
+        description="El profesional quedará inactivo y no aparecerá en la agenda. Podés reactivarlo editándolo."
+        confirmLabel="Desactivar"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </div>
   );
 }

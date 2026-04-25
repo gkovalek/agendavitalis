@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TURNO_ESTADOS, TIME_SLOTS, TurnoEstado, normalizeDiasTrabajo, getDayName } from '@/lib/constants';
+import { TURNO_ESTADOS, TurnoEstado, normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -35,8 +36,22 @@ interface PCSRecord {
   capacidad_simultanea: number;
 }
 
+function generateTimeSlots(inicio: string, fin: string, intervalo: number): string[] {
+  const slots: string[] = [];
+  const [hI, mI] = inicio.split(':').map(Number);
+  const [hF, mF] = fin.split(':').map(Number);
+  let total = hI * 60 + mI;
+  const end = hF * 60 + mF;
+  while (total <= end) {
+    slots.push(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+    total += intervalo;
+  }
+  return slots;
+}
+
 export default function Dashboard() {
   const { centroId } = useAuth();
+  const { getNumber, get, loading: configLoading } = useCentroConfig(centroId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
@@ -53,6 +68,13 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
+
+  const timeSlots = useMemo(() => {
+    const intervalo = getNumber('intervalo_turnos') || 30;
+    const inicio = get('hora_inicio_agenda') || '08:00';
+    const fin = get('hora_fin_agenda') || '20:00';
+    return generateTimeSlots(inicio, fin, intervalo);
+  }, [configLoading, centroId]);
 
   const fetchData = async () => {
     if (!centroId) return;
@@ -115,7 +137,7 @@ export default function Dashboard() {
       const available = new Set<string>();
       records.forEach(r => {
         if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
-          TIME_SLOTS.forEach(slot => {
+          timeSlots.forEach(slot => {
             if (slot >= r.hora_inicio && slot < r.hora_fin) available.add(slot);
           });
         }
@@ -221,7 +243,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {TIME_SLOTS.map(hora => (
+                    {timeSlots.map(hora => (
                       <tr key={hora} className="border-b border-border/50">
                         <td className="p-1 px-2 text-xs text-muted-foreground font-mono sticky left-0 bg-card">{hora}</td>
                         {visibleProfesionales.map(p => {

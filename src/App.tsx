@@ -16,6 +16,11 @@ import ObrasSociales from "@/pages/ObrasSociales";
 import Caja from "@/pages/Caja";
 import Tratamientos from "@/pages/Tratamientos";
 import Recordatorios from "@/pages/Recordatorios";
+import HistoriaClinica from "@/pages/HistoriaClinica";
+import Reportes from "@/pages/Reportes";
+import PedidosMedicos from "@/pages/PedidosMedicos";
+import Configuracion from "@/pages/Configuracion";
+import PortalPublico from "@/pages/PortalPublico";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import { Loader2 } from "lucide-react";
@@ -51,8 +56,12 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Rutas públicas */}
       <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/reservar/:centroId" element={<PortalPublico />} />
+
+      {/* Rutas protegidas */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/pacientes" element={<ProtectedRoute><Pacientes /></ProtectedRoute>} />
@@ -64,6 +73,10 @@ function AppRoutes() {
       <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="/tratamientos" element={<ProtectedRoute><Tratamientos /></ProtectedRoute>} />
       <Route path="/recordatorios" element={<ProtectedRoute><Recordatorios /></ProtectedRoute>} />
+      <Route path="/historia-clinica" element={<ProtectedRoute><HistoriaClinica /></ProtectedRoute>} />
+      <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
+      <Route path="/pedidos-medicos" element={<ProtectedRoute><PedidosMedicos /></ProtectedRoute>} />
+      <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

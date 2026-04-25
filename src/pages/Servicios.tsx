@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface Servicio {
   id: string;
@@ -33,6 +34,8 @@ export default function Servicios() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -71,8 +74,12 @@ export default function Servicios() {
     fetchData();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('servicios').delete().eq('id', id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    const { error } = await supabase.from('servicios').delete().eq('id', deleteId);
+    setDeleting(false);
+    setDeleteId(null);
     if (error) toast({ title: 'Error', description: 'No se pudo eliminar el servicio. Intentá de nuevo.', variant: 'destructive' });
     else { toast({ title: 'Servicio eliminado' }); fetchData(); }
   };
@@ -101,7 +108,7 @@ export default function Servicios() {
                     <p className="font-medium text-foreground">{s.nombre}</p>
                     <div className="flex gap-1 shrink-0">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(s.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDeleteId(s.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -126,7 +133,7 @@ export default function Servicios() {
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -156,6 +163,15 @@ export default function Servicios() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="¿Eliminar servicio?"
+        description="Esta acción eliminará el servicio permanentemente y no se puede deshacer."
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </div>
   );
 }

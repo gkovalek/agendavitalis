@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
 

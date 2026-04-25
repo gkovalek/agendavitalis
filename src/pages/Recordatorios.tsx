@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,7 @@ const ESTADOS_VALIDOS = ['reservado', 'confirmado', 'en_sala'];
 export default function Recordatorios() {
   const { centroId } = useAuth();
   const { toast } = useToast();
+  const { get } = useCentroConfig(centroId);
 
   const [turnos, setTurnos] = useState<TurnoRecordatorio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +37,7 @@ export default function Recordatorios() {
   const [fechaObjetivo, setFechaObjetivo] = useState<string>('');
   const [soloSinEnviar, setSoloSinEnviar] = useState(true);
 
-  // Configuración n8n (guardada en localStorage por centro)
-  const storageKey = `vitalis_n8n_webhook_${centroId}`;
-  const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem(storageKey) ?? '');
-  const [editandoConfig, setEditandoConfig] = useState(false);
-  const [webhookTemp, setWebhookTemp] = useState('');
+  const webhookUrl = get('n8n_webhook_recordatorios');
 
   // Calcular mañana como fecha default
   useEffect(() => {
@@ -71,13 +69,6 @@ export default function Recordatorios() {
 
   const conCelular = turnosFiltrados.filter(t => !!t.paciente?.celular && t.paciente.celular.trim() !== '');
   const sinCelular = turnosFiltrados.filter(t => !t.paciente?.celular || t.paciente.celular.trim() === '');
-
-  const handleGuardarConfig = () => {
-    localStorage.setItem(storageKey, webhookTemp);
-    setWebhookUrl(webhookTemp);
-    setEditandoConfig(false);
-    toast({ title: 'Configuración guardada' });
-  };
 
   const handleEnviarRecordatorios = async () => {
     if (!webhookUrl) {
@@ -127,43 +118,14 @@ export default function Recordatorios() {
         <p className="text-sm text-muted-foreground">Enviá recordatorios de turno por WhatsApp via n8n</p>
       </div>
 
-      {/* Configuración n8n */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Configuración n8n</CardTitle>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => { setWebhookTemp(webhookUrl); setEditandoConfig(!editandoConfig); }}>
-              {editandoConfig ? 'Cancelar' : 'Editar'}
-            </Button>
-          </div>
-          <CardDescription>URL del webhook de n8n que recibe los turnos para enviar recordatorios</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {editandoConfig ? (
-            <div className="flex gap-2">
-              <Input placeholder="https://tu-n8n.app/webhook/..." value={webhookTemp} onChange={e => setWebhookTemp(e.target.value)} className="flex-1 font-mono text-sm" />
-              <Button onClick={handleGuardarConfig} disabled={!webhookTemp}>Guardar</Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              {webhookUrl ? (
-                <>
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                  <span className="text-sm font-mono text-muted-foreground truncate">{webhookUrl}</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
-                  <span className="text-sm text-muted-foreground">No configurado — hacé click en Editar para agregar la URL del webhook</span>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Estado webhook */}
+      <div className="flex items-center gap-2 text-sm">
+        {webhookUrl ? (
+          <><CheckCircle className="h-4 w-4 text-green-500" /><span className="text-muted-foreground">Webhook configurado</span></>
+        ) : (
+          <><AlertCircle className="h-4 w-4 text-yellow-500" /><span className="text-muted-foreground">Webhook no configurado — configuralo en <a href="/configuracion" className="underline text-primary">Configuración</a></span></>
+        )}
+      </div>
 
       {/* Selector de fecha + filtros + acción */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
