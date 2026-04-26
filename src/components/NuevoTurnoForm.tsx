@@ -110,7 +110,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
     setSearching(true);
     const { data } = await supabase.from('pacientes')
-      .select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)')
+      .select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado')
       .eq('centro_id', centroId)
       .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%,dni.ilike.%${q}%,celular.ilike.%${q}%`)
       .limit(10);
@@ -170,7 +170,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       prepaga_id: newPatient.prepaga_id,
       numero_afiliado: newPatient.numero_afiliado || null,
       centro_id: centroId,
-    }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado, prepaga:prepagas(nombre)').single();
+    }).select('id, nombre, apellido, dni, celular, prepaga_id, numero_afiliado').single();
     setSavingPatient(false);
     if (error) {
       toast({ title: 'Error', description: 'No se pudo crear el paciente. Verificá los datos e intentá de nuevo.', variant: 'destructive' });
