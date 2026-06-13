@@ -71,6 +71,7 @@ function AppRoutes() {
       <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
       <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
+      <Route path="/caja/crear" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="/tratamientos" element={<ProtectedRoute><Tratamientos /></ProtectedRoute>} />
       <Route path="/recordatorios" element={<ProtectedRoute><Recordatorios /></ProtectedRoute>} />
       <Route path="/historia-clinica" element={<ProtectedRoute><HistoriaClinica /></ProtectedRoute>} />
