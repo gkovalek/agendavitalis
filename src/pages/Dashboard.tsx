@@ -38,6 +38,7 @@ interface Turno {
   motivo_cancelacion?: string | null;
   paciente?: { nombre: string; apellido: string };
   servicio?: { nombre: string; agenda_id?: string | null } | null;
+  tratamiento?: { total_sesiones: number } | null;
   sesion_num?: number;
   sesiones_total?: number | null;
   tiene_pago?: boolean;
@@ -169,9 +170,10 @@ export default function Dashboard() {
     const [profRes, turnosRes, pcsRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select(`
-        id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id, motivo_cancelacion,
+        id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id, motivo_cancelacion, tratamiento_id,
         paciente:pacientes(nombre, apellido),
-        servicio:servicios(nombre, agenda_id)
+        servicio:servicios(nombre, agenda_id),
+        tratamiento:tratamientos(total_sesiones)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
       supabase.from('profesional_centro_servicio')
         .select('profesional_id, agenda_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, nombre, duracion_minutos, sesiones_por_bloque)')
@@ -215,7 +217,8 @@ export default function Dashboard() {
       const sesion_num = t.estado === 'finalizado' ? finalizados : finalizados + 1;
       const agendaId = t.servicio?.agenda_id;
       const agendaRec = pcsListRaw.find(r => r.agenda?.id === agendaId);
-      const sesiones_total = agendaRec?.agenda?.sesiones_por_bloque ?? null;
+      // Preferir total_sesiones del tratamiento real; fallback a sesiones_por_bloque de la agenda
+      const sesiones_total = (t as any).tratamiento?.total_sesiones ?? agendaRec?.agenda?.sesiones_por_bloque ?? null;
       return { ...t, sesion_num, sesiones_total, tiene_pago: pagadoSet.has(t.id) };
     });
 
