@@ -85,18 +85,17 @@ function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (hre
   return (
     <div className="relative group">
       <button
-        className={`flex items-center gap-1.5 px-3 h-11 text-[13px] transition-colors whitespace-nowrap border-none bg-transparent cursor-pointer
+        className={`flex items-center gap-1 px-3 h-11 text-[12.5px] transition-colors whitespace-nowrap border-none bg-transparent cursor-pointer
           ${group.disabled
-            ? 'text-white/40 cursor-not-allowed'
+            ? 'text-white/35 cursor-not-allowed'
             : isActive
               ? 'text-white bg-white/15'
               : 'text-white/80 hover:text-white hover:bg-white/10'
           }`}
         disabled={group.disabled}
       >
-        <group.icon className="w-[15px] h-[15px]" />
         <span>{group.label}</span>
-        {!group.disabled && <ChevronDown className="w-3 h-3 opacity-60" />}
+        {!group.disabled && <ChevronDown className="w-3 h-3 opacity-50" />}
       </button>
 
       {!group.disabled && (
@@ -149,9 +148,9 @@ export function TopNavbar() {
   return (
     <header className="h-11 flex items-center bg-[#0F6E56] shrink-0 z-40 relative">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-4 pr-5 border-r border-white/20 h-full shrink-0">
+      <div className="flex items-center gap-1.5 px-3 pr-4 border-r border-white/20 h-full shrink-0">
         <Heart className="w-4 h-4 text-white" />
-        <span className="text-white font-semibold text-[14px]">Vitalis</span>
+        <span className="text-white font-semibold text-[13.5px]">Vitalis</span>
       </div>
 
       {/* Nav groups */}
