@@ -50,6 +50,11 @@ async function fetchPerfil(userId: string): Promise<{ perfil: UsuarioPerfil | nu
     rol_nombre: rolData?.nombre ?? null,
   };
 
+  if (!perfil.activo) {
+    await supabase.auth.signOut();
+    return { perfil: null, error: 'Tu cuenta está desactivada. Contactá al administrador.' };
+  }
+
   if (!perfil.centro_id) {
     return { perfil, error: 'Tu usuario no está asociado a ningún centro. Contactá al administrador.' };
   }
