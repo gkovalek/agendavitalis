@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
 import { Loader2, Heart, CheckCircle, Clock, User, ChevronLeft } from 'lucide-react';
+
+const reservaSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Nombre inválido'),
+  apellido: z.string().trim().min(1, 'El apellido es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Apellido inválido'),
+  dni: z.string().trim().regex(/^\d{7,8}$/, 'DNI inválido (7-8 dígitos)').optional().or(z.literal('')),
+  celular: z.string().trim().regex(/^[\d\s+()-]{8,20}$/, 'Teléfono inválido').optional().or(z.literal('')),
+  email: z.string().trim().email('Email inválido').max(120).optional().or(z.literal('')),
+});
 
 interface Centro { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
