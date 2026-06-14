@@ -62,6 +62,7 @@ export default function PortalPublico() {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', celular: '', email: '' });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [turnoId, setTurnoId] = useState('');
 
