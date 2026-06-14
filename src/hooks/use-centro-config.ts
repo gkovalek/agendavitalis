@@ -47,7 +47,12 @@ export function useCentroConfig(centroId: string | null) {
     }
 
     const map: ConfigMap = {};
-    (data ?? []).forEach(r => { map[r.clave] = r.valor ?? ''; });
+    // Never keep server-only secrets in client memory even if RLS accidentally returns them
+    const CLIENT_BLOCKED = new Set(['mp_access_token']);
+    (data ?? []).forEach(r => {
+      if (CLIENT_BLOCKED.has(r.clave)) return;
+      map[r.clave] = r.valor ?? '';
+    });
     setRaw(map);
     setLoading(false);
   }, [centroId]);
