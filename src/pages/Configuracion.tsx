@@ -23,15 +23,36 @@ CREATE TABLE IF NOT EXISTS centros_config (
 
 ALTER TABLE centros_config ENABLE ROW LEVEL SECURITY;
 
+-- Lectura: cualquier usuario activo del centro puede ver configuración no sensible.
+-- IMPORTANTE: No almacenar secretos (tokens privados de pago, API keys) en esta tabla.
+-- Usar Edge Function Secrets de Supabase para credenciales server-side.
+DROP POLICY IF EXISTS "usuarios ven config de su centro" ON centros_config;
 CREATE POLICY "usuarios ven config de su centro" ON centros_config
-  FOR SELECT USING (
-    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid())
+  FOR SELECT TO authenticated USING (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
   );
 
+-- Escritura: SOLO administradores del centro pueden modificar la configuración
+DROP POLICY IF EXISTS "admin modifica config de su centro" ON centros_config;
 CREATE POLICY "admin modifica config de su centro" ON centros_config
-  FOR ALL USING (
-    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid())
-  );`;
+  FOR ALL TO authenticated USING (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
+    AND EXISTS (
+      SELECT 1 FROM usuarios u
+      JOIN roles r ON r.id = u.rol_id
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+    )
+  ) WITH CHECK (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
+    AND EXISTS (
+      SELECT 1 FROM usuarios u
+      JOIN roles r ON r.id = u.rol_id
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+    )
+  );
+
+-- Eliminar cualquier token sensible que pueda haber quedado almacenado en client-readable config
+DELETE FROM centros_config WHERE clave IN ('mp_access_token');`;
 
 interface SectionProps {
   title: string;
