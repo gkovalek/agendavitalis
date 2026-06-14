@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
+import { TurnoContextMenu } from '@/components/TurnoContextMenu';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Profesional {
@@ -77,6 +78,10 @@ export default function Dashboard() {
   const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string; servicio_id?: string } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
   const [mobileColIndex, setMobileColIndex] = useState(0);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number; turno: Turno;
+    profId: string; hora: string; servicioId?: string;
+  } | null>(null);
   const isMobile = useIsMobile();
 
   const dateStr = useMemo(() => {
@@ -444,6 +449,7 @@ export default function Dashboard() {
                                     className="rounded px-1.5 py-1 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                     style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                     onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
+                                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: p.id, hora }); }}
                                   >
                                     <p className="font-semibold text-foreground truncate leading-tight">
                                       {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
@@ -514,6 +520,7 @@ export default function Dashboard() {
                                         className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                         style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                         onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
+                                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora, servicioId: s.id }); }}
                                       >
                                         <p className="font-semibold text-foreground leading-tight">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
@@ -543,9 +550,10 @@ export default function Dashboard() {
                                   return (
                                     <div
                                       key={t.id}
-                                      className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer"
+                                      className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                       style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                       onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
+                                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora }); }}
                                     >
                                       <p className="font-semibold">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
                                       <p style={{ color: est.color }}>{est.label}</p>
@@ -588,6 +596,30 @@ export default function Dashboard() {
         onClose={() => setSelectedTurno(null)}
         onUpdated={() => { setSelectedTurno(null); fetchData(); }}
       />
+
+      {contextMenu && (
+        <TurnoContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          slotFull={
+            contextMenu.servicioId
+              ? isServicioSlotFull(contextMenu.servicioId, contextMenu.hora)
+              : isSlotFull(contextMenu.profId, contextMenu.hora)
+          }
+          onViewTurno={() => setSelectedTurno(contextMenu.turno)}
+          onAddTurno={() => {
+            const prof = profesionales.find(p => p.id === contextMenu.profId);
+            setNewTurnoSlot({
+              fecha: dateStr,
+              hora: contextMenu.hora,
+              profesional_id: contextMenu.profId,
+              profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '',
+              servicio_id: contextMenu.servicioId,
+            });
+          }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
