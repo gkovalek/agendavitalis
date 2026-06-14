@@ -242,7 +242,7 @@ export default function Dashboard() {
   return (
     <div className="flex h-[calc(100vh-40px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
-      <aside className="w-[220px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
+      <aside className="w-[260px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
         {/* Selector de profesional */}
         <div>
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
@@ -264,7 +264,7 @@ export default function Dashboard() {
             mode="single"
             selected={selectedDate}
             onSelect={d => d && setSelectedDate(d)}
-            className="w-full p-1 [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-full [&_button]:text-[11px]"
+            className="w-full p-2 [&_table]:w-full [&_td]:p-0.5 [&_th]:p-0.5 [&_button]:h-7 [&_button]:w-7 [&_button]:text-[12px]"
           />
         </div>
 
