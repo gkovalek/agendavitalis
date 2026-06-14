@@ -240,9 +240,9 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   return (
-    <div className="flex h-[calc(100vh-44px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-40px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
-      <aside className="w-48 shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
+      <aside className="w-[220px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
         {/* Selector de profesional */}
         <div>
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
@@ -259,12 +259,12 @@ export default function Dashboard() {
         </div>
 
         {/* Mini calendario */}
-        <div className="border rounded-lg overflow-hidden bg-background">
+        <div className="border rounded-lg overflow-hidden bg-background w-full">
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={d => d && setSelectedDate(d)}
-            className="p-1 [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-[11px]"
+            className="w-full p-1 [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-full [&_button]:text-[11px]"
           />
         </div>
 
