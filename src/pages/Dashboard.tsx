@@ -29,7 +29,7 @@ interface PCSRecord {
   hora_inicio: string;
   hora_fin: string;
   capacidad_simultanea: number;
-  servicio?: { id: string; nombre: string; duracion_minutos: number } | null;
+  servicio?: { id: string; nombre: string; duracion_minutos: number; sesiones_por_bloque: number | null } | null;
 }
 
 interface Turno {
@@ -74,7 +74,7 @@ export default function Dashboard() {
   const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProfId, setSelectedProfId] = useState<string>('todos');
-  const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string } | null>(null);
+  const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string; servicio_id?: string } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
   const [mobileColIndex, setMobileColIndex] = useState(0);
   const isMobile = useIsMobile();
@@ -140,7 +140,7 @@ export default function Dashboard() {
         paciente:pacientes(nombre, apellido),
         servicio:servicios(nombre)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, servicio:servicios(id, nombre, duracion_minutos)').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, servicio:servicios(id, nombre, duracion_minutos, sesiones_por_bloque)').eq('centro_id', centroId).eq('activo', true),
     ]);
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
@@ -175,6 +175,7 @@ export default function Dashboard() {
     return map;
   }, [turnos, selectedProfId]);
 
+  // capacidad por profesional (para vista "todos")
   const capacityMap = useMemo(() => {
     const map: Record<string, number> = {};
     pcsRecords.forEach(r => {
@@ -186,23 +187,44 @@ export default function Dashboard() {
     return map;
   }, [pcsRecords, dayName]);
 
+  // capacidad por servicio: usa sesiones_por_bloque del servicio (cuántos pacientes simultáneos)
+  const servicioCapacityMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    pcsRecords.forEach(r => {
+      if (!r.servicio) return;
+      const cap = r.servicio.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
+      map[r.servicio.id] = Math.max(map[r.servicio.id] ?? 1, cap);
+    });
+    return map;
+  }, [pcsRecords]);
+
   const isSlotAvailable = (profId: string, hora: string) => profSlotMap[profId]?.has(hora) ?? true;
+
   const isSlotFull = (profId: string, hora: string) => {
     const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
     return slotTurnos.length >= (capacityMap[profId] ?? 1);
   };
 
+  const isServicioSlotFull = (servicioId: string, hora: string) => {
+    const key = `${servicioId}-${hora}`;
+    const count = turnoMapServicio[key]?.length ?? 0;
+    return count >= (servicioCapacityMap[servicioId] ?? 1);
+  };
+
+  // Click en vista "todos"
   const handleSlotClick = (profId: string, hora: string) => {
-    const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
-    const available = isSlotAvailable(profId, hora);
-    const full = isSlotFull(profId, hora);
-    if (available && !full) {
-      const prof = profesionales.find(p => p.id === profId);
-      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
-    } else if (slotTurnos.length > 0 && !full && available) {
-      const prof = profesionales.find(p => p.id === profId);
-      setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
-    }
+    if (!isSlotAvailable(profId, hora)) return;
+    if (isSlotFull(profId, hora)) return;
+    const prof = profesionales.find(p => p.id === profId);
+    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
+  };
+
+  // Click en vista "profesional individual" (columnas = servicios)
+  const handleServicioSlotClick = (servicioId: string, hora: string) => {
+    if (!isSlotAvailable(selectedProfId, hora)) return;
+    if (isServicioSlotFull(servicioId, hora)) return;
+    const prof = profesionales.find(p => p.id === selectedProfId);
+    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', servicio_id: servicioId });
   };
 
   // Resumen de estados del día
@@ -345,7 +367,7 @@ export default function Dashboard() {
               onClick={() => {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
                 const prof = profesionales.find(p => p.id === profId);
-                setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
+                setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', servicio_id: serviciosDelProf[0]?.id });
               }}
             >
               <Plus className="h-3.5 w-3.5" /> Nuevo turno
@@ -473,11 +495,15 @@ export default function Dashboard() {
                         ? serviciosDelProf.map(s => {
                             const key = `${s.id}-${hora}`;
                             const slotTurnos = turnoMapServicio[key] ?? [];
+                            const cap = servicioCapacityMap[s.id] ?? 1;
+                            const full = slotTurnos.length >= cap;
+                            const available = isSlotAvailable(selectedProfId, hora);
                             return (
                               <td
                                 key={s.id}
-                                className="p-1 align-top min-h-[48px] cursor-pointer hover:bg-primary/5 transition-colors"
-                                onClick={() => handleSlotClick(selectedProfId, hora)}
+                                className={`p-1 align-top min-h-[48px] transition-colors
+                                  ${available && !full ? 'cursor-pointer hover:bg-primary/5' : full ? 'cursor-default' : 'bg-muted/30 cursor-not-allowed'}`}
+                                onClick={() => handleServicioSlotClick(s.id, hora)}
                               >
                                 <div className="space-y-0.5">
                                   {slotTurnos.map(t => {
@@ -492,15 +518,16 @@ export default function Dashboard() {
                                         <p className="font-semibold text-foreground leading-tight">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
-                                        {t.servicio && (
-                                          <p className="text-[10px] text-muted-foreground leading-tight truncate">
-                                            {t.servicio.nombre}
-                                          </p>
-                                        )}
                                         <p className="leading-tight mt-0.5" style={{ color: est.color }}>{est.label}</p>
                                       </div>
                                     );
                                   })}
+                                  {/* indicador de capacidad */}
+                                  {cap > 1 && (
+                                    <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                      {slotTurnos.length}/{cap} {full ? '· completo' : '· disponible'}
+                                    </p>
+                                  )}
                                 </div>
                               </td>
                             );
@@ -548,6 +575,7 @@ export default function Dashboard() {
               hora={newTurnoSlot.hora}
               profesionalId={newTurnoSlot.profesional_id}
               profesionalNombre={newTurnoSlot.profesional_nombre}
+              preselectedServicioId={newTurnoSlot.servicio_id}
               onSuccess={() => { setNewTurnoSlot(null); fetchData(); }}
               onCancel={() => setNewTurnoSlot(null)}
             />

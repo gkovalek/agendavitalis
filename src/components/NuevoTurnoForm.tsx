@@ -20,6 +20,7 @@ interface Props {
   hora: string;
   profesionalId: string;
   profesionalNombre: string;
+  preselectedServicioId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -62,7 +63,7 @@ interface TurnoHistorial {
 
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
-export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, onSuccess, onCancel }: Props) {
+export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedServicioId, onSuccess, onCancel }: Props) {
   const { centroId } = useAuth();
   const { toast } = useToast();
 
@@ -82,7 +83,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const [savingPatient, setSavingPatient] = useState(false);
 
   const [servicios, setServicios] = useState<Servicio[]>([]);
-  const [servicioId, setServicioId] = useState('');
+  const [servicioId, setServicioId] = useState(preselectedServicioId ?? '');
   const [esTratamiento, setEsTratamiento] = useState(false);
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [tratamientoId, setTratamientoId] = useState('');
@@ -117,6 +118,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         });
         unique.sort((a, b) => a.nombre.localeCompare(b.nombre));
         setServicios(unique);
+        // Auto-seleccionar si hay uno preseleccionado o si solo hay uno disponible
+        if (preselectedServicioId && unique.find(s => s.id === preselectedServicioId)) {
+          setServicioId(preselectedServicioId);
+        } else if (unique.length === 1) {
+          setServicioId(unique[0].id);
+        }
       });
   }, [centroId, profesionalId]);
 
