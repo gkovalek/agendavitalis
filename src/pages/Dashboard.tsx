@@ -181,12 +181,14 @@ export default function Dashboard() {
   }, [turnos, selectedProfId]);
 
   // capacidad por profesional (para vista "todos")
+  // usa sesiones_por_bloque del servicio; cae en capacidad_simultanea del PCS si no está definido
   const capacityMap = useMemo(() => {
     const map: Record<string, number> = {};
     pcsRecords.forEach(r => {
       if (!r.profesional_id) return;
       if (normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) {
-        map[r.profesional_id] = Math.max(map[r.profesional_id] ?? 1, r.capacidad_simultanea ?? 1);
+        const cap = r.servicio?.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
+        map[r.profesional_id] = Math.max(map[r.profesional_id] ?? 1, cap);
       }
     });
     return map;
