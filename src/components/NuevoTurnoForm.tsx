@@ -306,19 +306,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       if (cajaErr) console.error('[NuevoTurnoForm] Caja insert error:', cajaErr.message, cajaErr.details);
     }
 
-    if (finalTratamientoId && !nuevoTratamiento && selectedTratamiento) {
-      const newConsumed = selectedTratamiento.sesiones_consumidas + 1;
-      await supabase.from('tratamientos').update({
-        sesiones_consumidas: newConsumed,
-        sesiones_restantes: selectedTratamiento.total_sesiones - newConsumed,
-      }).eq('id', finalTratamientoId);
-    } else if (finalTratamientoId && nuevoTratamiento) {
-      await supabase.from('tratamientos').update({
-        sesiones_consumidas: 1,
-        sesiones_restantes: totalSesiones - 1,
-      }).eq('id', finalTratamientoId);
-    }
-
     setSaving(false);
     toast({ title: 'Turno creado', description: `${selectedPaciente.apellido}, ${selectedPaciente.nombre} — ${fecha} ${hora}` });
     onSuccess();

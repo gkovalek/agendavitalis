@@ -220,9 +220,26 @@ export default function Dashboard() {
     const { error } = await supabase.from('turnos').update({ estado }).eq('id', turnoId);
     if (error) {
       toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
-    } else {
-      fetchData();
+      setContextMenu(null);
+      return;
     }
+
+    // Recalculate sesiones_consumidas based on actual finalized turnos
+    const { data: turnoData } = await supabase.from('turnos').select('tratamiento_id').eq('id', turnoId).single();
+    if (turnoData?.tratamiento_id) {
+      const { count } = await supabase.from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('tratamiento_id', turnoData.tratamiento_id)
+        .eq('estado', 'finalizado');
+      const sesiones = count ?? 0;
+      const { data: trat } = await supabase.from('tratamientos').select('total_sesiones').eq('id', turnoData.tratamiento_id).single();
+      await supabase.from('tratamientos').update({
+        sesiones_consumidas: sesiones,
+        sesiones_restantes: (trat?.total_sesiones ?? 0) - sesiones,
+      }).eq('id', turnoData.tratamiento_id);
+    }
+
+    fetchData();
     setContextMenu(null);
   };
 
