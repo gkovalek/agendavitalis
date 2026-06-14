@@ -7,6 +7,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
 import { TurnoContextMenu } from '@/components/TurnoContextMenu';
@@ -61,6 +62,7 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
 
 export default function Dashboard() {
   const { centroId } = useAuth();
+  const { toast } = useToast();
   const { getNumber, loading: configLoading } = useCentroConfig(centroId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -168,6 +170,16 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
   useEffect(() => { setMobileColIndex(0); }, [profesionales]);
+
+  const handleEstadoChange = async (turnoId: string, estado: TurnoEstado) => {
+    const { error } = await supabase.from('turnos').update({ estado }).eq('id', turnoId);
+    if (error) {
+      toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+    } else {
+      fetchData();
+    }
+    setContextMenu(null);
+  };
 
   // turnoMap: profId-hora → turnos (vista todos)
   const turnoMap = useMemo(() => {
@@ -596,6 +608,7 @@ export default function Dashboard() {
               ? isAgendaSlotFull(contextMenu.agendaId, contextMenu.hora)
               : isSlotFull(contextMenu.profId, contextMenu.hora)
           }
+          turnoId={contextMenu.turno?.id}
           onViewTurno={() => setSelectedTurno(contextMenu.turno)}
           onAddTurno={() => {
             const prof = profesionales.find(p => p.id === contextMenu.profId);
@@ -607,6 +620,9 @@ export default function Dashboard() {
               agenda_id: contextMenu.agendaId,
             });
           }}
+          onEstadoChange={handleEstadoChange}
+          onReprogramar={() => toast({ title: 'Reprogramar turno', description: 'Función en desarrollo — próximamente disponible.' })}
+          onEnviarRecordatorio={() => toast({ title: 'Enviar recordatorio', description: 'Función en desarrollo — próximamente disponible.' })}
           onClose={() => setContextMenu(null)}
         />
       )}
