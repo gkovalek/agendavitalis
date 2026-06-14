@@ -23,13 +23,21 @@ interface Servicio {
   es_tratamiento: boolean;
   sesiones_por_bloque: number | null;
   activo: boolean;
+  agenda_id: string | null;
+  agenda?: { nombre: string } | null;
 }
 
-const emptyForm = { nombre: '', duracion_minutos: 30, costo_base: 0, es_tratamiento: false, sesiones_por_bloque: null as number | null, activo: true };
+interface AgendaOption {
+  id: string;
+  nombre: string;
+}
+
+const emptyForm = { nombre: '', duracion_minutos: 30, costo_base: 0, es_tratamiento: false, sesiones_por_bloque: null as number | null, activo: true, agenda_id: '' };
 
 export default function Servicios() {
   const { centroId } = useAuth();
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [agendas, setAgendas] = useState<AgendaOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -43,8 +51,12 @@ export default function Servicios() {
   const fetchData = async () => {
     if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase.from('servicios').select('*').eq('centro_id', centroId).order('nombre');
-    setServicios(data ?? []);
+    const [{ data: srvData }, { data: agData }] = await Promise.all([
+      supabase.from('servicios').select('*, agenda:agendas(nombre)').eq('centro_id', centroId).order('nombre'),
+      supabase.from('agendas').select('id, nombre').eq('centro_id', centroId).order('nombre'),
+    ]);
+    setServicios(srvData ?? []);
+    setAgendas(agData ?? []);
     setLoading(false);
   };
 
@@ -53,14 +65,18 @@ export default function Servicios() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (s: Servicio) => {
     setEditId(s.id);
-    setForm({ nombre: s.nombre, duracion_minutos: s.duracion_minutos, costo_base: s.costo_base, es_tratamiento: s.es_tratamiento, sesiones_por_bloque: s.sesiones_por_bloque, activo: s.activo });
+    setForm({ nombre: s.nombre, duracion_minutos: s.duracion_minutos, costo_base: s.costo_base, es_tratamiento: s.es_tratamiento, sesiones_por_bloque: s.sesiones_por_bloque, activo: s.activo, agenda_id: s.agenda_id ?? '' });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!centroId) return;
     setSaving(true);
-    const payload = { ...form, sesiones_por_bloque: form.es_tratamiento ? form.sesiones_por_bloque : null };
+    const payload = {
+      ...form,
+      sesiones_por_bloque: form.es_tratamiento ? form.sesiones_por_bloque : null,
+      agenda_id: form.agenda_id || null,
+    };
     if (editId) {
       const { error } = await supabase.from('servicios').update(payload).eq('id', editId);
       if (error) toast({ title: 'Error', description: 'No se pudo actualizar el servicio. Intentá de nuevo.', variant: 'destructive' });
@@ -122,11 +138,17 @@ export default function Servicios() {
             </div>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Duración</TableHead><TableHead>Costo base</TableHead><TableHead>Tipo</TableHead><TableHead>Estado</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Agenda</TableHead><TableHead>Duración</TableHead><TableHead>Costo base</TableHead><TableHead>Tipo</TableHead><TableHead>Estado</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
               <TableBody>
                 {servicios.map(s => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.nombre}</TableCell>
+                    <TableCell>
+                      {s.agenda?.nombre
+                        ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s.agenda.nombre}</span>
+                        : <span className="text-xs text-muted-foreground">Sin asignar</span>
+                      }
+                    </TableCell>
                     <TableCell>{s.duracion_minutos} min</TableCell>
                     <TableCell>${s.costo_base}</TableCell>
                     <TableCell>{s.es_tratamiento ? <Badge variant="secondary">Tratamiento ({s.sesiones_por_bloque} ses.)</Badge> : <Badge variant="outline">Consulta</Badge>}</TableCell>
@@ -150,6 +172,16 @@ export default function Servicios() {
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Servicio</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
+            <div className="space-y-1">
+              <Label>Agenda *</Label>
+              <Select value={form.agenda_id} onValueChange={v => setForm({ ...form, agenda_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar agenda" /></SelectTrigger>
+                <SelectContent>
+                  {agendas.map(a => <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {agendas.length === 0 && <p className="text-xs text-amber-600">No hay agendas configuradas. Creá una en Agendas &gt; Gestión de Agendas.</p>}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Duración del turno</Label>
@@ -168,7 +200,7 @@ export default function Servicios() {
             {form.es_tratamiento && (<div className="space-y-1"><Label>Sesiones por bloque</Label><Input type="number" value={form.sesiones_por_bloque ?? ''} onChange={e => setForm({ ...form, sesiones_por_bloque: Number(e.target.value) })} /></div>)}
             <div className="flex items-center gap-2"><Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} /><Label>Activo</Label></div>
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} disabled={saving || !form.nombre} className="flex-1 sm:flex-none">{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar</Button>
+              <Button onClick={handleSave} disabled={saving || !form.nombre || !form.agenda_id} className="flex-1 sm:flex-none">{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar</Button>
               <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
             </div>
           </div>

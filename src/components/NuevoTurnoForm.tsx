@@ -144,6 +144,13 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         const list = ((data as Servicio[]) ?? []).sort((a, b) => a.nombre.localeCompare(b.nombre));
         setServicios(list);
         if (list.length === 1) setServicioId(list[0].id);
+        if (list.length === 0) {
+          toast({
+            title: 'Agenda sin servicios',
+            description: 'Esta agenda no tiene servicios asignados. Asigná al menos un servicio en Agendas > Servicios antes de crear un turno.',
+            variant: 'destructive',
+          });
+        }
       });
   }, [agendaId, centroId]);
 
@@ -479,7 +486,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Turno</Button>
+                <Button onClick={handleSave} disabled={saving || (!!agendaId && servicios.length === 0)}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Turno</Button>
                 <Button variant="outline" onClick={onCancel}>Cancelar</Button>
               </div>
             </TabsContent>
