@@ -264,19 +264,16 @@ export default function Configuracion() {
         description="Credenciales para generar links de pago al momento de reservar un turno"
         icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant="outline" className="text-xs">Próximamente</Badge>
-          <span className="text-xs text-muted-foreground">Módulo en desarrollo</span>
+        <div className="flex items-start gap-2 mb-2 p-3 rounded-md bg-yellow-50 border border-yellow-200">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-yellow-800">
+            <p className="font-semibold">El Access Token nunca se guarda en el navegador</p>
+            <p className="mt-1">
+              Por seguridad, el token privado de Mercado Pago debe almacenarse como Edge Function Secret en Lovable Cloud / Supabase
+              y usarse únicamente desde el servidor. Sólo la Public Key puede vivir en el cliente.
+            </p>
+          </div>
         </div>
-        <Field label="Access Token">
-          <Input
-            value={vals.mp_access_token ?? ''}
-            onChange={e => setVals(v => ({ ...v, mp_access_token: e.target.value }))}
-            placeholder="APP_USR-..."
-            type="password"
-            className="font-mono text-sm"
-          />
-        </Field>
         <Field label="Public Key">
           <Input
             value={vals.mp_public_key ?? ''}
@@ -288,7 +285,7 @@ export default function Configuracion() {
         <Button
           size="sm"
           disabled={saving === 'mp' || !tableExists}
-          onClick={() => handleSave('mp', ['mp_access_token', 'mp_public_key'])}
+          onClick={() => handleSave('mp', ['mp_public_key'])}
         >
           {saving === 'mp' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
