@@ -14,6 +14,7 @@ import Equipos from "@/pages/Equipos";
 import Servicios from "@/pages/Servicios";
 import GestionAgendas from "@/pages/GestionAgendas";
 import ObrasSociales from "@/pages/ObrasSociales";
+import LiquidacionOS from "@/pages/LiquidacionOS";
 import Caja from "@/pages/Caja";
 import Tratamientos from "@/pages/Tratamientos";
 import Recordatorios from "@/pages/Recordatorios";
@@ -72,6 +73,7 @@ function AppRoutes() {
       <Route path="/equipos" element={<ProtectedRoute><Equipos /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
+      <Route path="/liquidacion-os" element={<ProtectedRoute><LiquidacionOS /></ProtectedRoute>} />
       <Route path="/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="/caja/crear" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
       <Route path="/tratamientos" element={<ProtectedRoute><Tratamientos /></ProtectedRoute>} />

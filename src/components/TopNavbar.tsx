@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Obras sociales',
     items: [
       { label: 'Gestión de obras sociales', href: '/obras-sociales' },
+      { label: 'Liquidación mensual', href: '/liquidacion-os' },
     ],
   },
   {
