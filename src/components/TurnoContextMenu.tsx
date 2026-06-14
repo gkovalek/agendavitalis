@@ -165,7 +165,6 @@ export function TurnoContextMenu({
           >
             <Calendar className="w-3.5 h-3.5 opacity-60" />
             Reprogramar turno
-            <span className="ml-auto text-[10px] text-zinc-400 italic">próximamente</span>
           </button>
 
           {/* Recordatorio */}

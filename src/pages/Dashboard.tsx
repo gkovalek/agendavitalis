@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
 import { TurnoContextMenu } from '@/components/TurnoContextMenu';
+import { ReprogramarTurnoDialog } from '@/components/ReprogramarTurnoDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Profesional { id: string; nombre: string; apellido: string; }
@@ -94,6 +95,7 @@ export default function Dashboard() {
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; turno: Turno; profId: string; hora: string; agendaId?: string;
   } | null>(null);
+  const [reprogramarTurno, setReprogramarTurno] = useState<Turno | null>(null);
   const isMobile = useIsMobile();
 
   const dateStr = useMemo(() => {
@@ -691,6 +693,12 @@ export default function Dashboard() {
         onUpdated={() => { setSelectedTurno(null); fetchData(); }}
       />
 
+      <ReprogramarTurnoDialog
+        turno={reprogramarTurno}
+        onClose={() => setReprogramarTurno(null)}
+        onReprogramado={() => { setReprogramarTurno(null); fetchData(); }}
+      />
+
       {contextMenu && (
         <TurnoContextMenu
           x={contextMenu.x}
@@ -713,7 +721,7 @@ export default function Dashboard() {
             });
           }}
           onEstadoChange={handleEstadoChange}
-          onReprogramar={() => toast({ title: 'Reprogramar turno', description: 'Función en desarrollo — próximamente disponible.' })}
+          onReprogramar={() => { setReprogramarTurno(contextMenu!.turno); setContextMenu(null); }}
           onEnviarRecordatorio={() => toast({ title: 'Enviar recordatorio', description: 'Función en desarrollo — próximamente disponible.' })}
           onClose={() => setContextMenu(null)}
         />
