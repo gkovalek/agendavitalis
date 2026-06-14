@@ -37,6 +37,9 @@ interface Turno {
   servicio_id?: string | null;
   paciente?: { nombre: string; apellido: string };
   servicio?: { nombre: string; agenda_id?: string | null } | null;
+  sesion_num?: number;
+  sesiones_total?: number | null;
+  tiene_pago?: boolean;
 }
 
 function generateTimeSlots(inicio: string, fin: string, intervalo: number): string[] {
@@ -162,9 +165,51 @@ export default function Dashboard() {
         .select('profesional_id, agenda_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, nombre, duracion_minutos, sesiones_por_bloque)')
         .eq('centro_id', centroId).eq('activo', true),
     ]);
+    const turnosList: Turno[] = (turnosRes.data as any[]) ?? [];
+    const pcsListRaw: PCSRecord[] = ((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) }));
+
+    // Queries adicionales: conteo de sesiones finalizadas y pagos
+    const uniquePacienteIds = [...new Set(turnosList.map(t => t.paciente_id).filter(Boolean))];
+    const uniqueTurnoIds = turnosList.map(t => t.id);
+
+    const [countRes, payRes] = await Promise.all([
+      uniquePacienteIds.length > 0
+        ? supabase.from('turnos').select('paciente_id, servicio_id').in('paciente_id', uniquePacienteIds).eq('centro_id', centroId!).eq('estado', 'finalizado')
+        : Promise.resolve({ data: [] }),
+      uniqueTurnoIds.length > 0
+        ? supabase.from('caja_movimientos').select('turno_id, monto_efectivo, monto_transferencia, monto_prepaga').in('turno_id', uniqueTurnoIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    // Mapa finalizados: `pacienteId-servicioId` → cantidad
+    const finalizedMap: Record<string, number> = {};
+    ((countRes as any).data ?? []).forEach((r: any) => {
+      const key = `${r.paciente_id}-${r.servicio_id}`;
+      finalizedMap[key] = (finalizedMap[key] ?? 0) + 1;
+    });
+
+    // Set de turno_ids con pago cargado
+    const pagadoSet = new Set<string>();
+    ((payRes as any).data ?? []).forEach((p: any) => {
+      if (p.turno_id && ((p.monto_efectivo ?? 0) + (p.monto_transferencia ?? 0) + (p.monto_prepaga ?? 0)) > 0) {
+        pagadoSet.add(p.turno_id);
+      }
+    });
+
+    // Enriquecer cada turno con nro sesión y pago
+    const enriched: Turno[] = turnosList.map(t => {
+      const key = `${t.paciente_id}-${t.servicio_id}`;
+      const finalizados = finalizedMap[key] ?? 0;
+      const sesion_num = t.estado === 'finalizado' ? finalizados : finalizados + 1;
+      const agendaId = t.servicio?.agenda_id;
+      const agendaRec = pcsListRaw.find(r => r.agenda?.id === agendaId);
+      const sesiones_total = agendaRec?.agenda?.sesiones_por_bloque ?? null;
+      return { ...t, sesion_num, sesiones_total, tiene_pago: pagadoSet.has(t.id) };
+    });
+
     setProfesionales(profRes.data ?? []);
-    setTurnos((turnosRes.data as any[]) ?? []);
-    setPcsRecords(((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+    setTurnos(enriched);
+    setPcsRecords(pcsListRaw);
     setLoading(false);
   };
 
@@ -444,11 +489,15 @@ export default function Dashboard() {
                                 const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                 return (
                                   <div key={t.id}
-                                    className="rounded px-1.5 py-1 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
+                                    className="relative rounded px-1.5 py-1 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                     style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                     onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                     onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: p.id, hora }); }}>
-                                    <p className="font-semibold text-foreground truncate leading-tight">
+                                    <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
+                                      {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
+                                      {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                    </div>
+                                    <p className="font-semibold text-foreground truncate leading-tight pr-7">
                                       {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                     </p>
                                     <p className="leading-tight truncate" style={{ color: est.color }}>{est.label}</p>
@@ -516,11 +565,15 @@ export default function Dashboard() {
                                     const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                     return (
                                       <div key={t.id}
-                                        className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
+                                        className="relative rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                         style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                         onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora, agendaId: a.id }); }}>
-                                        <p className="font-semibold text-foreground leading-tight">
+                                        <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
+                                          {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
+                                          {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                        </div>
+                                        <p className="font-semibold text-foreground leading-tight pr-8">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
                                         <p className="text-[10px] leading-tight text-muted-foreground">{t.servicio?.nombre}</p>
@@ -553,11 +606,15 @@ export default function Dashboard() {
                                   const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                   return (
                                     <div key={t.id}
-                                      className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
+                                      className="relative rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                       style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                       onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora }); }}>
-                                      <p className="font-semibold">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
+                                      <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
+                                        {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
+                                        {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                      </div>
+                                      <p className="font-semibold pr-8">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
                                       <p style={{ color: est.color }}>{est.label}</p>
                                     </div>
                                   );
