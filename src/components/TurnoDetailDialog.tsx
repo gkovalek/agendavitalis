@@ -30,6 +30,7 @@ interface Paciente {
   celular: string;
   fecha_nacimiento: string | null;
   prepaga_id: string | null;
+  obra_social_id: string | null;
   numero_afiliado: string | null;
   plan_os: string | null;
   prepaga?: { id: string; nombre: string } | null;
@@ -112,7 +113,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     Promise.all([
       // Paciente completo
       supabase.from('pacientes')
-        .select('id, nombre, apellido, dni, celular, fecha_nacimiento, prepaga_id, numero_afiliado, plan_os, prepaga:prepagas(id, nombre)')
+        .select('id, nombre, apellido, dni, celular, fecha_nacimiento, prepaga_id, obra_social_id, numero_afiliado, plan_os, prepaga:prepagas(id, nombre)')
         .eq('id', turno.paciente_id).single(),
 
       // Servicio del turno
@@ -174,7 +175,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       setTratamientos(((tratRes as any).data ?? []) as TratamientoRow[]);
 
       setEstado(turno.estado);
-      setPrepagaId(pac.prepaga_id);
+      // Preferir obra_social_id (tabla nueva), fallback a prepaga_id (tabla vieja)
+      setPrepagaId(pac.obra_social_id ?? pac.prepaga_id);
       setNroCredencial(pac.numero_afiliado ?? '');
       setPlanOs(pac.plan_os ?? '');
       setMontoEfectivo((cajaRes as any).data?.monto_efectivo ?? 0);
@@ -197,7 +199,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
     const ops: Promise<any>[] = [
       supabase.from('turnos').update({ estado }).eq('id', turno.id),
-      supabase.from('pacientes').update({ prepaga_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
+      supabase.from('pacientes').update({ obra_social_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
 
     const totalPago = montoEfectivo + montoTransferencia + montoPrepaga;
