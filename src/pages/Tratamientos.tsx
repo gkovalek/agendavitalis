@@ -356,7 +356,8 @@ export default function Tratamientos() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Total de sesiones</Label>
+                  <Label>Sesiones del pedido médico</Label>
+                  <p className="text-[11px] text-muted-foreground -mt-0.5">Cantidad autorizada por el médico</p>
                   <Input type="number" min={1} value={form.total_sesiones} onChange={e => setForm(f => ({ ...f, total_sesiones: Number(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
@@ -400,15 +401,25 @@ function TratamientoDetail({ tratamiento, sesiones, loading, onCambiarEstado }: 
       </div>
 
       <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Progreso de sesiones</span>
-          <span className="font-semibold">{tratamiento.sesiones_consumidas} / {tratamiento.total_sesiones}</span>
+        <div className="grid grid-cols-3 gap-2 text-center mb-1">
+          <div className="rounded-lg bg-muted/50 p-2">
+            <p className="text-[18px] font-bold text-foreground">{tratamiento.total_sesiones}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Autorizadas</p>
+            <p className="text-[10px] text-muted-foreground">pedido médico</p>
+          </div>
+          <div className="rounded-lg bg-primary/10 p-2">
+            <p className="text-[18px] font-bold text-primary">{tratamiento.sesiones_consumidas}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Asistidas</p>
+            <p className="text-[10px] text-muted-foreground">realizadas</p>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-2">
+            <p className="text-[18px] font-bold text-foreground">{tratamiento.sesiones_restantes}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Restantes</p>
+            <p className="text-[10px] text-muted-foreground">pendientes</p>
+          </div>
         </div>
-        <Progress value={pct} className="h-3" />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{pct}% completado</span>
-          <span>{tratamiento.sesiones_restantes} restantes</span>
-        </div>
+        <Progress value={pct} className="h-2" />
+        <p className="text-xs text-muted-foreground text-center">{pct}% del pedido médico completado</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">

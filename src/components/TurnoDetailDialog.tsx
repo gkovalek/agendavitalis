@@ -31,6 +31,7 @@ interface Paciente {
   fecha_nacimiento: string | null;
   prepaga_id: string | null;
   numero_afiliado: string | null;
+  plan_os: string | null;
   prepaga?: { id: string; nombre: string } | null;
 }
 
@@ -84,7 +85,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
   // Datos principales (tab cita)
   const [paciente, setPaciente] = useState<Paciente | null>(null);
-  const [servicio, setServicio] = useState<{ id: string; nombre: string; costo_base: number } | null>(null);
+  const [servicio, setServicio] = useState<{ id: string; nombre: string; costo_base: number; requiere_os: boolean } | null>(null);
   const [tratamientoActual, setTratamientoActual] = useState<{ id: string; total_sesiones: number; sesiones_consumidas: number } | null>(null);
   const [sesionesFinalizadas, setSesionesFinalizadas] = useState(0);
   const [cajaActual, setCajaActual] = useState<{ monto_efectivo: number; monto_transferencia: number; monto_prepaga: number } | null>(null);
@@ -93,6 +94,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [estado, setEstado] = useState<TurnoEstado>('reservado');
   const [prepagaId, setPrepagaId] = useState<string | null>(null);
   const [nroCredencial, setNroCredencial] = useState('');
+  const [planOs, setPlanOs] = useState('');
   const [montoEfectivo, setMontoEfectivo] = useState(0);
   const [montoTransferencia, setMontoTransferencia] = useState(0);
   const [montoPrepaga, setMontoPrepaga] = useState(0);
@@ -110,12 +112,12 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     Promise.all([
       // Paciente completo
       supabase.from('pacientes')
-        .select('id, nombre, apellido, dni, celular, fecha_nacimiento, prepaga_id, numero_afiliado, prepaga:prepagas(id, nombre)')
+        .select('id, nombre, apellido, dni, celular, fecha_nacimiento, prepaga_id, numero_afiliado, plan_os, prepaga:prepagas(id, nombre)')
         .eq('id', turno.paciente_id).single(),
 
       // Servicio del turno
       turno.servicio_id
-        ? supabase.from('servicios').select('id, nombre, costo_base').eq('id', turno.servicio_id).single()
+        ? supabase.from('servicios').select('id, nombre, costo_base, requiere_os').eq('id', turno.servicio_id).single()
         : Promise.resolve({ data: null }),
 
       // Tratamiento del turno
@@ -174,6 +176,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       setEstado(turno.estado);
       setPrepagaId(pac.prepaga_id);
       setNroCredencial(pac.numero_afiliado ?? '');
+      setPlanOs(pac.plan_os ?? '');
       setMontoEfectivo((cajaRes as any).data?.monto_efectivo ?? 0);
       setMontoTransferencia((cajaRes as any).data?.monto_transferencia ?? 0);
       setMontoPrepaga((cajaRes as any).data?.monto_prepaga ?? 0);
@@ -185,9 +188,16 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     if (!turno || !paciente) return;
     setSaving(true);
 
+    // Validar OS obligatoria
+    if (servicio?.requiere_os && !prepagaId) {
+      toast({ title: 'Obra social requerida', description: 'Este servicio requiere seleccionar una obra social antes de guardar.', variant: 'destructive' });
+      setSaving(false);
+      return;
+    }
+
     const ops: Promise<any>[] = [
       supabase.from('turnos').update({ estado }).eq('id', turno.id),
-      supabase.from('pacientes').update({ prepaga_id: prepagaId, numero_afiliado: nroCredencial || null }).eq('id', paciente.id),
+      supabase.from('pacientes').update({ prepaga_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
 
     const totalPago = montoEfectivo + montoTransferencia + montoPrepaga;
@@ -291,16 +301,36 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
               {/* ── CITA ── */}
               {tab === 'cita' && (
                 <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                  {/* Sección OS */}
+                  <div className={`space-y-3 rounded-lg p-3 ${servicio?.requiere_os ? 'border-2 border-blue-200 bg-blue-50/50' : 'border bg-muted/20'}`}>
+                    {servicio?.requiere_os && (
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                        <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">Obra social — obligatorio para este servicio</p>
+                      </div>
+                    )}
+                    {!servicio?.requiere_os && (
                       <Label className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                         <Building2 className="w-3 h-3" />Obra social
                       </Label>
-                      <PrepagaAutocomplete value={prepagaId} onSelect={id => setPrepagaId(id)} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Nro. credencial</Label>
-                      <Input value={nroCredencial} onChange={e => setNroCredencial(e.target.value)} placeholder="—" className="h-9 text-[13px]" />
+                    )}
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          Obra social {servicio?.requiere_os && <span className="text-red-500">*</span>}
+                        </Label>
+                        <PrepagaAutocomplete value={prepagaId} onSelect={id => setPrepagaId(id)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">Nro. credencial</Label>
+                          <Input value={nroCredencial} onChange={e => setNroCredencial(e.target.value)} placeholder="—" className="h-8 text-[12px]" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">Plan</Label>
+                          <Input value={planOs} onChange={e => setPlanOs(e.target.value)} placeholder="Ej: 210, Gold, etc." className="h-8 text-[12px]" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 

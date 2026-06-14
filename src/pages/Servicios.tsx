@@ -22,6 +22,7 @@ interface Servicio {
   costo_base: number;
   es_tratamiento: boolean;
   sesiones_por_bloque: number | null;
+  requiere_os: boolean;
   activo: boolean;
   agenda_id: string | null;
   agenda?: { nombre: string } | null;
@@ -32,7 +33,7 @@ interface AgendaOption {
   nombre: string;
 }
 
-const emptyForm = { nombre: '', duracion_minutos: 30, costo_base: 0, es_tratamiento: false, sesiones_por_bloque: null as number | null, activo: true, agenda_id: '' };
+const emptyForm = { nombre: '', duracion_minutos: 30, costo_base: 0, es_tratamiento: false, sesiones_por_bloque: null as number | null, requiere_os: false, activo: true, agenda_id: '' };
 
 export default function Servicios() {
   const { centroId } = useAuth();
@@ -65,7 +66,7 @@ export default function Servicios() {
   const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (s: Servicio) => {
     setEditId(s.id);
-    setForm({ nombre: s.nombre, duracion_minutos: s.duracion_minutos, costo_base: s.costo_base, es_tratamiento: s.es_tratamiento, sesiones_por_bloque: s.sesiones_por_bloque, activo: s.activo, agenda_id: s.agenda_id ?? '' });
+    setForm({ nombre: s.nombre, duracion_minutos: s.duracion_minutos, costo_base: s.costo_base, es_tratamiento: s.es_tratamiento, sesiones_por_bloque: s.sesiones_por_bloque, requiere_os: s.requiere_os ?? false, activo: s.activo, agenda_id: s.agenda_id ?? '' });
     setDialogOpen(true);
   };
 
@@ -131,6 +132,7 @@ export default function Servicios() {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{s.duracion_minutos} min</span><span>·</span><span>${s.costo_base}</span><span>·</span>
                     {s.es_tratamiento ? <Badge variant="secondary" className="text-xs">Tratamiento ({s.sesiones_por_bloque} ses.)</Badge> : <Badge variant="outline" className="text-xs">Consulta</Badge>}
+                    {s.requiere_os && <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">OS obligatoria</Badge>}
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.activo ? 'Activo' : 'Inactivo'}</span>
                   </div>
                 </div>
@@ -151,7 +153,12 @@ export default function Servicios() {
                     </TableCell>
                     <TableCell>{s.duracion_minutos} min</TableCell>
                     <TableCell>${s.costo_base}</TableCell>
-                    <TableCell>{s.es_tratamiento ? <Badge variant="secondary">Tratamiento ({s.sesiones_por_bloque} ses.)</Badge> : <Badge variant="outline">Consulta</Badge>}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {s.es_tratamiento ? <Badge variant="secondary">Tratamiento ({s.sesiones_por_bloque} ses.)</Badge> : <Badge variant="outline">Consulta</Badge>}
+                        {s.requiere_os && <Badge className="bg-blue-100 text-blue-700 border-blue-200">OS obligatoria</Badge>}
+                      </div>
+                    </TableCell>
                     <TableCell><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.activo ? 'Activo' : 'Inactivo'}</span></TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -198,6 +205,13 @@ export default function Servicios() {
             </div>
             <div className="flex items-center gap-2"><Switch checked={form.es_tratamiento} onCheckedChange={v => setForm({ ...form, es_tratamiento: v })} /><Label>Es tratamiento</Label></div>
             {form.es_tratamiento && (<div className="space-y-1"><Label>Sesiones por bloque</Label><Input type="number" value={form.sesiones_por_bloque ?? ''} onChange={e => setForm({ ...form, sesiones_por_bloque: Number(e.target.value) })} /></div>)}
+            <div className="flex items-center gap-2">
+              <Switch checked={form.requiere_os} onCheckedChange={v => setForm({ ...form, requiere_os: v })} />
+              <div>
+                <Label>Requiere obra social</Label>
+                <p className="text-[11px] text-muted-foreground">Al cargar la cita se pedirá OS, plan y nro. de credencial obligatoriamente</p>
+              </div>
+            </div>
             <div className="flex items-center gap-2"><Switch checked={form.activo} onCheckedChange={v => setForm({ ...form, activo: v })} /><Label>Activo</Label></div>
             <div className="flex gap-2 pt-2">
               <Button onClick={handleSave} disabled={saving || !form.nombre || !form.agenda_id} className="flex-1 sm:flex-none">{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar</Button>
