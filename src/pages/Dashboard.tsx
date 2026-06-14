@@ -35,6 +35,7 @@ interface Turno {
   profesional_id: string;
   paciente_id: string;
   servicio_id?: string | null;
+  motivo_cancelacion?: string | null;
   paciente?: { nombre: string; apellido: string };
   servicio?: { nombre: string; agenda_id?: string | null } | null;
   sesion_num?: number;
@@ -53,6 +54,17 @@ function generateTimeSlots(inicio: string, fin: string, intervalo: number): stri
     total += intervalo;
   }
   return slots;
+}
+
+const MOTIVO_LABELS: Record<string, string> = {
+  por_paciente: 'Cancelado por paciente',
+  por_profesional: 'Cancelado por profesional',
+  error_carga: 'Error de carga',
+  ausente: 'Ausente',
+};
+
+function getCancelLabel(motivo?: string | null): string {
+  return motivo ? (MOTIVO_LABELS[motivo] ?? 'Cancelado') : 'Cancelado';
 }
 
 const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[] = [
@@ -157,7 +169,7 @@ export default function Dashboard() {
     const [profRes, turnosRes, pcsRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select(`
-        id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id,
+        id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id, motivo_cancelacion,
         paciente:pacientes(nombre, apellido),
         servicio:servicios(nombre, agenda_id)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
@@ -216,8 +228,11 @@ export default function Dashboard() {
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
   useEffect(() => { setMobileColIndex(0); }, [profesionales]);
 
-  const handleEstadoChange = async (turnoId: string, estado: TurnoEstado) => {
-    const { error } = await supabase.from('turnos').update({ estado }).eq('id', turnoId);
+  const handleEstadoChange = async (turnoId: string, estado: TurnoEstado, motivo?: string) => {
+    const updateData: Record<string, unknown> = { estado };
+    if (estado === 'cancelado' && motivo) updateData.motivo_cancelacion = motivo;
+    else if (estado !== 'cancelado') updateData.motivo_cancelacion = null;
+    const { error } = await supabase.from('turnos').update(updateData).eq('id', turnoId);
     if (error) {
       toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
       setContextMenu(null);
@@ -517,7 +532,7 @@ export default function Dashboard() {
                                     <p className="font-semibold text-foreground truncate leading-tight pr-7">
                                       {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                     </p>
-                                    <p className="leading-tight truncate" style={{ color: est.color }}>{est.label}</p>
+                                    <p className="leading-tight truncate" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                   </div>
                                 );
                               })}
@@ -594,7 +609,7 @@ export default function Dashboard() {
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
                                         <p className="text-[10px] leading-tight text-muted-foreground">{t.servicio?.nombre}</p>
-                                        <p className="leading-tight mt-0.5" style={{ color: est.color }}>{est.label}</p>
+                                        <p className="leading-tight mt-0.5" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                       </div>
                                     );
                                   })}
@@ -632,7 +647,7 @@ export default function Dashboard() {
                                         {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
                                       </div>
                                       <p className="font-semibold pr-8">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
-                                      <p style={{ color: est.color }}>{est.label}</p>
+                                      <p style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                     </div>
                                   );
                                 })}

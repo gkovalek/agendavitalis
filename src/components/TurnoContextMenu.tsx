@@ -12,7 +12,7 @@ interface TurnoContextMenuProps {
   turnoId?: string;
   onAddTurno: () => void;
   onViewTurno: () => void;
-  onEstadoChange?: (turnoId: string, estado: TurnoEstado) => void;
+  onEstadoChange?: (turnoId: string, estado: TurnoEstado, motivo?: string) => void;
   onReprogramar?: () => void;
   onEnviarRecordatorio?: () => void;
   onClose: () => void;
@@ -94,13 +94,13 @@ export function TurnoContextMenu({
     { label: '✅  Llegó (en sala)', onClick: () => onEstadoChange(turnoId, 'en_sala') },
     { label: '🩺  Siendo atendido', onClick: () => onEstadoChange(turnoId, 'siendo_atendido') },
     { label: '✔️  Finalizó', onClick: () => onEstadoChange(turnoId, 'finalizado') },
-    { label: '🚫  Ausente', onClick: () => onEstadoChange(turnoId, 'cancelado') },
+    { label: '🚫  Ausente', onClick: () => onEstadoChange(turnoId, 'cancelado', 'ausente') },
   ] : [];
 
   const cancelarItems: SubItem[] = turnoId && onEstadoChange ? [
-    { label: 'Cancelado por paciente', onClick: () => onEstadoChange(turnoId, 'cancelado'), danger: true },
-    { label: 'Cancelado por profesional', onClick: () => onEstadoChange(turnoId, 'cancelado'), danger: true },
-    { label: 'Error de carga', onClick: () => onEstadoChange(turnoId, 'cancelado'), danger: true },
+    { label: 'Cancelado por paciente', onClick: () => onEstadoChange(turnoId, 'cancelado', 'por_paciente'), danger: true },
+    { label: 'Cancelado por profesional', onClick: () => onEstadoChange(turnoId, 'cancelado', 'por_profesional'), danger: true },
+    { label: 'Error de carga', onClick: () => onEstadoChange(turnoId, 'cancelado', 'error_carga'), danger: true },
   ] : [];
 
   return (
