@@ -12,25 +12,18 @@ import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
 import { TurnoContextMenu } from '@/components/TurnoContextMenu';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-interface Profesional {
-  id: string;
-  nombre: string;
-  apellido: string;
-}
+interface Profesional { id: string; nombre: string; apellido: string; }
 
-interface Servicio {
-  id: string;
-  nombre: string;
-}
+interface Agenda { id: string; nombre: string; }
 
 interface PCSRecord {
   profesional_id: string | null;
-  servicio_id: string | null;
+  agenda_id: string | null;
   dias_trabajo: string[];
   hora_inicio: string;
   hora_fin: string;
   capacidad_simultanea: number;
-  servicio?: { id: string; nombre: string; duracion_minutos: number; sesiones_por_bloque: number | null } | null;
+  agenda?: { id: string; nombre: string; duracion_minutos: number; sesiones_por_bloque: number | null } | null;
 }
 
 interface Turno {
@@ -42,7 +35,7 @@ interface Turno {
   paciente_id: string;
   servicio_id?: string | null;
   paciente?: { nombre: string; apellido: string };
-  servicio?: { nombre: string } | null;
+  servicio?: { nombre: string; agenda_id?: string | null } | null;
 }
 
 function generateTimeSlots(inicio: string, fin: string, intervalo: number): string[] {
@@ -68,19 +61,20 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
 
 export default function Dashboard() {
   const { centroId } = useAuth();
-  const { getNumber, get, loading: configLoading } = useCentroConfig(centroId);
+  const { getNumber, loading: configLoading } = useCentroConfig(centroId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProfId, setSelectedProfId] = useState<string>('todos');
-  const [newTurnoSlot, setNewTurnoSlot] = useState<{ fecha: string; hora: string; profesional_id: string; profesional_nombre: string; servicio_id?: string } | null>(null);
+  const [newTurnoSlot, setNewTurnoSlot] = useState<{
+    fecha: string; hora: string; profesional_id: string; profesional_nombre: string; agenda_id?: string;
+  } | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
   const [mobileColIndex, setMobileColIndex] = useState(0);
   const [contextMenu, setContextMenu] = useState<{
-    x: number; y: number; turno: Turno;
-    profId: string; hora: string; servicioId?: string;
+    x: number; y: number; turno: Turno; profId: string; hora: string; agendaId?: string;
   } | null>(null);
   const isMobile = useIsMobile();
 
@@ -91,13 +85,13 @@ export default function Dashboard() {
 
   const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
 
-  // Slots por profesional para el día seleccionado (validados contra PCS)
+  // Slots por profesional validados contra PCS (dias+horario de la agenda)
   const profSlotMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
     pcsRecords.forEach(r => {
       if (!r.profesional_id) return;
       if (!normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) return;
-      const duracion = r.servicio?.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
+      const duracion = r.agenda?.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
       const slots = generateTimeSlots(r.hora_inicio, r.hora_fin, duracion);
       if (!map[r.profesional_id]) map[r.profesional_id] = new Set();
       slots.forEach(s => map[r.profesional_id!].add(s));
@@ -105,14 +99,14 @@ export default function Dashboard() {
     return map;
   }, [pcsRecords, dayName, configLoading]);
 
-  // Slots por servicio+profesional para el día seleccionado
-  const servicioSlotMap = useMemo(() => {
+  // Slots por profesional+agenda para el día seleccionado
+  const agendaSlotMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
     pcsRecords.forEach(r => {
-      if (!r.profesional_id || !r.servicio) return;
+      if (!r.profesional_id || !r.agenda) return;
       if (!normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) return;
-      const key = `${r.profesional_id}-${r.servicio.id}`;
-      const duracion = r.servicio.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
+      const key = `${r.profesional_id}-${r.agenda.id}`;
+      const duracion = r.agenda.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
       const slots = generateTimeSlots(r.hora_inicio, r.hora_fin, duracion);
       if (!map[key]) map[key] = new Set();
       slots.forEach(s => map[key].add(s));
@@ -127,7 +121,7 @@ export default function Dashboard() {
       ? profesionales.map(p => p.id)
       : [selectedProfId];
     profIds.forEach(id => profSlotMap[id]?.forEach(s => all.add(s)));
-    // Incluir también horas de turnos existentes aunque estén fuera del horario
+    // Incluir horas de turnos existentes aunque estén fuera del horario configurado
     turnos.forEach(t => {
       if (selectedProfId !== 'todos' && t.profesional_id !== selectedProfId) return;
       const h = t.hora_inicio?.substring(0, 5);
@@ -136,17 +130,17 @@ export default function Dashboard() {
     return Array.from(all).sort();
   }, [profSlotMap, selectedProfId, profesionales, turnos]);
 
-  // Servicios disponibles para el profesional seleccionado
-  const serviciosDelProf = useMemo((): Servicio[] => {
+  // Agendas del profesional seleccionado (desde PCS)
+  const agendasDelProf = useMemo((): Agenda[] => {
     if (selectedProfId === 'todos') return [];
     const seen = new Set<string>();
-    const result: Servicio[] = [];
+    const result: Agenda[] = [];
     pcsRecords
-      .filter(r => r.profesional_id === selectedProfId && r.servicio)
+      .filter(r => r.profesional_id === selectedProfId && r.agenda)
       .forEach(r => {
-        if (r.servicio && !seen.has(r.servicio.id)) {
-          seen.add(r.servicio.id);
-          result.push({ id: r.servicio.id, nombre: r.servicio.nombre });
+        if (r.agenda && !seen.has(r.agenda.id)) {
+          seen.add(r.agenda.id);
+          result.push({ id: r.agenda.id, nombre: r.agenda.nombre });
         }
       });
     return result;
@@ -160,9 +154,11 @@ export default function Dashboard() {
       supabase.from('turnos').select(`
         id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id,
         paciente:pacientes(nombre, apellido),
-        servicio:servicios(nombre)
+        servicio:servicios(nombre, agenda_id)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, servicio:servicios(id, nombre, duracion_minutos, sesiones_por_bloque)').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('profesional_centro_servicio')
+        .select('profesional_id, agenda_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, nombre, duracion_minutos, sesiones_por_bloque)')
+        .eq('centro_id', centroId).eq('activo', true),
     ]);
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
@@ -173,6 +169,7 @@ export default function Dashboard() {
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
   useEffect(() => { setMobileColIndex(0); }, [profesionales]);
 
+  // turnoMap: profId-hora → turnos (vista todos)
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno[]> = {};
     turnos.forEach(t => {
@@ -184,60 +181,58 @@ export default function Dashboard() {
     return map;
   }, [turnos]);
 
-  // servicio_id-hora (para un profesional) → turnos
-  const turnoMapServicio = useMemo(() => {
+  // turnoMapAgenda: agendaId-hora → turnos (vista por profesional)
+  const turnoMapAgenda = useMemo(() => {
     const map: Record<string, Turno[]> = {};
     turnos.forEach(t => {
       if (t.profesional_id !== selectedProfId) return;
+      const agendaId = (t.servicio as any)?.agenda_id;
+      if (!agendaId) return;
       const hora = t.hora_inicio?.substring(0, 5);
-      const key = `${t.servicio_id ?? 'sin-servicio'}-${hora}`;
+      const key = `${agendaId}-${hora}`;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     });
     return map;
   }, [turnos, selectedProfId]);
 
-  // capacidad por profesional (para vista "todos")
-  // sin filtro por día: la capacidad es propiedad del servicio, no del horario
+  // capacidad por profesional (vista todos) — sin filtro de día
   const capacityMap = useMemo(() => {
     const map: Record<string, number> = {};
     pcsRecords.forEach(r => {
       if (!r.profesional_id) return;
-      const cap = r.servicio?.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
+      const cap = r.agenda?.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
       map[r.profesional_id] = Math.max(map[r.profesional_id] ?? 1, cap);
     });
     return map;
   }, [pcsRecords]);
 
-  // capacidad por servicio: usa sesiones_por_bloque del servicio (cuántos pacientes simultáneos)
-  const servicioCapacityMap = useMemo(() => {
+  // capacidad por agenda
+  const agendaCapacityMap = useMemo(() => {
     const map: Record<string, number> = {};
     pcsRecords.forEach(r => {
-      if (!r.servicio) return;
-      const cap = r.servicio.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
-      map[r.servicio.id] = Math.max(map[r.servicio.id] ?? 1, cap);
+      if (!r.agenda) return;
+      const cap = r.agenda.sesiones_por_bloque ?? r.capacidad_simultanea ?? 1;
+      map[r.agenda.id] = Math.max(map[r.agenda.id] ?? 1, cap);
     });
     return map;
   }, [pcsRecords]);
 
-  // false si no hay configuración PCS para ese prof/hora en este día
   const isSlotAvailable = (profId: string, hora: string) => profSlotMap[profId]?.has(hora) ?? false;
 
-  const isServicioSlotAvailable = (profId: string, servicioId: string, hora: string) =>
-    servicioSlotMap[`${profId}-${servicioId}`]?.has(hora) ?? false;
+  const isAgendaSlotAvailable = (profId: string, agendaId: string, hora: string) =>
+    agendaSlotMap[`${profId}-${agendaId}`]?.has(hora) ?? false;
 
   const isSlotFull = (profId: string, hora: string) => {
-    const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
-    return slotTurnos.length >= (capacityMap[profId] ?? 1);
+    const count = turnoMap[`${profId}-${hora}`]?.length ?? 0;
+    return count >= (capacityMap[profId] ?? 1);
   };
 
-  const isServicioSlotFull = (servicioId: string, hora: string) => {
-    const key = `${servicioId}-${hora}`;
-    const count = turnoMapServicio[key]?.length ?? 0;
-    return count >= (servicioCapacityMap[servicioId] ?? 1);
+  const isAgendaSlotFull = (agendaId: string, hora: string) => {
+    const count = turnoMapAgenda[`${agendaId}-${hora}`]?.length ?? 0;
+    return count >= (agendaCapacityMap[agendaId] ?? 1);
   };
 
-  // Click en vista "todos"
   const handleSlotClick = (profId: string, hora: string) => {
     if (!isSlotAvailable(profId, hora)) return;
     if (isSlotFull(profId, hora)) return;
@@ -245,34 +240,27 @@ export default function Dashboard() {
     setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
   };
 
-  // Click en vista "profesional individual" (columnas = servicios)
-  const handleServicioSlotClick = (servicioId: string, hora: string) => {
-    if (!isServicioSlotAvailable(selectedProfId, servicioId, hora)) return;
-    if (isServicioSlotFull(servicioId, hora)) return;
+  const handleAgendaSlotClick = (agendaId: string, hora: string) => {
+    if (!isAgendaSlotAvailable(selectedProfId, agendaId, hora)) return;
+    if (isAgendaSlotFull(agendaId, hora)) return;
     const prof = profesionales.find(p => p.id === selectedProfId);
-    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', servicio_id: servicioId });
+    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendaId });
   };
 
-  // Resumen de estados del día
   const estadoResumen = useMemo(() => {
-    const turnosFiltrados = selectedProfId === 'todos'
-      ? turnos
-      : turnos.filter(t => t.profesional_id === selectedProfId);
+    const filtered = selectedProfId === 'todos' ? turnos : turnos.filter(t => t.profesional_id === selectedProfId);
     const counts: Record<string, number> = {};
-    turnosFiltrados.forEach(t => { counts[t.estado] = (counts[t.estado] ?? 0) + 1; });
+    filtered.forEach(t => { counts[t.estado] = (counts[t.estado] ?? 0) + 1; });
     return counts;
   }, [turnos, selectedProfId]);
 
   const selectedProf = profesionales.find(p => p.id === selectedProfId);
   const visibleProfesionales = selectedProfId !== 'todos'
     ? [selectedProf!].filter(Boolean)
-    : isMobile
-      ? profesionales.slice(mobileColIndex, mobileColIndex + 1)
-      : profesionales;
+    : isMobile ? profesionales.slice(mobileColIndex, mobileColIndex + 1) : profesionales;
 
   const formattedDate = selectedDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Genera strip de 7 días centrado en la fecha seleccionada
   const weekDays = useMemo(() => {
     const days = [];
     for (let i = -3; i <= 3; i++) {
@@ -287,7 +275,6 @@ export default function Dashboard() {
     <div className="flex h-[calc(100vh-40px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
       <aside className="w-[300px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
-        {/* Selector de profesional */}
         <div>
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
           <select
@@ -302,17 +289,10 @@ export default function Dashboard() {
           </select>
         </div>
 
-        {/* Mini calendario */}
         <div className="border rounded-lg overflow-hidden bg-background w-full">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={d => d && setSelectedDate(d)}
-            className="w-full"
-          />
+          <Calendar mode="single" selected={selectedDate} onSelect={d => d && setSelectedDate(d)} className="w-full" />
         </div>
 
-        {/* Resumen de estados */}
         <div>
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
             {selectedProfId === 'todos' ? 'Hoy · todos' : `${selectedProf?.nombre?.split(' ')[0] ?? ''}`}
@@ -333,14 +313,14 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Servicios del profesional (solo cuando se selecciona uno) */}
-        {selectedProfId !== 'todos' && serviciosDelProf.length > 0 && (
+        {/* Agendas del profesional seleccionado */}
+        {selectedProfId !== 'todos' && agendasDelProf.length > 0 && (
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Servicios</p>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Agendas</p>
             <div className="flex flex-wrap gap-1">
-              {serviciosDelProf.map(s => (
-                <span key={s.id} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                  {s.nombre}
+              {agendasDelProf.map(a => (
+                <span key={a.id} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                  {a.nombre}
                 </span>
               ))}
             </div>
@@ -350,7 +330,6 @@ export default function Dashboard() {
 
       {/* ── MAIN ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Sub-header */}
         <div className="flex items-center justify-between px-4 py-2 border-b bg-background shrink-0 gap-3">
           <div className="min-w-0">
             <h1 className="text-[14px] font-semibold truncate">
@@ -359,7 +338,6 @@ export default function Dashboard() {
             <p className="text-[12px] text-muted-foreground capitalize">{formattedDate}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Strip de días */}
             <div className="hidden md:flex items-center gap-1">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d); }}>
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -368,17 +346,9 @@ export default function Dashboard() {
                 const isSelected = d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedDate(d)}
+                  <button key={i} onClick={() => setSelectedDate(d)}
                     className={`w-7 h-7 rounded-full text-[12px] font-medium transition-colors
-                      ${isSelected
-                        ? 'bg-[#0F6E56] text-white'
-                        : isToday
-                          ? 'border border-[#0F6E56] text-[#0F6E56]'
-                          : 'text-muted-foreground hover:bg-muted'
-                      }`}
-                  >
+                      ${isSelected ? 'bg-[#0F6E56] text-white' : isToday ? 'border border-[#0F6E56] text-[#0F6E56]' : 'text-muted-foreground hover:bg-muted'}`}>
                     {d.getDate()}
                   </button>
                 );
@@ -387,15 +357,12 @@ export default function Dashboard() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Button
-              size="sm"
-              className="h-8 bg-[#0F6E56] hover:bg-[#0a5c48] text-white text-[12px] gap-1"
+            <Button size="sm" className="h-8 bg-[#0F6E56] hover:bg-[#0a5c48] text-white text-[12px] gap-1"
               onClick={() => {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
                 const prof = profesionales.find(p => p.id === profId);
-                setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', servicio_id: serviciosDelProf[0]?.id });
-              }}
-            >
+                setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendasDelProf[0]?.id });
+              }}>
               <Plus className="h-3.5 w-3.5" /> Nuevo turno
             </Button>
           </div>
@@ -404,9 +371,7 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
+            <div className="flex items-center justify-center h-full"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : profesionales.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
               No hay profesionales activos. Agregá uno desde el menú Agendas → Profesionales.
@@ -417,16 +382,14 @@ export default function Dashboard() {
               <p className="text-xs">Verificá la configuración en Agendas → Profesionales</p>
             </div>
           ) : selectedProfId === 'todos' ? (
-            /* ── VISTA TODOS ── */
+            /* ── VISTA TODOS: columnas = profesionales ── */
             <div className="min-w-max">
               {isMobile && profesionales.length > 1 && (
                 <div className="flex items-center justify-between px-3 py-2 border-b bg-background sticky top-0 z-10">
                   <Button variant="outline" size="icon" className="h-7 w-7" disabled={mobileColIndex === 0} onClick={() => setMobileColIndex(i => i - 1)}>
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </Button>
-                  <span className="text-[13px] font-medium">
-                    {profesionales[mobileColIndex]?.nombre} {profesionales[mobileColIndex]?.apellido}
-                  </span>
+                  <span className="text-[13px] font-medium">{profesionales[mobileColIndex]?.nombre} {profesionales[mobileColIndex]?.apellido}</span>
                   <Button variant="outline" size="icon" className="h-7 w-7" disabled={mobileColIndex === profesionales.length - 1} onClick={() => setMobileColIndex(i => i + 1)}>
                     <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
@@ -442,7 +405,7 @@ export default function Dashboard() {
                           <span>{p.nombre} {p.apellido}</span>
                           {(capacityMap[p.id] ?? 1) > 1 && (
                             <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-normal">
-                              <Users className="h-2.5 w-2.5" />{capacityMap[p.id]} asientos
+                              <Users className="h-2.5 w-2.5" />{capacityMap[p.id]} lugares
                             </span>
                           )}
                         </div>
@@ -460,23 +423,19 @@ export default function Dashboard() {
                         const full = isSlotFull(p.id, hora);
                         const capacity = capacityMap[p.id] ?? 1;
                         return (
-                          <td
-                            key={p.id}
+                          <td key={p.id}
                             className={`p-1 align-top min-h-[36px] transition-colors
                               ${available && !full ? 'cursor-pointer hover:bg-primary/5' : !available && slotTurnos.length === 0 ? 'bg-muted/40 cursor-not-allowed' : 'cursor-default'}`}
-                            onClick={() => handleSlotClick(p.id, hora)}
-                          >
+                            onClick={() => handleSlotClick(p.id, hora)}>
                             <div className="space-y-0.5">
                               {slotTurnos.map(t => {
                                 const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                 return (
-                                  <div
-                                    key={t.id}
+                                  <div key={t.id}
                                     className="rounded px-1.5 py-1 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                     style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                     onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
-                                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: p.id, hora }); }}
-                                  >
+                                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: p.id, hora }); }}>
                                     <p className="font-semibold text-foreground truncate leading-tight">
                                       {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                     </p>
@@ -490,11 +449,10 @@ export default function Dashboard() {
                                     {slotTurnos.length}/{capacity}
                                   </p>
                                   {!full && available && (
-                                    <button
-                                      onClick={e => { e.stopPropagation(); handleSlotClick(p.id, hora); }}
-                                      className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none"
-                                      title="Agregar turno en este horario"
-                                    >+ turno</button>
+                                    <button onClick={e => { e.stopPropagation(); handleSlotClick(p.id, hora); }}
+                                      className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none">
+                                      + turno
+                                    </button>
                                   )}
                                 </div>
                               )}
@@ -508,23 +466,21 @@ export default function Dashboard() {
               </table>
             </div>
           ) : (
-            /* ── VISTA PROFESIONAL INDIVIDUAL (columnas = servicios) ── */
+            /* ── VISTA PROFESIONAL INDIVIDUAL: columnas = agendas ── */
             <div className="min-w-max">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/50 sticky top-0 z-10">
                     <th className="p-2 text-[11px] font-medium text-muted-foreground w-14 text-left sticky left-0 bg-muted/50">Hora</th>
-                    {serviciosDelProf.length > 0
-                      ? serviciosDelProf.map(s => (
-                          <th key={s.id} className="p-2 text-[12px] font-medium text-foreground text-center min-w-[200px]">
-                            {s.nombre}
+                    {agendasDelProf.length > 0
+                      ? agendasDelProf.map(a => (
+                          <th key={a.id} className="p-2 text-[12px] font-medium text-foreground text-center min-w-[200px]">
+                            {a.nombre}
                           </th>
                         ))
-                      : (
-                          <th className="p-2 text-[12px] font-medium text-foreground text-center min-w-[250px]">
-                            {selectedProf?.nombre} {selectedProf?.apellido}
-                          </th>
-                        )
+                      : <th className="p-2 text-[12px] font-medium text-foreground text-center min-w-[250px]">
+                          {selectedProf?.nombre} {selectedProf?.apellido}
+                        </th>
                     }
                   </tr>
                 </thead>
@@ -532,64 +488,63 @@ export default function Dashboard() {
                   {timeAxis.map(hora => (
                     <tr key={hora} className="border-b border-border/40">
                       <td className="p-1 px-2 text-[11px] text-muted-foreground font-mono sticky left-0 bg-card w-14">{hora}</td>
-                      {serviciosDelProf.length > 0
-                        ? serviciosDelProf.map(s => {
-                            const key = `${s.id}-${hora}`;
-                            const slotTurnos = turnoMapServicio[key] ?? [];
-                            const cap = servicioCapacityMap[s.id] ?? 1;
+                      {agendasDelProf.length > 0
+                        ? agendasDelProf.map(a => {
+                            const slotTurnos = turnoMapAgenda[`${a.id}-${hora}`] ?? [];
+                            const cap = agendaCapacityMap[a.id] ?? 1;
                             const full = slotTurnos.length >= cap;
-                            const available = isServicioSlotAvailable(selectedProfId, s.id, hora);
+                            const available = isAgendaSlotAvailable(selectedProfId, a.id, hora);
                             return (
-                              <td
-                                key={s.id}
+                              <td key={a.id}
                                 className={`p-1 align-top min-h-[48px] transition-colors
                                   ${available && !full ? 'cursor-pointer hover:bg-primary/5' : slotTurnos.length > 0 ? 'cursor-default' : 'bg-muted/20 cursor-not-allowed'}`}
-                                onClick={() => handleServicioSlotClick(s.id, hora)}
-                              >
+                                onClick={() => handleAgendaSlotClick(a.id, hora)}>
                                 <div className="space-y-0.5">
                                   {slotTurnos.map(t => {
                                     const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                     return (
-                                      <div
-                                        key={t.id}
+                                      <div key={t.id}
                                         className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                         style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                         onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
-                                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora, servicioId: s.id }); }}
-                                      >
+                                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora, agendaId: a.id }); }}>
                                         <p className="font-semibold text-foreground leading-tight">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
+                                        <p className="text-[10px] leading-tight text-muted-foreground">{t.servicio?.nombre}</p>
                                         <p className="leading-tight mt-0.5" style={{ color: est.color }}>{est.label}</p>
                                       </div>
                                     );
                                   })}
-                                  {/* indicador de capacidad */}
                                   {cap > 1 && (
-                                    <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                      {slotTurnos.length}/{cap} {full ? '· completo' : '· disponible'}
-                                    </p>
+                                    <div className="flex items-center gap-1">
+                                      <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                        {slotTurnos.length}/{cap} {full ? '· completo' : '· disponible'}
+                                      </p>
+                                      {!full && available && slotTurnos.length > 0 && (
+                                        <button onClick={e => { e.stopPropagation(); handleAgendaSlotClick(a.id, hora); }}
+                                          className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none">
+                                          + turno
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </td>
                             );
                           })
                         : (
-                            <td
-                              className="p-1 align-top min-h-[48px] cursor-pointer hover:bg-primary/5"
-                              onClick={() => handleSlotClick(selectedProfId, hora)}
-                            >
+                            <td className="p-1 align-top min-h-[48px] cursor-pointer hover:bg-primary/5"
+                              onClick={() => handleSlotClick(selectedProfId, hora)}>
                               <div className="space-y-0.5">
                                 {(turnoMap[`${selectedProfId}-${hora}`] ?? []).map(t => {
                                   const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                   return (
-                                    <div
-                                      key={t.id}
+                                    <div key={t.id}
                                       className="rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
                                       style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
                                       onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
-                                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora }); }}
-                                    >
+                                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora }); }}>
                                       <p className="font-semibold">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
                                       <p style={{ color: est.color }}>{est.label}</p>
                                     </div>
@@ -618,7 +573,7 @@ export default function Dashboard() {
               hora={newTurnoSlot.hora}
               profesionalId={newTurnoSlot.profesional_id}
               profesionalNombre={newTurnoSlot.profesional_nombre}
-              preselectedServicioId={newTurnoSlot.servicio_id}
+              preselectedAgendaId={newTurnoSlot.agenda_id}
               onSuccess={() => { setNewTurnoSlot(null); fetchData(); }}
               onCancel={() => setNewTurnoSlot(null)}
             />
@@ -637,8 +592,8 @@ export default function Dashboard() {
           x={contextMenu.x}
           y={contextMenu.y}
           slotFull={
-            contextMenu.servicioId
-              ? isServicioSlotFull(contextMenu.servicioId, contextMenu.hora)
+            contextMenu.agendaId
+              ? isAgendaSlotFull(contextMenu.agendaId, contextMenu.hora)
               : isSlotFull(contextMenu.profId, contextMenu.hora)
           }
           onViewTurno={() => setSelectedTurno(contextMenu.turno)}
@@ -649,7 +604,7 @@ export default function Dashboard() {
               hora: contextMenu.hora,
               profesional_id: contextMenu.profId,
               profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '',
-              servicio_id: contextMenu.servicioId,
+              agenda_id: contextMenu.agendaId,
             });
           }}
           onClose={() => setContextMenu(null)}

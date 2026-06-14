@@ -20,7 +20,7 @@ interface Props {
   hora: string;
   profesionalId: string;
   profesionalNombre: string;
-  preselectedServicioId?: string;
+  preselectedAgendaId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -63,7 +63,7 @@ interface TurnoHistorial {
 
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
-export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedServicioId, onSuccess, onCancel }: Props) {
+export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
   const { centroId } = useAuth();
   const { toast } = useToast();
 
@@ -82,8 +82,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   });
   const [savingPatient, setSavingPatient] = useState(false);
 
+  // Agendas disponibles para este profesional (desde PCS)
+  const [agendas, setAgendas] = useState<{ id: string; nombre: string }[]>([]);
+  const [agendaId, setAgendaId] = useState(preselectedAgendaId ?? '');
+
   const [servicios, setServicios] = useState<Servicio[]>([]);
-  const [servicioId, setServicioId] = useState(preselectedServicioId ?? '');
+  const [servicioId, setServicioId] = useState('');
   const [esTratamiento, setEsTratamiento] = useState(false);
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [tratamientoId, setTratamientoId] = useState('');
@@ -100,32 +104,48 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const [historial, setHistorial] = useState<TurnoHistorial[]>([]);
   const [loadingTabs, setLoadingTabs] = useState(false);
 
+  // Cargar agendas del profesional (vía PCS → agendas)
   useEffect(() => {
     if (!centroId || !profesionalId) return;
-    // Solo los servicios asignados a este profesional en este centro
     supabase
       .from('profesional_centro_servicio')
-      .select('servicio:servicios(id, nombre, duracion_minutos, costo_base)')
+      .select('agenda:agendas(id, nombre)')
       .eq('centro_id', centroId)
       .eq('profesional_id', profesionalId)
       .eq('activo', true)
       .then(({ data }) => {
         const seen = new Set<string>();
-        const unique: Servicio[] = [];
+        const unique: { id: string; nombre: string }[] = [];
         (data ?? []).forEach((r: any) => {
-          const s = r.servicio;
-          if (s && !seen.has(s.id)) { seen.add(s.id); unique.push(s); }
+          const a = r.agenda;
+          if (a && !seen.has(a.id)) { seen.add(a.id); unique.push(a); }
         });
         unique.sort((a, b) => a.nombre.localeCompare(b.nombre));
-        setServicios(unique);
-        // Auto-seleccionar si hay uno preseleccionado o si solo hay uno disponible
-        if (preselectedServicioId && unique.find(s => s.id === preselectedServicioId)) {
-          setServicioId(preselectedServicioId);
-        } else if (unique.length === 1) {
-          setServicioId(unique[0].id);
-        }
+        setAgendas(unique);
+        // Auto-seleccionar si viene preseleccionado o si solo hay una
+        const pre = preselectedAgendaId && unique.find(a => a.id === preselectedAgendaId);
+        if (pre) setAgendaId(pre.id);
+        else if (unique.length === 1) setAgendaId(unique[0].id);
       });
   }, [centroId, profesionalId]);
+
+  // Cargar servicios filtrados por agenda seleccionada
+  useEffect(() => {
+    setServicioId('');
+    setServicios([]);
+    if (!agendaId || !centroId) return;
+    supabase
+      .from('servicios')
+      .select('id, nombre, duracion_minutos, costo_base')
+      .eq('agenda_id', agendaId)
+      .eq('centro_id', centroId)
+      .eq('activo', true)
+      .then(({ data }) => {
+        const list = ((data as Servicio[]) ?? []).sort((a, b) => a.nombre.localeCompare(b.nombre));
+        setServicios(list);
+        if (list.length === 1) setServicioId(list[0].id);
+      });
+  }, [agendaId, centroId]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
@@ -381,16 +401,30 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
             </TabsList>
 
             <TabsContent value="turno" className="space-y-4 mt-4">
+              {/* Agenda */}
               <div className="space-y-1">
-                <Label>Servicio *</Label>
-                <Select value={servicioId} onValueChange={setServicioId}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar servicio" /></SelectTrigger>
+                <Label>Agenda *</Label>
+                <Select value={agendaId} onValueChange={setAgendaId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar agenda" /></SelectTrigger>
                   <SelectContent>
-                    {servicios.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre} ({s.duracion_minutos} min)</SelectItem>))}
+                    {agendas.map(a => (<SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>))}
                   </SelectContent>
                 </Select>
-                {horaFin && <p className="text-xs text-muted-foreground">Finaliza a las {horaFin}</p>}
               </div>
+
+              {/* Servicio (variante de facturación) */}
+              {agendaId && (
+                <div className="space-y-1">
+                  <Label>Servicio *</Label>
+                  <Select value={servicioId} onValueChange={setServicioId}>
+                    <SelectTrigger><SelectValue placeholder={servicios.length === 0 ? 'Sin servicios para esta agenda' : 'Seleccionar servicio'} /></SelectTrigger>
+                    <SelectContent>
+                      {servicios.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre} ({s.duracion_minutos} min)</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  {horaFin && <p className="text-xs text-muted-foreground">Finaliza a las {horaFin}</p>}
+                </div>
+              )}
 
               <div className="flex items-center gap-2"><Switch checked={esTratamiento} onCheckedChange={setEsTratamiento} /><Label>¿Es parte de un tratamiento?</Label></div>
 
