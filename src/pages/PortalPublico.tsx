@@ -375,14 +375,14 @@ export default function PortalPublico() {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" />Tus datos</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} /></div>
-                  <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} maxLength={60} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />{formErrors.nombre && <p className="text-xs text-destructive">{formErrors.nombre}</p>}</div>
+                  <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} maxLength={60} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />{formErrors.apellido && <p className="text-xs text-destructive">{formErrors.apellido}</p>}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} /></div>
-                  <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} /></div>
+                  <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} maxLength={8} inputMode="numeric" onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} />{formErrors.dni && <p className="text-xs text-destructive">{formErrors.dni}</p>}</div>
+                  <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} maxLength={20} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} />{formErrors.celular && <p className="text-xs text-destructive">{formErrors.celular}</p>}</div>
                 </div>
-                <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} maxLength={120} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />{formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}</div>
                 <Button
                   className="w-full"
                   disabled={saving || !form.nombre || !form.apellido}
