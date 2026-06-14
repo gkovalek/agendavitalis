@@ -459,9 +459,18 @@ export default function Dashboard() {
                                 );
                               })}
                               {capacity > 1 && slotTurnos.length > 0 && (
-                                <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                  {slotTurnos.length}/{capacity}
-                                </p>
+                                <div className="flex items-center gap-1">
+                                  <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                    {slotTurnos.length}/{capacity}
+                                  </p>
+                                  {!full && available && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleSlotClick(p.id, hora); }}
+                                      className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none"
+                                      title="Agregar turno en este horario"
+                                    >+ turno</button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </td>
