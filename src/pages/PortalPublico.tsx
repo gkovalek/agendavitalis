@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
 import { Loader2, Heart, CheckCircle, Clock, User, ChevronLeft } from 'lucide-react';
+
+const reservaSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Nombre inválido'),
+  apellido: z.string().trim().min(1, 'El apellido es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Apellido inválido'),
+  dni: z.string().trim().regex(/^\d{7,8}$/, 'DNI inválido (7-8 dígitos)').optional().or(z.literal('')),
+  celular: z.string().trim().regex(/^[\d\s+()-]{8,20}$/, 'Teléfono inválido').optional().or(z.literal('')),
+  email: z.string().trim().email('Email inválido').max(120).optional().or(z.literal('')),
+});
 
 interface Centro { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
@@ -53,6 +62,7 @@ export default function PortalPublico() {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', celular: '', email: '' });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [turnoId, setTurnoId] = useState('');
 
@@ -143,7 +153,17 @@ export default function PortalPublico() {
   useEffect(() => { if (step === 'fecha_hora') fetchSlots(); }, [selectedDate, step]);
 
   const handleConfirmarReserva = async () => {
-    if (!centroId || !form.nombre || !form.apellido) return;
+    if (!centroId) return;
+
+    const parsed = reservaSchema.safeParse(form);
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      parsed.error.issues.forEach(i => { errs[i.path[0] as string] = i.message; });
+      setFormErrors(errs);
+      return;
+    }
+    setFormErrors({});
+    const data = parsed.data;
     setSaving(true);
 
     const dateStr = formatDate(selectedDate);
@@ -151,16 +171,16 @@ export default function PortalPublico() {
 
     // Buscar o crear paciente
     let pacienteId: string | null = null;
-    if (form.dni) {
+    if (data.dni) {
       const { data: existing } = await supabase
-        .from('pacientes').select('id').eq('centro_id', centroId).eq('dni', form.dni).maybeSingle();
+        .from('pacientes').select('id').eq('centro_id', centroId).eq('dni', data.dni).maybeSingle();
       pacienteId = existing?.id ?? null;
     }
 
     if (!pacienteId) {
       const { data: newPac } = await supabase
         .from('pacientes')
-        .insert({ centro_id: centroId, nombre: form.nombre, apellido: form.apellido, dni: form.dni || null, celular: form.celular || null, email: form.email || null })
+        .insert({ centro_id: centroId, nombre: data.nombre, apellido: data.apellido, dni: data.dni || null, celular: data.celular || null, email: data.email || null })
         .select('id').single();
       pacienteId = newPac?.id ?? null;
     }
@@ -355,14 +375,14 @@ export default function PortalPublico() {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" />Tus datos</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} /></div>
-                  <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} maxLength={60} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />{formErrors.nombre && <p className="text-xs text-destructive">{formErrors.nombre}</p>}</div>
+                  <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} maxLength={60} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />{formErrors.apellido && <p className="text-xs text-destructive">{formErrors.apellido}</p>}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} /></div>
-                  <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} /></div>
+                  <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} maxLength={8} inputMode="numeric" onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} />{formErrors.dni && <p className="text-xs text-destructive">{formErrors.dni}</p>}</div>
+                  <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} maxLength={20} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} />{formErrors.celular && <p className="text-xs text-destructive">{formErrors.celular}</p>}</div>
                 </div>
-                <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} maxLength={120} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />{formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}</div>
                 <Button
                   className="w-full"
                   disabled={saving || !form.nombre || !form.apellido}

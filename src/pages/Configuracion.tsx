@@ -23,15 +23,36 @@ CREATE TABLE IF NOT EXISTS centros_config (
 
 ALTER TABLE centros_config ENABLE ROW LEVEL SECURITY;
 
+-- Lectura: cualquier usuario activo del centro puede ver configuración no sensible.
+-- IMPORTANTE: No almacenar secretos (tokens privados de pago, API keys) en esta tabla.
+-- Usar Edge Function Secrets de Supabase para credenciales server-side.
+DROP POLICY IF EXISTS "usuarios ven config de su centro" ON centros_config;
 CREATE POLICY "usuarios ven config de su centro" ON centros_config
-  FOR SELECT USING (
-    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid())
+  FOR SELECT TO authenticated USING (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
   );
 
+-- Escritura: SOLO administradores del centro pueden modificar la configuración
+DROP POLICY IF EXISTS "admin modifica config de su centro" ON centros_config;
 CREATE POLICY "admin modifica config de su centro" ON centros_config
-  FOR ALL USING (
-    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid())
-  );`;
+  FOR ALL TO authenticated USING (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
+    AND EXISTS (
+      SELECT 1 FROM usuarios u
+      JOIN roles r ON r.id = u.rol_id
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+    )
+  ) WITH CHECK (
+    centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
+    AND EXISTS (
+      SELECT 1 FROM usuarios u
+      JOIN roles r ON r.id = u.rol_id
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+    )
+  );
+
+-- Eliminar cualquier token sensible que pueda haber quedado almacenado en client-readable config
+DELETE FROM centros_config WHERE clave IN ('mp_access_token');`;
 
 interface SectionProps {
   title: string;
@@ -243,19 +264,16 @@ export default function Configuracion() {
         description="Credenciales para generar links de pago al momento de reservar un turno"
         icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant="outline" className="text-xs">Próximamente</Badge>
-          <span className="text-xs text-muted-foreground">Módulo en desarrollo</span>
+        <div className="flex items-start gap-2 mb-2 p-3 rounded-md bg-yellow-50 border border-yellow-200">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-yellow-800">
+            <p className="font-semibold">El Access Token nunca se guarda en el navegador</p>
+            <p className="mt-1">
+              Por seguridad, el token privado de Mercado Pago debe almacenarse como Edge Function Secret en Lovable Cloud / Supabase
+              y usarse únicamente desde el servidor. Sólo la Public Key puede vivir en el cliente.
+            </p>
+          </div>
         </div>
-        <Field label="Access Token">
-          <Input
-            value={vals.mp_access_token ?? ''}
-            onChange={e => setVals(v => ({ ...v, mp_access_token: e.target.value }))}
-            placeholder="APP_USR-..."
-            type="password"
-            className="font-mono text-sm"
-          />
-        </Field>
         <Field label="Public Key">
           <Input
             value={vals.mp_public_key ?? ''}
@@ -267,7 +285,7 @@ export default function Configuracion() {
         <Button
           size="sm"
           disabled={saving === 'mp' || !tableExists}
-          onClick={() => handleSave('mp', ['mp_access_token', 'mp_public_key'])}
+          onClick={() => handleSave('mp', ['mp_public_key'])}
         >
           {saving === 'mp' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
