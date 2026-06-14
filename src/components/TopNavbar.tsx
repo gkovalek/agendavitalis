@@ -29,6 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Agendas',
     items: [
       { label: 'Panel principal', href: '/dashboard' },
+      { label: 'Gestión de Agendas', href: '/agendas' },
       { label: 'Profesionales', href: '/profesionales' },
       { label: 'Servicios', href: '/servicios' },
       { label: 'Tratamientos', href: '/tratamientos' },

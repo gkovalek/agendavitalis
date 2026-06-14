@@ -13,7 +13,7 @@ import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft } from 'lucide-r
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
-import { InlineServiciosHorarios, type InlineServicioAsignado } from '@/components/InlineServiciosHorarios';
+import { InlineAgendasHorarios, type InlineAgendaAsignada } from '@/components/InlineAgendasHorarios';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -38,7 +38,7 @@ export default function Profesionales() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [inlineServicios, setInlineServicios] = useState<InlineServicioAsignado[]>([]);
+  const [inlineAgendas, setInlineAgendas] = useState<InlineAgendaAsignada[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -59,7 +59,7 @@ export default function Profesionales() {
   const openNew = () => {
     setEditId(null);
     setForm(emptyForm);
-    setInlineServicios([]);
+    setInlineAgendas([]);
     setDialogOpen(true);
   };
 
@@ -70,22 +70,22 @@ export default function Profesionales() {
 
     const { data: asignaciones } = await supabase
       .from('profesional_centro_servicio')
-      .select('id, servicio_id, capacidad_simultanea, dias_trabajo, hora_inicio, hora_fin')
+      .select('id, agenda_id, dias_trabajo, hora_inicio, hora_fin')
       .eq('profesional_id', p.id)
-      .eq('centro_id', centroId);
+      .eq('centro_id', centroId)
+      .not('agenda_id', 'is', null);
 
     if (asignaciones && asignaciones.length > 0) {
-      const mapped: InlineServicioAsignado[] = asignaciones.map(a => ({
+      const mapped: InlineAgendaAsignada[] = asignaciones.map(a => ({
         id: a.id,
-        servicio_id: a.servicio_id,
-        capacidad_simultanea: a.capacidad_simultanea,
+        agenda_id: a.agenda_id,
         dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo),
         hora_inicio: a.hora_inicio,
         hora_fin: a.hora_fin,
       }));
-      setInlineServicios(mapped);
+      setInlineAgendas(mapped);
     } else {
-      setInlineServicios([]);
+      setInlineAgendas([]);
     }
 
     setDialogOpen(true);
@@ -110,9 +110,9 @@ export default function Profesionales() {
 
     console.log('[handleSave] profesionalId for services:', profesionalId);
 
-    const srvError = await saveInlineServicios('profesional_id', profesionalId!);
+    const srvError = await saveInlineAgendas(profesionalId!);
     if (srvError) {
-      toast({ title: 'Error guardando servicios', description: srvError, variant: 'destructive' });
+      toast({ title: 'Error guardando agendas', description: srvError, variant: 'destructive' });
     }
 
     setSaving(false);
@@ -121,48 +121,33 @@ export default function Profesionales() {
     fetchData();
   };
 
-  const saveInlineServicios = async (entityColumn: string, entityId: string): Promise<string | null> => {
+  const saveInlineAgendas = async (profesionalId: string): Promise<string | null> => {
     if (!centroId) return 'No se pudo determinar el centro.';
 
     const { data: existing } = await supabase
       .from('profesional_centro_servicio')
       .select('id')
-      .eq(entityColumn, entityId)
-      .eq('centro_id', centroId);
+      .eq('profesional_id', profesionalId)
+      .eq('centro_id', centroId)
+      .not('agenda_id', 'is', null);
 
     if (existing && existing.length > 0) {
-      const existingIds = existing.map(e => e.id);
-      const { error: delErr } = await supabase.from('profesional_centro_servicio').delete().in('id', existingIds);
-      if (delErr) return 'No se pudieron actualizar los servicios asignados. Verificá los permisos.';
+      const { error: delErr } = await supabase.from('profesional_centro_servicio').delete().in('id', existing.map(e => e.id));
+      if (delErr) return 'No se pudieron actualizar las agendas asignadas.';
     }
 
-    console.log('[saveInlineServicios] Total servicios to save:', inlineServicios.length);
-
-    for (const srv of inlineServicios) {
-      if (!srv.servicio_id) {
-        console.log('[saveInlineServicios] Skipping service with empty servicio_id');
-        continue;
-      }
-      const insertPayload = {
-        [entityColumn]: entityId,
-        servicio_id: srv.servicio_id,
-        capacidad_simultanea: srv.capacidad_simultanea,
+    for (const ag of inlineAgendas) {
+      if (!ag.agenda_id) continue;
+      const { error: insErr } = await supabase.from('profesional_centro_servicio').insert({
+        profesional_id: profesionalId,
+        agenda_id: ag.agenda_id,
         activo: true,
         centro_id: centroId,
-        dias_trabajo: normalizeDiasTrabajo(srv.dias_trabajo),
-        hora_inicio: srv.hora_inicio,
-        hora_fin: srv.hora_fin,
-      };
-      console.log('[saveInlineServicios] Inserting profesional_centro_servicio:', JSON.stringify(insertPayload));
-
-      const { data: asig, error: insErr } = await supabase.from('profesional_centro_servicio').insert(insertPayload).select('id').single();
-
-      console.log('[saveInlineServicios] Insert result - data:', asig, 'error:', insErr);
-
-      if (insErr) {
-        console.error('[saveInlineServicios] ERROR:', insErr.message, insErr.code, insErr.details);
-        return `Error al asignar servicio: ${insErr.message}`;
-      }
+        dias_trabajo: normalizeDiasTrabajo(ag.dias_trabajo),
+        hora_inicio: ag.hora_inicio,
+        hora_fin: ag.hora_fin,
+      });
+      if (insErr) return `Error al asignar agenda: ${insErr.message}`;
     }
     return null;
   };
@@ -207,7 +192,7 @@ export default function Profesionales() {
         </Tabs>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="max-w-2xl w-full">
             <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Profesional</DialogTitle></DialogHeader>
             <ScrollArea className="max-h-[70vh] pr-3">
               <div className="space-y-3">
@@ -223,7 +208,7 @@ export default function Profesionales() {
                   <Label>Activo</Label>
                 </div>
                 <div className="border-t pt-3 mt-3">
-                  <InlineServiciosHorarios centroId={centroId} servicios={inlineServicios} onChange={setInlineServicios} />
+                  <InlineAgendasHorarios centroId={centroId} agendas={inlineAgendas} onChange={setInlineAgendas} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
@@ -341,7 +326,7 @@ export default function Profesionales() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-2xl w-full">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Profesional</DialogTitle></DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-3">
             <div className="space-y-3">
@@ -357,7 +342,7 @@ export default function Profesionales() {
                 <Label>Activo</Label>
               </div>
               <div className="border-t pt-3 mt-3">
-                <InlineServiciosHorarios centroId={centroId} servicios={inlineServicios} onChange={setInlineServicios} />
+                <InlineAgendasHorarios centroId={centroId} agendas={inlineAgendas} onChange={setInlineAgendas} />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">

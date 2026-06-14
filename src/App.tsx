@@ -12,6 +12,7 @@ import NuevoPaciente from "@/pages/NuevoPaciente";
 import Profesionales from "@/pages/Profesionales";
 import Equipos from "@/pages/Equipos";
 import Servicios from "@/pages/Servicios";
+import GestionAgendas from "@/pages/GestionAgendas";
 import ObrasSociales from "@/pages/ObrasSociales";
 import Caja from "@/pages/Caja";
 import Tratamientos from "@/pages/Tratamientos";
@@ -67,6 +68,7 @@ function AppRoutes() {
       <Route path="/pacientes" element={<ProtectedRoute><Pacientes /></ProtectedRoute>} />
       <Route path="/pacientes/nuevo" element={<ProtectedRoute><NuevoPaciente /></ProtectedRoute>} />
       <Route path="/profesionales" element={<ProtectedRoute><Profesionales /></ProtectedRoute>} />
+      <Route path="/agendas" element={<ProtectedRoute><GestionAgendas /></ProtectedRoute>} />
       <Route path="/equipos" element={<ProtectedRoute><Equipos /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/obras-sociales" element={<ProtectedRoute><ObrasSociales /></ProtectedRoute>} />
