@@ -91,6 +91,7 @@ export default function Dashboard() {
 
   const dayName = useMemo(() => getDayName(selectedDate.getDay()), [selectedDate]);
 
+  // Slots por profesional para el día seleccionado (validados contra PCS)
   const profSlotMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
     pcsRecords.forEach(r => {
@@ -104,20 +105,36 @@ export default function Dashboard() {
     return map;
   }, [pcsRecords, dayName, configLoading]);
 
+  // Slots por servicio+profesional para el día seleccionado
+  const servicioSlotMap = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    pcsRecords.forEach(r => {
+      if (!r.profesional_id || !r.servicio) return;
+      if (!normalizeDiasTrabajo(r.dias_trabajo).includes(dayName)) return;
+      const key = `${r.profesional_id}-${r.servicio.id}`;
+      const duracion = r.servicio.duracion_minutos ?? getNumber('intervalo_turnos') ?? 30;
+      const slots = generateTimeSlots(r.hora_inicio, r.hora_fin, duracion);
+      if (!map[key]) map[key] = new Set();
+      slots.forEach(s => map[key].add(s));
+    });
+    return map;
+  }, [pcsRecords, dayName, configLoading]);
+
+  // Eje de tiempo: solo horas reales de trabajo (sin fallback al día completo)
   const timeAxis = useMemo(() => {
     const all = new Set<string>();
     const profIds = selectedProfId === 'todos'
       ? profesionales.map(p => p.id)
       : [selectedProfId];
     profIds.forEach(id => profSlotMap[id]?.forEach(s => all.add(s)));
-    if (all.size === 0) {
-      const intervalo = getNumber('intervalo_turnos') ?? 30;
-      const inicio = get('hora_inicio_agenda') ?? '08:00';
-      const fin = get('hora_fin_agenda') ?? '20:00';
-      generateTimeSlots(inicio, fin, intervalo).forEach(s => all.add(s));
-    }
+    // Incluir también horas de turnos existentes aunque estén fuera del horario
+    turnos.forEach(t => {
+      if (selectedProfId !== 'todos' && t.profesional_id !== selectedProfId) return;
+      const h = t.hora_inicio?.substring(0, 5);
+      if (h) all.add(h);
+    });
     return Array.from(all).sort();
-  }, [profSlotMap, selectedProfId, profesionales, configLoading]);
+  }, [profSlotMap, selectedProfId, profesionales, turnos]);
 
   // Servicios disponibles para el profesional seleccionado
   const serviciosDelProf = useMemo((): Servicio[] => {
@@ -203,7 +220,11 @@ export default function Dashboard() {
     return map;
   }, [pcsRecords]);
 
-  const isSlotAvailable = (profId: string, hora: string) => profSlotMap[profId]?.has(hora) ?? true;
+  // false si no hay configuración PCS para ese prof/hora en este día
+  const isSlotAvailable = (profId: string, hora: string) => profSlotMap[profId]?.has(hora) ?? false;
+
+  const isServicioSlotAvailable = (profId: string, servicioId: string, hora: string) =>
+    servicioSlotMap[`${profId}-${servicioId}`]?.has(hora) ?? false;
 
   const isSlotFull = (profId: string, hora: string) => {
     const slotTurnos = turnoMap[`${profId}-${hora}`] ?? [];
@@ -226,7 +247,7 @@ export default function Dashboard() {
 
   // Click en vista "profesional individual" (columnas = servicios)
   const handleServicioSlotClick = (servicioId: string, hora: string) => {
-    if (!isSlotAvailable(selectedProfId, hora)) return;
+    if (!isServicioSlotAvailable(selectedProfId, servicioId, hora)) return;
     if (isServicioSlotFull(servicioId, hora)) return;
     const prof = profesionales.find(p => p.id === selectedProfId);
     setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', servicio_id: servicioId });
@@ -390,6 +411,11 @@ export default function Dashboard() {
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
               No hay profesionales activos. Agregá uno desde el menú Agendas → Profesionales.
             </div>
+          ) : timeAxis.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+              <p className="text-sm font-medium">Sin horarios configurados para este día</p>
+              <p className="text-xs">Verificá la configuración en Agendas → Profesionales</p>
+            </div>
           ) : selectedProfId === 'todos' ? (
             /* ── VISTA TODOS ── */
             <div className="min-w-max">
@@ -512,12 +538,12 @@ export default function Dashboard() {
                             const slotTurnos = turnoMapServicio[key] ?? [];
                             const cap = servicioCapacityMap[s.id] ?? 1;
                             const full = slotTurnos.length >= cap;
-                            const available = isSlotAvailable(selectedProfId, hora);
+                            const available = isServicioSlotAvailable(selectedProfId, s.id, hora);
                             return (
                               <td
                                 key={s.id}
                                 className={`p-1 align-top min-h-[48px] transition-colors
-                                  ${available && !full ? 'cursor-pointer hover:bg-primary/5' : full ? 'cursor-default' : 'bg-muted/30 cursor-not-allowed'}`}
+                                  ${available && !full ? 'cursor-pointer hover:bg-primary/5' : slotTurnos.length > 0 ? 'cursor-default' : 'bg-muted/20 cursor-not-allowed'}`}
                                 onClick={() => handleServicioSlotClick(s.id, hora)}
                               >
                                 <div className="space-y-0.5">
