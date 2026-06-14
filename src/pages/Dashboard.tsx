@@ -148,7 +148,7 @@ export default function Dashboard() {
     ]);
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
-    setPcsRecords(((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+    setPcsRecords(((pcsRes.data as unknown as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
     setLoading(false);
   };
 
