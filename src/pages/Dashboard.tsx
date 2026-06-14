@@ -42,8 +42,6 @@ interface Turno {
   servicio_id?: string | null;
   paciente?: { nombre: string; apellido: string };
   servicio?: { nombre: string } | null;
-  tratamiento?: { nombre: string; sesiones_totales: number } | null;
-  numero_sesion?: number | null;
 }
 
 function generateTimeSlots(inicio: string, fin: string, intervalo: number): string[] {
@@ -140,15 +138,13 @@ export default function Dashboard() {
       supabase.from('turnos').select(`
         id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id,
         paciente:pacientes(nombre, apellido),
-        servicio:servicios(nombre),
-        tratamiento:tratamientos(nombre, sesiones_totales),
-        numero_sesion
+        servicio:servicios(nombre)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
       supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, servicio:servicios(id, nombre, duracion_minutos)').eq('centro_id', centroId).eq('activo', true),
     ]);
     setProfesionales(profRes.data ?? []);
     setTurnos((turnosRes.data as any[]) ?? []);
-    setPcsRecords(((pcsRes.data as unknown as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+    setPcsRecords(((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
     setLoading(false);
   };
 
@@ -496,9 +492,9 @@ export default function Dashboard() {
                                         <p className="font-semibold text-foreground leading-tight">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
-                                        {t.tratamiento && (
+                                        {t.servicio && (
                                           <p className="text-[10px] text-muted-foreground leading-tight truncate">
-                                            {t.tratamiento.nombre} · Sesión {t.numero_sesion ?? '?'}/{t.tratamiento.sesiones_totales}
+                                            {t.servicio.nombre}
                                           </p>
                                         )}
                                         <p className="leading-tight mt-0.5" style={{ color: est.color }}>{est.label}</p>
