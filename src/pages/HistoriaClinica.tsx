@@ -60,8 +60,9 @@ export default function HistoriaClinica() {
   // Dialog nueva entrada
   const [dialogOpen, setDialogOpen] = useState(false);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
-  const [pacientesSearch, setPacientesSearch] = useState('');
-  const [pacientesSugeridos, setPacientesSugeridos] = useState<Paciente[]>([]);
+  const [dniInput, setDniInput] = useState('');
+  const [nombreInput, setNombreInput] = useState('');
+  const [apellidoInput, setApellidoInput] = useState('');
   const [loadingPacientes, setLoadingPacientes] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [profesionalId, setProfesionalId] = useState('');
@@ -120,21 +121,30 @@ export default function HistoriaClinica() {
   useEffect(() => { fetchFichas(); }, [fetchFichas]);
   useEffect(() => { fetchProfesionales(); }, [fetchProfesionales]);
 
-  /* ─── Búsqueda de pacientes ─── */
-  const buscarPacientes = useCallback(async (term: string) => {
-    if (!centroId || term.trim().length < 2) { setPacientesSugeridos([]); return; }
+  /* ─── Autocomplete por DNI ─── */
+  const buscarPorDni = useCallback(async (dni: string) => {
+    if (!centroId || dni.trim().length < 6) return;
     setLoadingPacientes(true);
     const { data } = await supabase.from('pacientes').select('id, nombre, apellido, dni')
-      .eq('centro_id', centroId).or(`nombre.ilike.%${term}%,apellido.ilike.%${term}%,dni.ilike.%${term}%`).limit(8);
-    setPacientesSugeridos(data ?? []);
+      .eq('centro_id', centroId).eq('dni', dni.trim()).limit(1);
+    const p = data?.[0] as Paciente | undefined;
+    if (p) {
+      setPacienteSeleccionado(p);
+      setNombreInput(p.nombre);
+      setApellidoInput(p.apellido);
+    } else {
+      setPacienteSeleccionado(null);
+      setNombreInput('');
+      setApellidoInput('');
+    }
     setLoadingPacientes(false);
   }, [centroId]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { buscarPacientes(pacientesSearch); }, 300);
+    debounceRef.current = setTimeout(() => { buscarPorDni(dniInput); }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [pacientesSearch, buscarPacientes]);
+  }, [dniInput, buscarPorDni]);
 
   /* ─── Cambio de ficha modelo ─── */
   const handleFichaChange = async (fichaId: string) => {
@@ -155,14 +165,14 @@ export default function HistoriaClinica() {
 
   /* ─── Guardar entrada ─── */
   const resetDialog = () => {
-    setPacientesSearch(''); setPacientesSugeridos([]); setPacienteSeleccionado(null);
+    setDniInput(''); setNombreInput(''); setApellidoInput(''); setPacienteSeleccionado(null);
     setProfesionalId(''); setFecha(HOY); setFichaModeloId(''); setFichaVariables([]);
     setValoresVariables({}); setComentariosExtras('');
   };
 
   const handleGuardar = async () => {
-    if (!centroId || !pacienteSeleccionado || !profesionalId) {
-      toast({ title: 'Campos requeridos', description: 'Completá paciente y profesional.', variant: 'destructive' });
+    if (!centroId || !profesionalId || !dniInput.trim()) {
+      toast({ title: 'Campos requeridos', description: 'Completá el DNI del paciente y el profesional.', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -173,7 +183,7 @@ export default function HistoriaClinica() {
 
     const { error } = await supabase.from('historia_clinica').insert({
       centro_id: centroId,
-      paciente_id: pacienteSeleccionado.id,
+      paciente_id: pacienteSeleccionado?.id ?? null,
       profesional_id: profesionalId,
       fecha,
       comentario_evolucion: comentariosExtras.trim() || '',
@@ -430,41 +440,49 @@ export default function HistoriaClinica() {
           <ScrollArea className="max-h-[78vh] pr-2">
             <div className="space-y-4 pb-2">
 
-              {/* Paciente */}
-              <div className="space-y-1">
-                <Label>Paciente *</Label>
-                {pacienteSeleccionado ? (
-                  <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-muted/50">
-                    <div>
-                      <span className="text-sm font-medium">{pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre}</span>
-                      {pacienteSeleccionado.dni && <span className="text-xs text-muted-foreground ml-2">DNI {pacienteSeleccionado.dni}</span>}
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs"
-                      onClick={() => { setPacienteSeleccionado(null); setPacientesSearch(''); setPacientesSugeridos([]); }}>
-                      Cambiar
-                    </Button>
-                  </div>
-                ) : (
+              {/* Paciente — DNI autocompleta Nombre y Apellido */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
+                    <Label>DNI *</Label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Buscar por nombre o DNI..." className="pl-9" value={pacientesSearch}
-                        onChange={e => setPacientesSearch(e.target.value)} />
-                      {loadingPacientes && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+                      <Input
+                        placeholder="Ej: 36115676"
+                        value={dniInput}
+                        onChange={e => { setDniInput(e.target.value); setPacienteSeleccionado(null); setNombreInput(''); setApellidoInput(''); }}
+                        className={pacienteSeleccionado ? 'border-[#00ADBB]' : ''}
+                      />
+                      {loadingPacientes && (
+                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                      )}
                     </div>
-                    {pacientesSugeridos.length > 0 && (
-                      <div className="border rounded-md divide-y shadow-sm bg-background">
-                        {pacientesSugeridos.map(p => (
-                          <button key={p.id} type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
-                            onClick={() => { setPacienteSeleccionado(p); setPacientesSearch(''); setPacientesSugeridos([]); }}>
-                            <span className="font-medium">{p.apellido}, {p.nombre}</span>
-                            {p.dni && <span className="text-muted-foreground ml-2 text-xs">DNI {p.dni}</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
+                  <div className="space-y-1">
+                    <Label>Apellido</Label>
+                    <Input
+                      placeholder="Apellido"
+                      value={apellidoInput}
+                      readOnly={!!pacienteSeleccionado}
+                      onChange={e => setApellidoInput(e.target.value)}
+                      className={pacienteSeleccionado ? 'bg-muted/50 text-muted-foreground' : ''}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Nombre</Label>
+                    <Input
+                      placeholder="Nombre"
+                      value={nombreInput}
+                      readOnly={!!pacienteSeleccionado}
+                      onChange={e => setNombreInput(e.target.value)}
+                      className={pacienteSeleccionado ? 'bg-muted/50 text-muted-foreground' : ''}
+                    />
+                  </div>
+                </div>
+                {pacienteSeleccionado && (
+                  <p className="text-xs text-[#00ADBB]">✓ Paciente encontrado en el sistema</p>
+                )}
+                {dniInput.length >= 6 && !loadingPacientes && !pacienteSeleccionado && (
+                  <p className="text-xs text-amber-600">DNI no encontrado. La entrada se guardará sin vincular al paciente.</p>
                 )}
               </div>
 
@@ -529,7 +547,7 @@ export default function HistoriaClinica() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleGuardar} disabled={saving || !pacienteSeleccionado || !profesionalId}
+                <Button onClick={handleGuardar} disabled={saving || !dniInput.trim() || !profesionalId}
                   className="flex-1" style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}>
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
                 </Button>
