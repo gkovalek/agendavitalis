@@ -100,11 +100,25 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const [loadingTabs, setLoadingTabs] = useState(false);
 
   useEffect(() => {
-    if (!centroId) return;
-    supabase.from('servicios').select('id, nombre, duracion_minutos, costo_base')
-      .eq('centro_id', centroId).eq('activo', true).order('nombre')
-      .then(({ data }) => setServicios(data ?? []));
-  }, [centroId]);
+    if (!centroId || !profesionalId) return;
+    // Solo los servicios asignados a este profesional en este centro
+    supabase
+      .from('profesional_centro_servicio')
+      .select('servicio:servicios(id, nombre, duracion_minutos, costo_base)')
+      .eq('centro_id', centroId)
+      .eq('profesional_id', profesionalId)
+      .eq('activo', true)
+      .then(({ data }) => {
+        const seen = new Set<string>();
+        const unique: Servicio[] = [];
+        (data ?? []).forEach((r: any) => {
+          const s = r.servicio;
+          if (s && !seen.has(s.id)) { seen.add(s.id); unique.push(s); }
+        });
+        unique.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        setServicios(unique);
+      });
+  }, [centroId, profesionalId]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
@@ -187,6 +201,11 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     : formaPago === 'transferencia' ? montoTransferencia
     : formaPago === 'obra_social' ? montoPrepaga
     : montoEfectivo + montoTransferencia + montoPrepaga;
+
+  // Solo los tratamientos activos del paciente cuyo servicio coincide con el seleccionado
+  const tratamientosFiltrados = servicioId
+    ? tratamientos.filter(t => t.servicio_id === servicioId)
+    : tratamientos;
 
   const selectedTratamiento = tratamientos.find(t => t.id === tratamientoId);
 
@@ -373,9 +392,9 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                   {!nuevoTratamiento ? (
                     <>
                       <Select value={tratamientoId} onValueChange={(v) => { if (v === '__new') { setNuevoTratamiento(true); } else { setTratamientoId(v); } }}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar tratamiento" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={tratamientosFiltrados.length === 0 ? 'Sin tratamientos activos para este servicio' : 'Seleccionar tratamiento'} /></SelectTrigger>
                         <SelectContent>
-                          {tratamientos.map(t => (<SelectItem key={t.id} value={t.id}>{(t.servicio as any)?.nombre} — {t.sesiones_consumidas}/{t.total_sesiones} sesiones</SelectItem>))}
+                          {tratamientosFiltrados.map(t => (<SelectItem key={t.id} value={t.id}>{(t.servicio as any)?.nombre} — sesión {t.sesiones_consumidas + 1}/{t.total_sesiones}</SelectItem>))}
                           <SelectItem value="__new">+ Iniciar nuevo tratamiento</SelectItem>
                         </SelectContent>
                       </Select>
