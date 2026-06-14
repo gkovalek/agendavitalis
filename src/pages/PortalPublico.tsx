@@ -152,7 +152,17 @@ export default function PortalPublico() {
   useEffect(() => { if (step === 'fecha_hora') fetchSlots(); }, [selectedDate, step]);
 
   const handleConfirmarReserva = async () => {
-    if (!centroId || !form.nombre || !form.apellido) return;
+    if (!centroId) return;
+
+    const parsed = reservaSchema.safeParse(form);
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      parsed.error.issues.forEach(i => { errs[i.path[0] as string] = i.message; });
+      setFormErrors(errs);
+      return;
+    }
+    setFormErrors({});
+    const data = parsed.data;
     setSaving(true);
 
     const dateStr = formatDate(selectedDate);
@@ -160,16 +170,16 @@ export default function PortalPublico() {
 
     // Buscar o crear paciente
     let pacienteId: string | null = null;
-    if (form.dni) {
+    if (data.dni) {
       const { data: existing } = await supabase
-        .from('pacientes').select('id').eq('centro_id', centroId).eq('dni', form.dni).maybeSingle();
+        .from('pacientes').select('id').eq('centro_id', centroId).eq('dni', data.dni).maybeSingle();
       pacienteId = existing?.id ?? null;
     }
 
     if (!pacienteId) {
       const { data: newPac } = await supabase
         .from('pacientes')
-        .insert({ centro_id: centroId, nombre: form.nombre, apellido: form.apellido, dni: form.dni || null, celular: form.celular || null, email: form.email || null })
+        .insert({ centro_id: centroId, nombre: data.nombre, apellido: data.apellido, dni: data.dni || null, celular: data.celular || null, email: data.email || null })
         .select('id').single();
       pacienteId = newPac?.id ?? null;
     }
