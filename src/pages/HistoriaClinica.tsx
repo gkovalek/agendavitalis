@@ -5,68 +5,59 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User } from 'lucide-react';
+import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+/* ─────────────────── Interfaces ─────────────────── */
 interface EntradaHistoria {
   id: string;
   fecha: string;
   comentario_evolucion: string;
+  comentarios_extras: string | null;
+  variables_json: Record<string, string> | null;
+  ficha_modelo_id: string | null;
   created_at: string;
   paciente: { id: string; nombre: string; apellido: string; dni: string };
-  profesional: { id: string; nombre: string; apellido: string; profesion_id: string | null };
+  profesional: { id: string; nombre: string; apellido: string };
+  ficha_modelo?: { nombre: string } | null;
 }
 
-interface VariablePlantilla {
+interface FichaModelo {
+  id: string;
+  nombre: string;
+  variables?: FichaVariable[];
+}
+
+interface FichaVariable {
   id: string;
   nombre_variable: string;
-  tipo: 'texto' | 'numero' | 'lista' | 'booleano' | 'fecha';
-  opciones: string[] | null;
   orden: number;
 }
 
-interface VariableValor {
-  variable_id: string;
-  nombre_variable: string;
-  tipo: string;
-  valor: string;
-}
-
-interface Profesional {
-  id: string;
-  nombre: string;
-  apellido: string;
-  profesion_id: string | null;
-}
-
-interface Paciente {
-  id: string;
-  nombre: string;
-  apellido: string;
-  dni: string;
-}
+interface Profesional { id: string; nombre: string; apellido: string; }
+interface Paciente { id: string; nombre: string; apellido: string; dni: string; }
 
 const HOY = new Date().toISOString().split('T')[0];
 
+/* ═══════════════════════════════════════════════════ */
 export default function HistoriaClinica() {
   const { centroId } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
+  // Lista de entradas
   const [entradas, setEntradas] = useState<EntradaHistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedEntrada, setSelectedEntrada] = useState<EntradaHistoria | null>(null);
-  const [variablesDetalle, setVariablesDetalle] = useState<VariableValor[]>([]);
-  const [loadingDetalle, setLoadingDetalle] = useState(false);
 
+  // Dialog nueva entrada
   const [dialogOpen, setDialogOpen] = useState(false);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [pacientesSearch, setPacientesSearch] = useState('');
@@ -75,58 +66,66 @@ export default function HistoriaClinica() {
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [profesionalId, setProfesionalId] = useState('');
   const [fecha, setFecha] = useState(HOY);
-  const [comentario, setComentario] = useState('');
-  const [variables, setVariables] = useState<VariablePlantilla[]>([]);
+  const [fichaModeloId, setFichaModeloId] = useState('');
+  const [fichasDisponibles, setFichasDisponibles] = useState<FichaModelo[]>([]);
+  const [fichaVariables, setFichaVariables] = useState<FichaVariable[]>([]);
   const [valoresVariables, setValoresVariables] = useState<Record<string, string>>({});
-  const [loadingVariables, setLoadingVariables] = useState(false);
+  const [comentariosExtras, setComentariosExtras] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Dialog crear ficha modelo
+  const [fichaDialogOpen, setFichaDialogOpen] = useState(false);
+  const [fichaForm, setFichaForm] = useState({ nombre: '' });
+  const [fichaVarsForm, setFichaVarsForm] = useState<{ nombre: string }[]>([{ nombre: '' }]);
+  const [savingFicha, setSavingFicha] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* ─── Fetching ─── */
   const fetchEntradas = useCallback(async () => {
     if (!centroId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('historia_clinica')
       .select(`
-        id, fecha, comentario_evolucion, created_at,
+        id, fecha, comentario_evolucion, comentarios_extras, variables_json, ficha_modelo_id, created_at,
         paciente:pacientes(id, nombre, apellido, dni),
-        profesional:profesionales(id, nombre, apellido, profesion_id)
+        profesional:profesionales(id, nombre, apellido),
+        ficha_modelo:fichas_modelo(nombre)
       `)
       .eq('centro_id', centroId)
       .order('fecha', { ascending: false })
       .order('created_at', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Error', description: 'No se pudieron cargar las entradas clínicas.', variant: 'destructive' });
-    } else {
-      setEntradas((data ?? []) as unknown as EntradaHistoria[]);
-    }
+    setEntradas((data ?? []) as unknown as EntradaHistoria[]);
     setLoading(false);
+  }, [centroId]);
+
+  const fetchFichas = useCallback(async () => {
+    if (!centroId) return;
+    const { data } = await supabase
+      .from('fichas_modelo')
+      .select('id, nombre')
+      .eq('centro_id', centroId)
+      .order('nombre');
+    setFichasDisponibles((data ?? []) as FichaModelo[]);
   }, [centroId]);
 
   const fetchProfesionales = useCallback(async () => {
     if (!centroId) return;
-    const { data } = await supabase
-      .from('profesionales')
-      .select('id, nombre, apellido, profesion_id')
-      .eq('centro_id', centroId)
-      .order('apellido');
+    const { data } = await supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido');
     setProfesionales(data ?? []);
   }, [centroId]);
 
   useEffect(() => { fetchEntradas(); }, [fetchEntradas]);
+  useEffect(() => { fetchFichas(); }, [fetchFichas]);
   useEffect(() => { fetchProfesionales(); }, [fetchProfesionales]);
 
+  /* ─── Búsqueda de pacientes ─── */
   const buscarPacientes = useCallback(async (term: string) => {
     if (!centroId || term.trim().length < 2) { setPacientesSugeridos([]); return; }
     setLoadingPacientes(true);
-    const { data } = await supabase
-      .from('pacientes')
-      .select('id, nombre, apellido, dni')
-      .eq('centro_id', centroId)
-      .or(`nombre.ilike.%${term}%,apellido.ilike.%${term}%,dni.ilike.%${term}%`)
-      .limit(8);
+    const { data } = await supabase.from('pacientes').select('id, nombre, apellido, dni')
+      .eq('centro_id', centroId).or(`nombre.ilike.%${term}%,apellido.ilike.%${term}%,dni.ilike.%${term}%`).limit(8);
     setPacientesSugeridos(data ?? []);
     setLoadingPacientes(false);
   }, [centroId]);
@@ -137,171 +136,119 @@ export default function HistoriaClinica() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [pacientesSearch, buscarPacientes]);
 
-  const cargarVariables = async (profId: string) => {
-    const prof = profesionales.find(p => p.id === profId);
-    if (!prof?.profesion_id || !centroId) { setVariables([]); setValoresVariables({}); return; }
-    setLoadingVariables(true);
-    const { data } = await supabase
-      .from('variables_clinicas_plantilla')
-      .select('id, nombre_variable, tipo, opciones, orden')
-      .eq('centro_id', centroId)
-      .eq('profesion_id', prof.profesion_id)
-      .eq('activo', true)
-      .order('orden');
-    const vars = (data ?? []) as VariablePlantilla[];
-    setVariables(vars);
-    const initVals: Record<string, string> = {};
-    vars.forEach(v => { initVals[v.id] = v.tipo === 'booleano' ? 'false' : ''; });
-    setValoresVariables(initVals);
-    setLoadingVariables(false);
-  };
-
-  const handleProfesionalChange = (id: string) => {
-    setProfesionalId(id);
-    cargarVariables(id);
-  };
-
-  const cargarVariablesDetalle = async (entradaId: string) => {
-    setLoadingDetalle(true);
-    const { data } = await supabase
-      .from('historia_clinica_variables')
-      .select(`
-        variable_id, valor,
-        variable:variables_clinicas_plantilla(nombre_variable, tipo)
-      `)
-      .eq('historia_clinica_id', entradaId);
-
-    const vars: VariableValor[] = (data ?? []).map((d: any) => ({
-      variable_id: d.variable_id,
-      nombre_variable: d.variable?.nombre_variable ?? '',
-      tipo: d.variable?.tipo ?? '',
-      valor: d.valor,
-    }));
-    setVariablesDetalle(vars);
-    setLoadingDetalle(false);
-  };
-
-  const handleSeleccionarEntrada = (entrada: EntradaHistoria) => {
-    setSelectedEntrada(entrada);
-    setVariablesDetalle([]);
-    cargarVariablesDetalle(entrada.id);
-  };
-
-  const resetDialog = () => {
-    setPacientesSearch('');
-    setPacientesSugeridos([]);
-    setPacienteSeleccionado(null);
-    setProfesionalId('');
-    setFecha(HOY);
-    setComentario('');
-    setVariables([]);
+  /* ─── Cambio de ficha modelo ─── */
+  const handleFichaChange = async (fichaId: string) => {
+    setFichaModeloId(fichaId);
     setValoresVariables({});
+    if (!fichaId) { setFichaVariables([]); return; }
+    const { data } = await supabase
+      .from('fichas_modelo_variables')
+      .select('id, nombre_variable, orden')
+      .eq('ficha_modelo_id', fichaId)
+      .order('orden');
+    const vars = (data ?? []) as FichaVariable[];
+    setFichaVariables(vars);
+    const init: Record<string, string> = {};
+    vars.forEach(v => { init[v.id] = ''; });
+    setValoresVariables(init);
   };
 
-  const handleOpenDialog = () => {
-    resetDialog();
-    setDialogOpen(true);
+  /* ─── Guardar entrada ─── */
+  const resetDialog = () => {
+    setPacientesSearch(''); setPacientesSugeridos([]); setPacienteSeleccionado(null);
+    setProfesionalId(''); setFecha(HOY); setFichaModeloId(''); setFichaVariables([]);
+    setValoresVariables({}); setComentariosExtras('');
   };
 
   const handleGuardar = async () => {
-    if (!centroId || !pacienteSeleccionado || !profesionalId || !comentario.trim()) {
-      toast({ title: 'Campos requeridos', description: 'Completá paciente, profesional y comentario de evolución.', variant: 'destructive' });
+    if (!centroId || !pacienteSeleccionado || !profesionalId) {
+      toast({ title: 'Campos requeridos', description: 'Completá paciente y profesional.', variant: 'destructive' });
       return;
     }
     setSaving(true);
 
-    const { data: hc, error: hcErr } = await supabase
-      .from('historia_clinica')
-      .insert({
-        centro_id: centroId,
-        paciente_id: pacienteSeleccionado.id,
-        profesional_id: profesionalId,
-        fecha,
-        comentario_evolucion: comentario.trim(),
-      })
-      .select('id')
-      .single();
+    // Construir variables_json desde los valores ingresados
+    const variablesJson: Record<string, string> = {};
+    fichaVariables.forEach(v => { if (valoresVariables[v.id]) variablesJson[v.nombre_variable] = valoresVariables[v.id]; });
 
-    if (hcErr || !hc) {
+    const { error } = await supabase.from('historia_clinica').insert({
+      centro_id: centroId,
+      paciente_id: pacienteSeleccionado.id,
+      profesional_id: profesionalId,
+      fecha,
+      comentario_evolucion: comentariosExtras.trim() || '',
+      comentarios_extras: comentariosExtras.trim() || null,
+      variables_json: Object.keys(variablesJson).length > 0 ? variablesJson : null,
+      ficha_modelo_id: fichaModeloId || null,
+    });
+
+    if (error) {
       toast({ title: 'Error', description: 'No se pudo guardar la entrada clínica.', variant: 'destructive' });
-      setSaving(false);
+    } else {
+      toast({ title: 'Entrada guardada' });
+      setDialogOpen(false);
+      resetDialog();
+      fetchEntradas();
+    }
+    setSaving(false);
+  };
+
+  /* ─── Guardar ficha modelo ─── */
+  const resetFichaDialog = () => {
+    setFichaForm({ nombre: '' });
+    setFichaVarsForm([{ nombre: '' }]);
+  };
+
+  const handleGuardarFicha = async () => {
+    if (!centroId || !fichaForm.nombre.trim()) return;
+    const validVars = fichaVarsForm.filter(v => v.nombre.trim());
+    if (validVars.length === 0) {
+      toast({ title: 'Sin variables', description: 'Agregá al menos una variable a la ficha.', variant: 'destructive' });
+      return;
+    }
+    setSavingFicha(true);
+
+    const { data: fichaData, error: fichaErr } = await supabase
+      .from('fichas_modelo')
+      .insert({ centro_id: centroId, nombre: fichaForm.nombre.trim() })
+      .select('id').single();
+
+    if (fichaErr || !fichaData) {
+      toast({ title: 'Error', description: fichaErr?.message, variant: 'destructive' });
+      setSavingFicha(false);
       return;
     }
 
-    const variablesAInsertar = variables
-      .filter(v => valoresVariables[v.id] !== '' && valoresVariables[v.id] !== undefined)
-      .map(v => ({
-        historia_clinica_id: hc.id,
-        variable_id: v.id,
-        valor: valoresVariables[v.id],
-      }));
+    const varsPayload = validVars.map((v, i) => ({
+      ficha_modelo_id: fichaData.id,
+      nombre_variable: v.nombre.trim(),
+      orden: i,
+    }));
 
-    if (variablesAInsertar.length > 0) {
-      const { error: varErr } = await supabase.from('historia_clinica_variables').insert(variablesAInsertar);
-      if (varErr) {
-        toast({ title: 'Advertencia', description: 'La entrada se guardó pero hubo un error con las variables clínicas.', variant: 'destructive' });
-      }
+    const { error: varErr } = await supabase.from('fichas_modelo_variables').insert(varsPayload);
+    if (varErr) {
+      toast({ title: 'Error guardando variables', description: varErr.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Ficha modelo creada', description: `"${fichaForm.nombre}" disponible al crear entradas.` });
+      setFichaDialogOpen(false);
+      resetFichaDialog();
+      fetchFichas();
     }
-
-    toast({ title: 'Entrada guardada', description: 'La historia clínica fue registrada correctamente.' });
-    setSaving(false);
-    setDialogOpen(false);
-    fetchEntradas();
+    setSavingFicha(false);
   };
 
+  /* ─── Helpers ─── */
   const filtradas = entradas.filter(e => {
     const term = search.toLowerCase();
     if (!term) return true;
-    const nombrePaciente = `${e.paciente?.apellido} ${e.paciente?.nombre}`.toLowerCase();
-    const nombreProf = `${e.profesional?.apellido} ${e.profesional?.nombre}`.toLowerCase();
-    return nombrePaciente.includes(term) || nombreProf.includes(term);
+    const nombre = `${e.paciente?.apellido} ${e.paciente?.nombre}`.toLowerCase();
+    const prof = `${e.profesional?.apellido} ${e.profesional?.nombre}`.toLowerCase();
+    return nombre.includes(term) || prof.includes(term);
   });
 
-  const formatFecha = (iso: string) => {
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
-  };
+  const formatFecha = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
 
-  const renderValorVariable = (v: VariableValor) => {
-    if (v.tipo === 'booleano') return v.valor === 'true' ? 'Sí' : 'No';
-    if (v.tipo === 'fecha' && v.valor) return formatFecha(v.valor);
-    return v.valor || '—';
-  };
-
-  const renderCampoVariable = (v: VariablePlantilla) => {
-    const val = valoresVariables[v.id] ?? '';
-    const set = (newVal: string) => setValoresVariables(prev => ({ ...prev, [v.id]: newVal }));
-
-    switch (v.tipo) {
-      case 'texto':
-        return <Input value={val} onChange={e => set(e.target.value)} placeholder={v.nombre_variable} />;
-      case 'numero':
-        return <Input type="number" value={val} onChange={e => set(e.target.value)} placeholder={v.nombre_variable} />;
-      case 'fecha':
-        return <Input type="date" value={val} onChange={e => set(e.target.value)} />;
-      case 'booleano':
-        return (
-          <div className="flex items-center gap-2 pt-1">
-            <Switch checked={val === 'true'} onCheckedChange={checked => set(checked ? 'true' : 'false')} />
-            <span className="text-sm text-muted-foreground">{val === 'true' ? 'Sí' : 'No'}</span>
-          </div>
-        );
-      case 'lista':
-        return (
-          <Select value={val} onValueChange={set}>
-            <SelectTrigger><SelectValue placeholder="Seleccioná una opción" /></SelectTrigger>
-            <SelectContent>
-              {(v.opciones ?? []).map(op => (
-                <SelectItem key={op} value={op}>{op}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      default:
-        return <Input value={val} onChange={e => set(e.target.value)} />;
-    }
-  };
-
+  /* ─── Panel detalle ─── */
   const PanelDetalle = () => {
     if (!selectedEntrada) {
       return (
@@ -311,6 +258,7 @@ export default function HistoriaClinica() {
         </div>
       );
     }
+    const vars = selectedEntrada.variables_json;
     return (
       <div className="space-y-4">
         {isMobile && (
@@ -318,6 +266,8 @@ export default function HistoriaClinica() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Volver
           </Button>
         )}
+
+        {/* Encabezado */}
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-lg font-bold text-foreground">
             <User className="w-5 h-5 text-[#00ADBB]" />
@@ -327,6 +277,7 @@ export default function HistoriaClinica() {
             <p className="text-xs text-muted-foreground ml-7">DNI {selectedEntrada.paciente.dni}</p>
           )}
         </div>
+
         <div className="flex flex-col gap-1 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -334,36 +285,46 @@ export default function HistoriaClinica() {
           </div>
           <div className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            <span>
-              {selectedEntrada.profesional?.apellido}, {selectedEntrada.profesional?.nombre}
-            </span>
+            <span>{selectedEntrada.profesional?.apellido}, {selectedEntrada.profesional?.nombre}</span>
           </div>
+          {selectedEntrada.ficha_modelo?.nombre && (
+            <div className="flex items-center gap-2">
+              <LayoutTemplate className="w-4 h-4" />
+              <span className="text-[#00ADBB] font-medium">{selectedEntrada.ficha_modelo.nombre}</span>
+            </div>
+          )}
         </div>
-        <Separator />
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Evolución</p>
-          <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-            {selectedEntrada.comentario_evolucion}
-          </p>
-        </div>
-        {loadingDetalle ? (
-          <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-[#00ADBB]" /></div>
-        ) : variablesDetalle.length > 0 ? (
+
+        {/* Variables de la ficha */}
+        {vars && Object.keys(vars).length > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Variables clínicas</p>
-              <div className="space-y-1">
-                {variablesDetalle.map(v => (
-                  <div key={v.variable_id} className="flex justify-between text-sm gap-2">
-                    <span className="text-muted-foreground shrink-0">{v.nombre_variable}</span>
-                    <span className="font-medium text-foreground text-right">{renderValorVariable(v)}</span>
+              <div className="grid grid-cols-1 gap-2">
+                {Object.entries(vars).map(([nombre, valor]) => (
+                  <div key={nombre} className="flex justify-between items-start gap-3 py-1.5 border-b border-dashed border-zinc-100 last:border-0">
+                    <span className="text-sm text-muted-foreground shrink-0 min-w-[140px]">{nombre}</span>
+                    <span className="text-sm font-medium text-foreground text-right">{valor || '—'}</span>
                   </div>
                 ))}
               </div>
             </div>
           </>
-        ) : null}
+        )}
+
+        {/* Comentarios extras / evolución */}
+        {(selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion) && (
+          <>
+            <Separator />
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Comentarios extras</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                {selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -378,47 +339,49 @@ export default function HistoriaClinica() {
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Historia Clínica</h1>
           <p className="text-sm text-muted-foreground">{entradas.length} entradas registradas</p>
         </div>
-        <Button
-          onClick={handleOpenDialog}
-          className="w-full sm:w-auto"
-          style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
-        >
-          <Plus className="w-4 h-4 mr-2" /> Nueva Entrada
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => { resetFichaDialog(); setFichaDialogOpen(true); }}
+            className="gap-2"
+          >
+            <LayoutTemplate className="w-4 h-4" /> Crear ficha modelo
+          </Button>
+          <Button
+            onClick={() => { resetDialog(); setDialogOpen(true); }}
+            className="gap-2"
+            style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
+          >
+            <Plus className="w-4 h-4" /> Nueva Entrada
+          </Button>
+        </div>
       </div>
 
+      {/* Lista + detalle */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
         <Card className="shadow-sm lg:col-span-2">
           <div className="p-3 sm:p-4 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar paciente o profesional..."
-                className="pl-9"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+              <Input placeholder="Buscar paciente o profesional..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           </div>
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-[#00ADBB]" />
-              </div>
+              <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#00ADBB]" /></div>
             ) : filtradas.length === 0 ? (
               <p className="text-center py-10 text-muted-foreground text-sm">No se encontraron entradas</p>
             ) : (
               <ScrollArea className="h-[calc(100vh-280px)]">
                 <div className="divide-y">
                   {filtradas.map(e => (
-                    <button
-                      key={e.id}
-                      onClick={() => handleSeleccionarEntrada(e)}
+                    <button key={e.id} onClick={() => setSelectedEntrada(e)}
                       className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${selectedEntrada?.id === e.id ? 'bg-muted' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -429,10 +392,10 @@ export default function HistoriaClinica() {
                           <p className="text-xs text-muted-foreground truncate">
                             {e.profesional?.apellido}, {e.profesional?.nombre}
                           </p>
-                          {e.comentario_evolucion && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                              {e.comentario_evolucion}
-                            </p>
+                          {e.ficha_modelo?.nombre && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00ADBB]/10 text-[#00ADBB] font-medium mt-0.5 inline-block">
+                              {e.ficha_modelo.nombre}
+                            </span>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
@@ -458,27 +421,26 @@ export default function HistoriaClinica() {
         )}
       </div>
 
+      {/* ═══════════════ DIALOG NUEVA ENTRADA ═══════════════ */}
       <Dialog open={dialogOpen} onOpenChange={open => { if (!open) resetDialog(); setDialogOpen(open); }}>
-        <DialogContent className="sm:max-w-lg w-full">
+        <DialogContent className="max-w-xl w-full">
           <DialogHeader>
             <DialogTitle>Nueva Entrada Clínica</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[75vh] pr-2">
+          <ScrollArea className="max-h-[78vh] pr-2">
             <div className="space-y-4 pb-2">
+
+              {/* Paciente */}
               <div className="space-y-1">
                 <Label>Paciente *</Label>
                 {pacienteSeleccionado ? (
                   <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-muted/50">
-                    <span className="text-sm font-medium">
-                      {pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre}
-                      {pacienteSeleccionado.dni ? ` · DNI ${pacienteSeleccionado.dni}` : ''}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-muted-foreground"
-                      onClick={() => { setPacienteSeleccionado(null); setPacientesSearch(''); setPacientesSugeridos([]); }}
-                    >
+                    <div>
+                      <span className="text-sm font-medium">{pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre}</span>
+                      {pacienteSeleccionado.dni && <span className="text-xs text-muted-foreground ml-2">DNI {pacienteSeleccionado.dni}</span>}
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                      onClick={() => { setPacienteSeleccionado(null); setPacientesSearch(''); setPacientesSugeridos([]); }}>
                       Cambiar
                     </Button>
                   </div>
@@ -486,98 +448,187 @@ export default function HistoriaClinica() {
                   <div className="space-y-1">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar por nombre o DNI..."
-                        className="pl-9"
-                        value={pacientesSearch}
-                        onChange={e => setPacientesSearch(e.target.value)}
-                      />
-                      {loadingPacientes && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
+                      <Input placeholder="Buscar por nombre o DNI..." className="pl-9" value={pacientesSearch}
+                        onChange={e => setPacientesSearch(e.target.value)} />
+                      {loadingPacientes && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
                     </div>
                     {pacientesSugeridos.length > 0 && (
                       <div className="border rounded-md divide-y shadow-sm bg-background">
                         {pacientesSugeridos.map(p => (
-                          <button
-                            key={p.id}
-                            type="button"
+                          <button key={p.id} type="button"
                             className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
-                            onClick={() => { setPacienteSeleccionado(p); setPacientesSearch(''); setPacientesSugeridos([]); }}
-                          >
+                            onClick={() => { setPacienteSeleccionado(p); setPacientesSearch(''); setPacientesSugeridos([]); }}>
                             <span className="font-medium">{p.apellido}, {p.nombre}</span>
                             {p.dni && <span className="text-muted-foreground ml-2 text-xs">DNI {p.dni}</span>}
                           </button>
                         ))}
                       </div>
                     )}
-                    {pacientesSearch.length >= 2 && !loadingPacientes && pacientesSugeridos.length === 0 && (
-                      <p className="text-xs text-muted-foreground px-1">No se encontraron pacientes.</p>
-                    )}
                   </div>
                 )}
               </div>
 
+              {/* Profesional + Fecha en fila */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Profesional *</Label>
+                  <Select value={profesionalId} onValueChange={setProfesionalId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>
+                      {profesionales.map(p => <SelectItem key={p.id} value={p.id}>{p.apellido}, {p.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Fecha *</Label>
+                  <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Ficha modelo */}
               <div className="space-y-1">
-                <Label>Profesional *</Label>
-                <Select value={profesionalId} onValueChange={handleProfesionalChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccioná un profesional" />
-                  </SelectTrigger>
+                <Label>Ficha modelo</Label>
+                <Select value={fichaModeloId} onValueChange={handleFichaChange}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar ficha (opcional)" /></SelectTrigger>
                   <SelectContent>
-                    {profesionales.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.apellido}, {p.nombre}
-                      </SelectItem>
-                    ))}
+                    {fichasDisponibles.map(f => <SelectItem key={f.id} value={f.id}>{f.nombre}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {fichasDisponibles.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sin fichas creadas aún. Usá "Crear ficha modelo" para definir las variables.</p>
+                )}
               </div>
 
-              <div className="space-y-1">
-                <Label>Fecha *</Label>
-                <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Comentario de evolución *</Label>
-                <Textarea
-                  placeholder="Describí la evolución del paciente..."
-                  className="min-h-[100px] resize-none"
-                  value={comentario}
-                  onChange={e => setComentario(e.target.value)}
-                />
-              </div>
-
-              {loadingVariables ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#00ADBB]" />
-                </div>
-              ) : variables.length > 0 ? (
-                <div className="space-y-3 border-t pt-4">
-                  <p className="text-sm font-medium text-foreground">Variables clínicas</p>
-                  {variables.map(v => (
-                    <div key={v.id} className="space-y-1">
-                      <Label className="text-sm">{v.nombre_variable}</Label>
-                      {renderCampoVariable(v)}
+              {/* Variables de la ficha seleccionada */}
+              {fichaVariables.length > 0 && (
+                <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Variables de la ficha</p>
+                  {fichaVariables.map(v => (
+                    <div key={v.id} className="grid grid-cols-2 gap-3 items-center">
+                      <Label className="text-sm font-normal text-foreground">{v.nombre_variable}</Label>
+                      <Input
+                        value={valoresVariables[v.id] ?? ''}
+                        onChange={e => setValoresVariables(prev => ({ ...prev, [v.id]: e.target.value }))}
+                        placeholder="Valor..."
+                        className="h-8"
+                      />
                     </div>
                   ))}
                 </div>
-              ) : null}
+              )}
+
+              {/* Comentarios extras */}
+              <div className="space-y-1">
+                <Label>Comentarios extras</Label>
+                <Textarea
+                  placeholder="Escribí libremente observaciones, evolución, indicaciones..."
+                  className="min-h-[100px] resize-none"
+                  value={comentariosExtras}
+                  onChange={e => setComentariosExtras(e.target.value)}
+                />
+              </div>
 
               <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={handleGuardar}
-                  disabled={saving || !pacienteSeleccionado || !profesionalId || !comentario.trim()}
-                  className="flex-1"
-                  style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
-                >
-                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Guardar
+                <Button onClick={handleGuardar} disabled={saving || !pacienteSeleccionado || !profesionalId}
+                  className="flex-1" style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}>
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
                 </Button>
-                <Button variant="outline" onClick={() => { resetDialog(); setDialogOpen(false); }} className="flex-1">
-                  Cancelar
+                <Button variant="outline" onClick={() => { resetDialog(); setDialogOpen(false); }} className="flex-1">Cancelar</Button>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════ DIALOG CREAR FICHA MODELO ═══════════════ */}
+      <Dialog open={fichaDialogOpen} onOpenChange={open => { if (!open) resetFichaDialog(); setFichaDialogOpen(open); }}>
+        <DialogContent className="max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutTemplate className="w-5 h-5 text-[#00ADBB]" />
+              Crear ficha modelo
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[78vh] pr-2">
+            <div className="space-y-5 pb-2">
+
+              {/* Nombre */}
+              <div className="space-y-1">
+                <Label>Nombre de la ficha *</Label>
+                <Input
+                  placeholder="Ej: Ficha Kinesiología, Ficha RPG, Ficha Respiratoria..."
+                  value={fichaForm.nombre}
+                  onChange={e => setFichaForm({ nombre: e.target.value })}
+                />
+              </div>
+
+              {/* Variables */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Variables a evaluar *</Label>
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => setFichaVarsForm(prev => [...prev, { nombre: '' }])}>
+                    <Plus className="w-3 h-3 mr-1" /> Agregar variable
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Definí los campos que el profesional completará en cada sesión.</p>
+
+                <div className="space-y-2">
+                  {fichaVarsForm.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <GripVertical className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                      <div className="flex-1 grid grid-cols-1">
+                        <Input
+                          placeholder={`Variable ${i + 1} — ej: Dolor (EVA 0-10), ROM flexión, Fuerza...`}
+                          value={v.nombre}
+                          onChange={e => {
+                            const next = [...fichaVarsForm];
+                            next[i] = { nombre: e.target.value };
+                            setFichaVarsForm(next);
+                          }}
+                          className="h-9"
+                        />
+                      </div>
+                      {fichaVarsForm.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0"
+                          onClick={() => setFichaVarsForm(prev => prev.filter((_, idx) => idx !== i))}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              {fichaForm.nombre && fichaVarsForm.some(v => v.nombre.trim()) && (
+                <div className="border rounded-lg p-4 bg-muted/20 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista previa de la ficha</p>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground font-medium border-b pb-1">
+                      <span>Variable</span><span>Respuesta (en blanco)</span>
+                    </div>
+                    {fichaVarsForm.filter(v => v.nombre.trim()).map((v, i) => (
+                      <div key={i} className="grid grid-cols-2 gap-2 text-sm">
+                        <span className="text-foreground">{v.nombre}</span>
+                        <span className="text-muted-foreground italic text-xs">campo de texto</span>
+                      </div>
+                    ))}
+                    <div className="border-t pt-2 text-sm">
+                      <span className="text-foreground font-medium">Comentarios extras:</span>
+                      <span className="text-muted-foreground italic text-xs ml-2">área de texto libre</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <Button onClick={handleGuardarFicha}
+                  disabled={savingFicha || !fichaForm.nombre.trim() || !fichaVarsForm.some(v => v.nombre.trim())}
+                  className="flex-1" style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}>
+                  {savingFicha && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar ficha
                 </Button>
+                <Button variant="outline" onClick={() => { resetFichaDialog(); setFichaDialogOpen(false); }} className="flex-1">Cancelar</Button>
               </div>
             </div>
           </ScrollArea>
