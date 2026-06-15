@@ -164,7 +164,7 @@ export function ReprogramarTurnoDialog({ turno, onClose, onReprogramado }: Props
           )}
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
           {/* Selector de fecha */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">1. Elegí la nueva fecha</p>
