@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PacienteAutocomplete, PacienteOption } from '@/components/PacienteAutocomplete';
 
 /* ─────────────────── Interfaces ─────────────────── */
 interface EntradaHistoria {
@@ -60,11 +61,8 @@ export default function HistoriaClinica() {
   // Dialog nueva entrada
   const [dialogOpen, setDialogOpen] = useState(false);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
-  const [dniInput, setDniInput] = useState('');
-  const [nombreInput, setNombreInput] = useState('');
-  const [apellidoInput, setApellidoInput] = useState('');
-  const [loadingPacientes, setLoadingPacientes] = useState(false);
-  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<PacienteOption | null>(null);
+  const [resetAutocomplete, setResetAutocomplete] = useState(0);
   const [profesionalId, setProfesionalId] = useState('');
   const [fecha, setFecha] = useState(HOY);
   const [fichaModeloId, setFichaModeloId] = useState('');
@@ -80,7 +78,6 @@ export default function HistoriaClinica() {
   const [fichaVarsForm, setFichaVarsForm] = useState<{ nombre: string }[]>([{ nombre: '' }]);
   const [savingFicha, setSavingFicha] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ─── Fetching ─── */
   const fetchEntradas = useCallback(async () => {
@@ -121,30 +118,6 @@ export default function HistoriaClinica() {
   useEffect(() => { fetchFichas(); }, [fetchFichas]);
   useEffect(() => { fetchProfesionales(); }, [fetchProfesionales]);
 
-  /* ─── Autocomplete por DNI ─── */
-  const buscarPorDni = useCallback(async (dni: string) => {
-    if (!centroId || dni.trim().length < 6) return;
-    setLoadingPacientes(true);
-    const { data } = await supabase.from('pacientes').select('id, nombre, apellido, dni')
-      .eq('centro_id', centroId).eq('dni', dni.trim()).limit(1);
-    const p = data?.[0] as Paciente | undefined;
-    if (p) {
-      setPacienteSeleccionado(p);
-      setNombreInput(p.nombre);
-      setApellidoInput(p.apellido);
-    } else {
-      setPacienteSeleccionado(null);
-      setNombreInput('');
-      setApellidoInput('');
-    }
-    setLoadingPacientes(false);
-  }, [centroId]);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { buscarPorDni(dniInput); }, 400);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [dniInput, buscarPorDni]);
 
   /* ─── Cambio de ficha modelo ─── */
   const handleFichaChange = async (fichaId: string) => {
@@ -165,14 +138,15 @@ export default function HistoriaClinica() {
 
   /* ─── Guardar entrada ─── */
   const resetDialog = () => {
-    setDniInput(''); setNombreInput(''); setApellidoInput(''); setPacienteSeleccionado(null);
+    setPacienteSeleccionado(null);
+    setResetAutocomplete(n => n + 1);
     setProfesionalId(''); setFecha(HOY); setFichaModeloId(''); setFichaVariables([]);
     setValoresVariables({}); setComentariosExtras('');
   };
 
   const handleGuardar = async () => {
-    if (!centroId || !profesionalId || !dniInput.trim()) {
-      toast({ title: 'Campos requeridos', description: 'Completá el DNI del paciente y el profesional.', variant: 'destructive' });
+    if (!centroId || !profesionalId || !pacienteSeleccionado) {
+      toast({ title: 'Campos requeridos', description: 'Seleccioná el paciente y el profesional.', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -183,7 +157,7 @@ export default function HistoriaClinica() {
 
     const { error } = await supabase.from('historia_clinica').insert({
       centro_id: centroId,
-      paciente_id: pacienteSeleccionado?.id ?? null,
+      paciente_id: pacienteSeleccionado.id,
       profesional_id: profesionalId,
       fecha,
       comentario_evolucion: comentariosExtras.trim() || '',
@@ -440,49 +414,18 @@ export default function HistoriaClinica() {
           <ScrollArea className="max-h-[78vh] pr-2">
             <div className="space-y-4 pb-2">
 
-              {/* Paciente — DNI autocompleta Nombre y Apellido */}
-              <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label>DNI *</Label>
-                    <div className="relative">
-                      <Input
-                        placeholder="Ej: 36115676"
-                        value={dniInput}
-                        onChange={e => { setDniInput(e.target.value); setPacienteSeleccionado(null); setNombreInput(''); setApellidoInput(''); }}
-                        className={pacienteSeleccionado ? 'border-[#00ADBB]' : ''}
-                      />
-                      {loadingPacientes && (
-                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Apellido</Label>
-                    <Input
-                      placeholder="Apellido"
-                      value={apellidoInput}
-                      readOnly={!!pacienteSeleccionado}
-                      onChange={e => setApellidoInput(e.target.value)}
-                      className={pacienteSeleccionado ? 'bg-muted/50 text-muted-foreground' : ''}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Nombre</Label>
-                    <Input
-                      placeholder="Nombre"
-                      value={nombreInput}
-                      readOnly={!!pacienteSeleccionado}
-                      onChange={e => setNombreInput(e.target.value)}
-                      className={pacienteSeleccionado ? 'bg-muted/50 text-muted-foreground' : ''}
-                    />
-                  </div>
-                </div>
+              {/* Paciente — autocomplete por DNI, nombre o apellido */}
+              <div className="space-y-1.5">
+                <Label>Paciente *</Label>
+                <PacienteAutocomplete
+                  key={resetAutocomplete}
+                  onSelect={setPacienteSeleccionado}
+                  placeholder="Buscar por apellido, nombre o DNI..."
+                />
                 {pacienteSeleccionado && (
-                  <p className="text-xs text-[#00ADBB]">✓ Paciente encontrado en el sistema</p>
-                )}
-                {dniInput.length >= 6 && !loadingPacientes && !pacienteSeleccionado && (
-                  <p className="text-xs text-amber-600">DNI no encontrado. La entrada se guardará sin vincular al paciente.</p>
+                  <p className="text-xs text-[#00ADBB]">
+                    ✓ {pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre} — DNI {pacienteSeleccionado.dni}
+                  </p>
                 )}
               </div>
 
@@ -547,7 +490,7 @@ export default function HistoriaClinica() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleGuardar} disabled={saving || !dniInput.trim() || !profesionalId}
+                <Button onClick={handleGuardar} disabled={saving || !pacienteSeleccionado || !profesionalId}
                   className="flex-1" style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}>
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
                 </Button>

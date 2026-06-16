@@ -6,8 +6,9 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Phone, CreditCard, CalendarDays, Banknote, ArrowLeftRight, Building2 } from 'lucide-react';
+import { Loader2, X, Phone, CreditCard, CalendarDays, Banknote, ArrowLeftRight, Building2, FileText, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
 
@@ -68,6 +69,16 @@ interface TratamientoRow {
   profesional?: { nombre: string; apellido: string } | null;
 }
 
+interface HistoriaEntrada {
+  id: string;
+  fecha: string;
+  comentario_evolucion: string;
+  comentarios_extras: string | null;
+  variables_json: Record<string, string> | null;
+  ficha_modelo?: { nombre: string } | null;
+  profesional?: { nombre: string; apellido: string } | null;
+}
+
 type Tab = 'cita' | 'historia' | 'tratamiento' | 'pagos' | 'historial';
 
 interface Props {
@@ -104,6 +115,16 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [historial, setHistorial] = useState<TurnoHistorial[]>([]);
   const [pagos, setPagos] = useState<PagoRow[]>([]);
   const [tratamientos, setTratamientos] = useState<TratamientoRow[]>([]);
+
+  // Historia clínica
+  const [historiaEntradas, setHistoriaEntradas] = useState<HistoriaEntrada[]>([]);
+  const [hcComentario, setHcComentario] = useState('');
+  const [hcFichasDisponibles, setHcFichasDisponibles] = useState<{ id: string; nombre: string; variables: { id: string; nombre_variable: string; orden: number }[] }[]>([]);
+  const [hcFichaId, setHcFichaId] = useState('');
+  const [hcVariables, setHcVariables] = useState<{ id: string; nombre_variable: string; orden: number }[]>([]);
+  const [hcValores, setHcValores] = useState<Record<string, string>>({});
+  const [hcSaving, setHcSaving] = useState(false);
+  const [hcExpanded, setHcExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     if (!turno || !centroId) return;
@@ -161,7 +182,21 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         .eq('paciente_id', turno.paciente_id)
         .eq('centro_id', centroId)
         .order('fecha_inicio', { ascending: false }),
-    ]).then(([pacRes, servRes, turnoRes, cajaRes, sesRes, histRes, pagosRes, tratRes]) => {
+
+      // Historia clínica del paciente
+      supabase.from('historia_clinica')
+        .select('id, fecha, comentario_evolucion, comentarios_extras, variables_json, ficha_modelo:fichas_modelo(nombre), profesional:profesionales(nombre, apellido)')
+        .eq('paciente_id', turno.paciente_id)
+        .eq('centro_id', centroId!)
+        .order('fecha', { ascending: false })
+        .limit(50),
+
+      // Fichas modelo disponibles
+      supabase.from('fichas_modelo')
+        .select('id, nombre, variables:fichas_modelo_variables(id, nombre_variable, orden)')
+        .eq('centro_id', centroId!)
+        .order('nombre'),
+    ]).then(([pacRes, servRes, turnoRes, cajaRes, sesRes, histRes, pagosRes, tratRes, hcRes, fichasRes]) => {
       const pac = (pacRes as any).data as Paciente | null;
       if (!pac) { setLoading(false); return; }
 
@@ -173,6 +208,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       setHistorial(((histRes as any).data ?? []) as TurnoHistorial[]);
       setPagos(((pagosRes as any).data ?? []) as PagoRow[]);
       setTratamientos(((tratRes as any).data ?? []) as TratamientoRow[]);
+      setHistoriaEntradas(((hcRes as any).data ?? []) as HistoriaEntrada[]);
+      setHcFichasDisponibles(((fichasRes as any).data ?? []) as any);
 
       setEstado(turno.estado);
       // Preferir obra_social_id (tabla nueva), fallback a prepaga_id (tabla vieja)
@@ -219,6 +256,48 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     setSaving(false);
     toast({ title: 'Turno actualizado' });
     onUpdated();
+  };
+
+  const handleGuardarHC = async () => {
+    if (!turno || !paciente || !centroId) return;
+    if (!hcComentario.trim() && Object.values(hcValores).every(v => !v.trim())) {
+      toast({ title: 'Sin contenido', description: 'Escribí un comentario o completá alguna variable antes de guardar.', variant: 'destructive' });
+      return;
+    }
+    setHcSaving(true);
+    const variablesJson: Record<string, string> = {};
+    hcVariables.forEach(v => { if (hcValores[v.id]?.trim()) variablesJson[v.nombre_variable] = hcValores[v.id]; });
+
+    const { data: newEntry, error } = await supabase.from('historia_clinica').insert({
+      centro_id: centroId,
+      paciente_id: paciente.id,
+      profesional_id: turno.profesional_id,
+      fecha: turno.fecha,
+      comentario_evolucion: hcComentario.trim(),
+      comentarios_extras: hcComentario.trim() || null,
+      variables_json: Object.keys(variablesJson).length > 0 ? variablesJson : null,
+      ficha_modelo_id: hcFichaId || null,
+    }).select('id, fecha, comentario_evolucion, comentarios_extras, variables_json, ficha_modelo:fichas_modelo(nombre), profesional:profesionales(nombre, apellido)').single();
+
+    setHcSaving(false);
+    if (error) {
+      toast({ title: 'Error', description: 'No se pudo guardar la entrada.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Entrada guardada en historia clínica' });
+      setHistoriaEntradas(prev => [newEntry as unknown as HistoriaEntrada, ...prev]);
+      setHcComentario(''); setHcFichaId(''); setHcVariables([]); setHcValores({});
+    }
+  };
+
+  const handleHcFichaChange = async (fichaId: string) => {
+    setHcFichaId(fichaId);
+    setHcValores({});
+    const ficha = hcFichasDisponibles.find(f => f.id === fichaId);
+    const vars = (ficha?.variables ?? []).sort((a, b) => a.orden - b.orden);
+    setHcVariables(vars);
+    const init: Record<string, string> = {};
+    vars.forEach(v => { init[v.id] = ''; });
+    setHcValores(init);
   };
 
   const fmt = (s: string | null) => {
@@ -409,10 +488,118 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
               {/* ── HISTORIA CLÍNICA ── */}
               {tab === 'historia' && (
-                <div className="p-5">
-                  <p className="text-[13px] text-muted-foreground text-center py-12">
-                    Historia clínica — próximamente disponible en este módulo
-                  </p>
+                <div className="p-4 space-y-4">
+                  {/* Formulario nueva entrada */}
+                  <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" /> Nueva entrada para esta cita
+                    </p>
+
+                    {hcFichasDisponibles.length > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-[12px]">Ficha modelo (opcional)</Label>
+                        <Select value={hcFichaId} onValueChange={handleHcFichaChange}>
+                          <SelectTrigger className="h-8 text-[13px]"><SelectValue placeholder="Sin ficha — texto libre" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Sin ficha</SelectItem>
+                            {hcFichasDisponibles.map(f => <SelectItem key={f.id} value={f.id}>{f.nombre}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {hcVariables.length > 0 && (
+                      <div className="space-y-2">
+                        {hcVariables.map(v => (
+                          <div key={v.id} className="grid grid-cols-2 gap-2 items-center">
+                            <Label className="text-[12px] font-normal">{v.nombre_variable}</Label>
+                            <Input
+                              className="h-8 text-[13px]"
+                              value={hcValores[v.id] ?? ''}
+                              onChange={e => setHcValores(prev => ({ ...prev, [v.id]: e.target.value }))}
+                              placeholder="Valor..."
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <Label className="text-[12px]">Comentarios / Evolución</Label>
+                      <Textarea
+                        className="min-h-[80px] text-[13px] resize-none"
+                        placeholder="Evolución del paciente, indicaciones, observaciones..."
+                        value={hcComentario}
+                        onChange={e => setHcComentario(e.target.value)}
+                      />
+                    </div>
+
+                    <Button
+                      size="sm"
+                      onClick={handleGuardarHC}
+                      disabled={hcSaving}
+                      className="w-full"
+                      style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
+                    >
+                      {hcSaving && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
+                      Guardar entrada clínica
+                    </Button>
+                  </div>
+
+                  {/* Entradas anteriores */}
+                  {historiaEntradas.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-[13px]">Sin entradas clínicas previas para este paciente</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Historial clínico ({historiaEntradas.length})
+                      </p>
+                      {historiaEntradas.map(e => (
+                        <div key={e.id} className="border rounded-lg overflow-hidden">
+                          <button
+                            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/40 transition-colors text-left"
+                            onClick={() => setHcExpanded(hcExpanded === e.id ? null : e.id)}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="w-3.5 h-3.5 text-[#00ADBB] shrink-0" />
+                              <span className="text-[13px] font-medium">{fmt(e.fecha)}</span>
+                              {e.ficha_modelo?.nombre && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00ADBB]/10 text-[#00ADBB] font-medium">
+                                  {e.ficha_modelo.nombre}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-muted-foreground truncate">
+                                {e.profesional ? `${e.profesional.apellido}, ${e.profesional.nombre}` : ''}
+                              </span>
+                            </div>
+                            {hcExpanded === e.id ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                          </button>
+                          {hcExpanded === e.id && (
+                            <div className="px-3 pb-3 space-y-2 border-t bg-muted/10">
+                              {e.variables_json && Object.keys(e.variables_json).length > 0 && (
+                                <div className="pt-2 space-y-1">
+                                  {Object.entries(e.variables_json).map(([k, v]) => (
+                                    <div key={k} className="flex justify-between text-[12px]">
+                                      <span className="text-muted-foreground">{k}</span>
+                                      <span className="font-medium">{v || '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {(e.comentarios_extras || e.comentario_evolucion) && (
+                                <p className="text-[12px] text-foreground whitespace-pre-wrap pt-1 border-t">
+                                  {e.comentarios_extras || e.comentario_evolucion}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
