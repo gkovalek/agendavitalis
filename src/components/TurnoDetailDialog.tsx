@@ -234,7 +234,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       return;
     }
 
-    const ops: Promise<any>[] = [
+    const ops: any[] = [
       supabase.from('turnos').update({ estado }).eq('id', turno.id),
       supabase.from('pacientes').update({ obra_social_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
