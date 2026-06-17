@@ -77,7 +77,10 @@ export default function ObrasSociales() {
         .eq('activo', true)
         .order('apellido'),
     ]);
-    setItems((osRes.data as ObraSocial[]) ?? []);
+    setItems(((osRes.data as any[]) ?? []).map((os: any) => ({
+      ...os,
+      profesional: Array.isArray(os.profesional) ? (os.profesional[0] ?? null) : os.profesional,
+    })) as ObraSocial[]);
     setProfesionales((profRes.data as Profesional[]) ?? []);
     setLoading(false);
   };
@@ -382,13 +385,12 @@ export default function ObrasSociales() {
       {/* Confirmar eliminar */}
       <ConfirmDialog
         open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
         title="Eliminar obra social"
         description="¿Estás seguro? Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
         loading={deleting}
-        variant="destructive"
       />
     </div>
   );

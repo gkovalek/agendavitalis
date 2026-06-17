@@ -28,7 +28,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Agendas',
     items: [
-      { label: 'Panel principal', href: '/dashboard' },
       { label: 'Gestión de Agendas', href: '/agendas' },
       { label: 'Profesionales', href: '/profesionales' },
       { label: 'Servicios', href: '/servicios' },
@@ -117,6 +116,7 @@ function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (hre
 export function TopNavbar() {
   const navigate = useNavigate();
   const { perfil, signOut } = useAuth();
+  const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -144,6 +144,19 @@ export function TopNavbar() {
 
       {/* Nav — flex sin overflow */}
       <nav className="flex items-stretch flex-1 min-w-0">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className={`
+            flex items-center px-3 h-full text-[12px] font-semibold
+            transition-colors whitespace-nowrap border-none shrink-0 cursor-pointer
+            ${location.pathname === '/dashboard'
+              ? 'bg-white text-[#0F6E56]'
+              : 'bg-white/90 text-[#0F6E56] hover:bg-white'
+            }
+          `}
+        >
+          Panel principal
+        </button>
         {NAV_GROUPS.map((group, i) => (
           <DropdownMenu key={i} group={group} onNavigate={navigate} />
         ))}

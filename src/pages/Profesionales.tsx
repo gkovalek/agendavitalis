@@ -97,7 +97,7 @@ export default function Profesionales() {
     let profesionalId = editId;
 
     console.log('[handleSave] Starting save. centroId:', centroId, 'editId:', editId);
-    console.log('[handleSave] inlineServicios state:', JSON.stringify(inlineServicios, null, 2));
+    console.log('[handleSave] inlineAgendas state:', JSON.stringify(inlineAgendas, null, 2));
 
     if (editId) {
       const { error } = await supabase.from('profesionales').update(form).eq('id', editId);
