@@ -117,6 +117,7 @@ function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (hre
 export function TopNavbar() {
   const navigate = useNavigate();
   const { perfil, signOut } = useAuth();
+  const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
