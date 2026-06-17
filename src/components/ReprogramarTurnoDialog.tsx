@@ -73,10 +73,14 @@ export function ReprogramarTurnoDialog({ turno, onClose, onReprogramado }: Props
       .eq('centro_id', centroId)
       .eq('profesional_id', turno.profesional_id)
       .then(({ data }) => {
-        const rec = agendaId
+        const raw = agendaId
           ? (data ?? []).find((r: any) => r.agenda_id === agendaId)
           : (data ?? [])[0];
-        setPcs(rec ?? null);
+        const rec = raw ? {
+          ...raw,
+          agenda: Array.isArray(raw.agenda) ? (raw.agenda[0] ?? null) : raw.agenda,
+        } : null;
+        setPcs(rec as PCSRecord | null);
       });
   }, [turno?.id]);
 
