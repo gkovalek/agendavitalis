@@ -182,7 +182,11 @@ export default function Dashboard() {
         .eq('centro_id', centroId).eq('activo', true),
     ]);
     const turnosList: Turno[] = (turnosRes.data as any[]) ?? [];
-    const pcsListRaw: PCSRecord[] = ((pcsRes.data as PCSRecord[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) }));
+    const pcsListRaw: PCSRecord[] = ((pcsRes.data as any[]) ?? []).map((r: any) => ({
+      ...r,
+      dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo),
+      agenda: Array.isArray(r.agenda) ? (r.agenda[0] ?? null) : r.agenda,
+    }));
 
     // Queries adicionales: conteo de sesiones finalizadas y pagos
     const uniquePacienteIds = [...new Set(turnosList.map(t => t.paciente_id).filter(Boolean))];
