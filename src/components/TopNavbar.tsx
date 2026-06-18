@@ -50,8 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Recordatorios',
-    disabled: true,
-    items: [{ label: 'Próximamente', disabled: true }],
+    items: [{ label: 'Recordatorios de turno', href: '/recordatorios' }],
   },
   {
     label: 'Autorizaciones',
