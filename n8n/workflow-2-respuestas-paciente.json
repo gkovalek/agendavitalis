@@ -1,0 +1,316 @@
+{
+  "name": "Vitalis - Respuestas WhatsApp Twilio",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-respuestas",
+        "responseMode": "onReceived",
+        "responseData": ""
+      },
+      "id": "node-wh-02",
+      "name": "Webhook Twilio Respuestas",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "twilio-respuestas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Twilio envia form-urlencoded. Extraemos Body y From.\nconst body = $input.first().json.body;\n\n// From llega como 'whatsapp:+5493624777801' -> extraemos solo el numero\nconst fromRaw = body.From || '';\nconst celular = fromRaw.replace('whatsapp:+', '').replace('whatsapp:', '').replace('+', '');\n\n// Mensaje en minusculas para el switch\nconst mensaje = (body.Body || '').toLowerCase().trim();\n\n// Fecha de hoy y manana para buscar el turno activo\nconst hoy = new Date();\nconst manana = new Date(hoy);\nmanana.setDate(manana.getDate() + 1);\n\nconst fmt = d => d.toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    celular,\n    mensaje,\n    from_raw: fromRaw,\n    fecha_desde: fmt(hoy),\n    fecha_hasta: fmt(manana)\n  }\n}];"
+      },
+      "id": "node-code-02",
+      "name": "Extraer datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "=REEMPLAZAR_CON_SUPABASE_URL/rest/v1/turnos?select=id,estado,fecha,hora_inicio,paciente:pacientes!inner(id,celular)&paciente.celular=eq.{{ $json.celular }}&fecha=gte.{{ $json.fecha_desde }}&fecha=lte.{{ $json.fecha_hasta }}&estado=in.(reservado,confirmado,en_sala)&limit=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-supa-find",
+      "name": "Buscar turno en Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combina el turno encontrado con los datos del paso anterior\nconst turno = $input.first().json[0] || null;\nconst prev  = $('Extraer datos').first().json;\n\nif (!turno) {\n  return [{ json: { turno_found: false, mensaje: prev.mensaje, from_raw: prev.from_raw } }];\n}\n\nreturn [{\n  json: {\n    turno_found: true,\n    turno_id:   turno.id,\n    estado_actual: turno.estado,\n    mensaje:    prev.mensaje,\n    from_raw:   prev.from_raw,\n    celular:    prev.celular\n  }\n}];"
+      },
+      "id": "node-code-03",
+      "name": "Combinar turno + mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.turno_found }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-found",
+      "name": "Turno encontrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mensaje }}",
+                    "rightValue": "confirmo turno",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "confirmar"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mensaje }}",
+                    "rightValue": "cancelo turno",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "cancelar"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mensaje }}",
+                    "rightValue": "reagendar turno",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "reagendar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-switch",
+      "name": "Switch accion",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "url": "=REEMPLAZAR_CON_SUPABASE_URL/rest/v1/turnos?id=eq.{{ $json.turno_id }}",
+        "httpMethod": "PATCH",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY" },
+            { "name": "Authorization", "value": "Bearer REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"estado\": \"confirmado\" }",
+        "options": {}
+      },
+      "id": "node-supa-confirm",
+      "name": "Supabase: confirmar turno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 100]
+    },
+    {
+      "parameters": {
+        "url": "=REEMPLAZAR_CON_SUPABASE_URL/rest/v1/turnos?id=eq.{{ $json.turno_id }}",
+        "httpMethod": "PATCH",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY" },
+            { "name": "Authorization", "value": "Bearer REEMPLAZAR_CON_SUPABASE_SERVICE_ROLE_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"estado\": \"cancelado\", \"motivo_cancelacion\": \"por_paciente\" }",
+        "options": {}
+      },
+      "id": "node-supa-cancel",
+      "name": "Supabase: cancelar turno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 260]
+    },
+    {
+      "parameters": {
+        "url": "https://api.twilio.com/2010-04-01/Accounts/REEMPLAZAR_CON_ACCOUNT_SID/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "From", "value": "whatsapp:+5493625456570" },
+            { "name": "To", "value": "={{ $('Combinar turno + mensaje').first().json.from_raw }}" },
+            { "name": "Body", "value": "✅ ¡Gracias! Tu turno está confirmado. Te esperamos 🙌" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-reply-confirm",
+      "name": "WA: respuesta confirmado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 100],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "REEMPLAZAR_CON_ID_CREDENCIAL",
+          "name": "REEMPLAZAR_CON_NOMBRE_CREDENCIAL_TWILIO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.twilio.com/2010-04-01/Accounts/REEMPLAZAR_CON_ACCOUNT_SID/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "From", "value": "whatsapp:+5493625456570" },
+            { "name": "To", "value": "={{ $('Combinar turno + mensaje').first().json.from_raw }}" },
+            { "name": "Body", "value": "❌ Entendemos, tu turno fue cancelado. Si querés sacar uno nuevo escribinos al +543624955955." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-reply-cancel",
+      "name": "WA: respuesta cancelado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 260],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "REEMPLAZAR_CON_ID_CREDENCIAL",
+          "name": "REEMPLAZAR_CON_NOMBRE_CREDENCIAL_TWILIO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.twilio.com/2010-04-01/Accounts/REEMPLAZAR_CON_ACCOUNT_SID/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "From", "value": "whatsapp:+5493625456570" },
+            { "name": "To", "value": "={{ $('Combinar turno + mensaje').first().json.from_raw }}" },
+            { "name": "Body", "value": "📅 Claro, para reagendar escribinos directamente al +543624955955 y te ayudamos 😊" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-reply-reagendar",
+      "name": "WA: respuesta reagendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 420],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "REEMPLAZAR_CON_ID_CREDENCIAL",
+          "name": "REEMPLAZAR_CON_NOMBRE_CREDENCIAL_TWILIO"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Twilio Respuestas": {
+      "main": [[{ "node": "Extraer datos", "type": "main", "index": 0 }]]
+    },
+    "Extraer datos": {
+      "main": [[{ "node": "Buscar turno en Supabase", "type": "main", "index": 0 }]]
+    },
+    "Buscar turno en Supabase": {
+      "main": [[{ "node": "Combinar turno + mensaje", "type": "main", "index": 0 }]]
+    },
+    "Combinar turno + mensaje": {
+      "main": [[{ "node": "Turno encontrado?", "type": "main", "index": 0 }]]
+    },
+    "Turno encontrado?": {
+      "main": [
+        [{ "node": "Switch accion", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Switch accion": {
+      "confirmar": [[{ "node": "Supabase: confirmar turno", "type": "main", "index": 0 }]],
+      "cancelar":  [[{ "node": "Supabase: cancelar turno",  "type": "main", "index": 0 }]],
+      "reagendar": [[{ "node": "WA: respuesta reagendar",   "type": "main", "index": 0 }]]
+    },
+    "Supabase: confirmar turno": {
+      "main": [[{ "node": "WA: respuesta confirmado", "type": "main", "index": 0 }]]
+    },
+    "Supabase: cancelar turno": {
+      "main": [[{ "node": "WA: respuesta cancelado", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
