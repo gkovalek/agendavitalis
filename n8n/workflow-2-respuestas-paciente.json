@@ -96,7 +96,7 @@
                 "conditions": [
                   {
                     "leftValue": "={{ $json.mensaje }}",
-                    "rightValue": "confirmo turno",
+                    "rightValue": "confirmo el turno.",
                     "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
@@ -110,7 +110,7 @@
                 "conditions": [
                   {
                     "leftValue": "={{ $json.mensaje }}",
-                    "rightValue": "cancelo turno",
+                    "rightValue": "cancelar turno",
                     "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
@@ -124,7 +124,7 @@
                 "conditions": [
                   {
                     "leftValue": "={{ $json.mensaje }}",
-                    "rightValue": "reagendar turno",
+                    "rightValue": "reprogramar turno",
                     "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
