@@ -57,7 +57,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     setLoading(true);
     const [serviciosRes, asignacionesRes] = await Promise.all([
       supabase.from('servicios').select('id, nombre').eq('centro_id', centroId).eq('activo', true).order('nombre'),
-      supabase.from('profesional_centro_servicio').select('*, servicio:servicios(id, nombre)')
+      supabase.from('profesional_centro_servicio').select('*, servicio:servicios!servicio_id(id, nombre)')
         .eq(entityColumn, entityId).eq('centro_id', centroId),
     ]);
     setServiciosDisponibles(serviciosRes.data ?? []);
