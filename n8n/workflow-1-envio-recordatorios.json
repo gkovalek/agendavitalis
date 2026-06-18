@@ -48,7 +48,7 @@
             },
             {
               "name": "ContentVariables",
-              "value": "={{ JSON.stringify({ \"1\": $json.nombre, \"2\": $json.fecha, \"3\": $json.hora, \"4\": $json.servicio, \"5\": $json.profesional, \"6\": $json.centro_nombre }) }}"
+              "value": "={{ JSON.stringify({ \"1\": $json.nombre, \"2\": $json.centro_nombre, \"3\": $json.fecha, \"4\": $json.hora, \"5\": $json.profesional, \"6\": $json.servicio }) }}"
             }
           ]
         },
