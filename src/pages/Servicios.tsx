@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -28,10 +29,8 @@ interface Servicio {
   agenda?: { nombre: string } | null;
 }
 
-interface AgendaOption {
-  id: string;
-  nombre: string;
-}
+interface AgendaOption { id: string; nombre: string; }
+interface ProfesionalOption { id: string; nombre: string; apellido: string; }
 
 const emptyForm = { nombre: '', duracion_minutos: 30, costo_base: 0, es_tratamiento: false, sesiones_por_bloque: null as number | null, requiere_os: false, activo: true, agenda_id: '' };
 
@@ -39,10 +38,12 @@ export default function Servicios() {
   const { centroId } = useAuth();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [agendas, setAgendas] = useState<AgendaOption[]>([]);
+  const [profesionales, setProfesionales] = useState<ProfesionalOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [profSeleccionados, setProfSeleccionados] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -52,22 +53,37 @@ export default function Servicios() {
   const fetchData = async () => {
     if (!centroId) return;
     setLoading(true);
-    const [{ data: srvData }, { data: agData }] = await Promise.all([
+    const [{ data: srvData }, { data: agData }, { data: profData }] = await Promise.all([
       supabase.from('servicios').select('*, agenda:agendas(nombre)').eq('centro_id', centroId).order('nombre'),
       supabase.from('agendas').select('id, nombre').eq('centro_id', centroId).order('nombre'),
+      supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
     ]);
     setServicios(srvData ?? []);
     setAgendas(agData ?? []);
+    setProfesionales(profData ?? []);
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [centroId]);
 
-  const openNew = () => { setEditId(null); setForm(emptyForm); setDialogOpen(true); };
-  const openEdit = (s: Servicio) => {
+  const openNew = () => {
+    setEditId(null);
+    setForm(emptyForm);
+    setProfSeleccionados([]);
+    setDialogOpen(true);
+  };
+
+  const openEdit = async (s: Servicio) => {
     setEditId(s.id);
     setForm({ nombre: s.nombre, duracion_minutos: s.duracion_minutos, costo_base: s.costo_base, es_tratamiento: s.es_tratamiento, sesiones_por_bloque: s.sesiones_por_bloque, requiere_os: s.requiere_os ?? false, activo: s.activo, agenda_id: s.agenda_id ?? '' });
+    // Cargar profesionales ya asignados a este servicio
+    const { data } = await supabase.from('profesional_centro_servicio').select('profesional_id').eq('servicio_id', s.id).eq('centro_id', centroId!);
+    setProfSeleccionados((data ?? []).map(r => r.profesional_id).filter(Boolean));
     setDialogOpen(true);
+  };
+
+  const toggleProf = (id: string, checked: boolean) => {
+    setProfSeleccionados(prev => checked ? [...prev, id] : prev.filter(p => p !== id));
   };
 
   const handleSave = async () => {
@@ -78,15 +94,38 @@ export default function Servicios() {
       sesiones_por_bloque: form.es_tratamiento ? form.sesiones_por_bloque : null,
       agenda_id: form.agenda_id || null,
     };
+
+    let servicioId = editId;
+
     if (editId) {
       const { error } = await supabase.from('servicios').update(payload).eq('id', editId);
-      if (error) toast({ title: 'Error', description: 'No se pudo actualizar el servicio. Intentá de nuevo.', variant: 'destructive' });
-      else toast({ title: 'Servicio actualizado' });
+      if (error) { toast({ title: 'Error', description: 'No se pudo actualizar el servicio.', variant: 'destructive' }); setSaving(false); return; }
     } else {
-      const { error } = await supabase.from('servicios').insert({ ...payload, centro_id: centroId });
-      if (error) toast({ title: 'Error', description: 'No se pudo crear el servicio. Intentá de nuevo.', variant: 'destructive' });
-      else toast({ title: 'Servicio creado' });
+      const { data, error } = await supabase.from('servicios').insert({ ...payload, centro_id: centroId }).select('id').single();
+      if (error || !data) { toast({ title: 'Error', description: 'No se pudo crear el servicio.', variant: 'destructive' }); setSaving(false); return; }
+      servicioId = data.id;
     }
+
+    // Sincronizar profesional_centro_servicio
+    // Eliminar asignaciones existentes para este servicio
+    await supabase.from('profesional_centro_servicio').delete().eq('servicio_id', servicioId!).eq('centro_id', centroId);
+
+    // Insertar las seleccionadas
+    if (profSeleccionados.length > 0) {
+      const rows = profSeleccionados.map(profId => ({
+        centro_id: centroId,
+        profesional_id: profId,
+        servicio_id: servicioId,
+        activo: true,
+        capacidad_simultanea: 1,
+        dias_trabajo: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
+        hora_inicio: '08:00:00',
+        hora_fin: '20:00:00',
+      }));
+      await supabase.from('profesional_centro_servicio').insert(rows);
+    }
+
+    toast({ title: editId ? 'Servicio actualizado' : 'Servicio creado' });
     setSaving(false);
     setDialogOpen(false);
     fetchData();
@@ -98,7 +137,7 @@ export default function Servicios() {
     const { error } = await supabase.from('servicios').delete().eq('id', deleteId);
     setDeleting(false);
     setDeleteId(null);
-    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el servicio. Intentá de nuevo.', variant: 'destructive' });
+    if (error) toast({ title: 'Error', description: 'No se pudo eliminar el servicio.', variant: 'destructive' });
     else { toast({ title: 'Servicio eliminado' }); fetchData(); }
   };
 
@@ -177,7 +216,7 @@ export default function Servicios() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Servicio</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
             <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></div>
             <div className="space-y-1">
               <Label>Agenda *</Label>
@@ -187,8 +226,29 @@ export default function Servicios() {
                   {agendas.map(a => <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {agendas.length === 0 && <p className="text-xs text-amber-600">No hay agendas configuradas. Creá una en Agendas &gt; Gestión de Agendas.</p>}
+              {agendas.length === 0 && <p className="text-xs text-amber-600">No hay agendas configuradas.</p>}
             </div>
+
+            {/* Profesionales */}
+            <div className="space-y-2">
+              <Label>Profesionales que lo atienden</Label>
+              {profesionales.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No hay profesionales activos.</p>
+              ) : (
+                <div className="border rounded-md p-3 space-y-2">
+                  {profesionales.map(p => (
+                    <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={profSeleccionados.includes(p.id)}
+                        onCheckedChange={v => toggleProf(p.id, !!v)}
+                      />
+                      {p.apellido}, {p.nombre}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Duración del turno</Label>
