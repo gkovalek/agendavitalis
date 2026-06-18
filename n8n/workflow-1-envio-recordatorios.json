@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extrae el array de turnos del body y prepara un item por cada uno\nconst body = $input.first().json.body;\nconst turnos = body.turnos || [];\nconst centroId = body.centro_id;\n\nreturn turnos.map(t => ({\n  json: {\n    turno_id:   t.turno_id,\n    centro_id:  centroId,\n    to:         'whatsapp:+' + String(t.celular).replace(/^\\+/, ''),\n    from:       'whatsapp:+5493625456570',\n    nombre:     t.paciente_nombre,\n    apellido:   t.paciente_apellido,\n    fecha:      t.fecha.split('-').reverse().join('/'),\n    hora:       t.hora.substring(0, 5),\n    servicio:   t.servicio || '',\n    profesional: t.profesional || ''\n  }\n}));"
+        "jsCode": "// Extrae el array de turnos del body y prepara un item por cada uno\nconst body = $input.first().json.body;\nconst turnos = body.turnos || [];\nconst centroNombre = body.centro_nombre || 'el centro';\n\nreturn turnos.map(t => ({\n  json: {\n    turno_id:     t.turno_id,\n    to:           'whatsapp:+' + String(t.celular).replace(/^\\+/, ''),\n    from:         'whatsapp:+5493625456570',\n    nombre:       t.paciente_nombre,\n    fecha:        t.fecha.split('-').reverse().join('/'),\n    hora:         t.hora.substring(0, 5),\n    servicio:     t.servicio || '',\n    profesional:  t.profesional || '',\n    centro_nombre: centroNombre\n  }\n}));"
       },
       "id": "node-code-01",
       "name": "Preparar items",
@@ -44,11 +44,11 @@
             },
             {
               "name": "ContentSid",
-              "value": "REEMPLAZAR_CON_TEMPLATE_SID"
+              "value": "HX1897acd70f7b2e8fec1666a36c1e5a63"
             },
             {
               "name": "ContentVariables",
-              "value": "={{ JSON.stringify({ \"1\": $json.nombre, \"2\": $json.fecha, \"3\": $json.hora, \"4\": $json.servicio, \"5\": $json.profesional }) }}"
+              "value": "={{ JSON.stringify({ \"1\": $json.nombre, \"2\": $json.fecha, \"3\": $json.hora, \"4\": $json.servicio, \"5\": $json.profesional, \"6\": $json.centro_nombre }) }}"
             }
           ]
         },
