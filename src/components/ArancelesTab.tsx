@@ -68,10 +68,11 @@ export function ArancelesTab({ profesionalId }: Props) {
       supabase.from('profesionales').select('precio_particular, acepta_particular').eq('id', profesionalId).single(),
       supabase.from('obras_sociales').select('id, nombre').eq('activo', true).order('nombre'),
       supabase.from('profesionales_os').select('*').eq('profesional_id', profesionalId),
-      supabase.from('profesional_centro_servicio')
-        .select('servicio_id, servicios(id, nombre)')
-        .eq('profesional_id', profesionalId)
-        .eq('centro_id', centroId),
+      supabase.from('servicios')
+        .select('id, nombre')
+        .eq('centro_id', centroId)
+        .eq('activo', true)
+        .order('nombre'),
       supabase.from('profesionales_servicios_config').select('*').eq('profesional_id', profesionalId),
       supabase.from('profesionales_dias_config').select('*').eq('profesional_id', profesionalId),
     ]);
@@ -90,21 +91,15 @@ export function ArancelesTab({ profesionalId }: Props) {
       monto_plus: osMap[os.id]?.monto_plus?.toString() ?? '',
     })));
 
-    // Servicios: cruzar los asignados al profesional con config
+    // Servicios: todos los del centro cruzados con config del profesional
     const srvMap: Record<string, any> = {};
     profServicios?.forEach(r => { srvMap[r.servicio_id] = r; });
-    const serviciosUnicos = new Map<string, string>();
-    todosServicios?.forEach((r: any) => {
-      if (r.servicio_id && r.servicios?.nombre) {
-        serviciosUnicos.set(r.servicio_id, r.servicios.nombre);
-      }
-    });
-    setServicioRows(Array.from(serviciosUnicos.entries()).map(([id, nombre]) => ({
-      servicio_id: id,
-      nombre,
-      solo_particular: srvMap[id]?.solo_particular ?? false,
-      precio_particular: srvMap[id]?.precio_particular?.toString() ?? '',
-      precio_os_sin_plus: srvMap[id]?.precio_os_sin_plus?.toString() ?? '',
+    setServicioRows((todosServicios ?? []).map((s: any) => ({
+      servicio_id: s.id,
+      nombre: s.nombre,
+      solo_particular: srvMap[s.id]?.solo_particular ?? false,
+      precio_particular: srvMap[s.id]?.precio_particular?.toString() ?? '',
+      precio_os_sin_plus: srvMap[s.id]?.precio_os_sin_plus?.toString() ?? '',
     })));
 
     // Días: lunes a sábado por defecto
