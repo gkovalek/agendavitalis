@@ -57,14 +57,16 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     setLoading(true);
     const [serviciosRes, asignacionesRes] = await Promise.all([
       supabase.from('servicios').select('id, nombre').eq('centro_id', centroId).eq('activo', true).order('nombre'),
-      supabase.from('profesional_centro_servicio').select('*, servicio:servicios!servicio_id(id, nombre)')
+      supabase.from('profesional_centro_servicio').select('*')
         .eq(entityColumn, entityId).eq('centro_id', centroId),
     ]);
+    const serviciosMap: Record<string, string> = {};
+    (serviciosRes.data ?? []).forEach(s => { serviciosMap[s.id] = s.nombre; });
     setServiciosDisponibles(serviciosRes.data ?? []);
     const asigs = (asignacionesRes.data ?? []).map((a: any) => ({
       id: a.id, servicio_id: a.servicio_id, capacidad_simultanea: a.capacidad_simultanea,
       activo: a.activo, dias_trabajo: normalizeDiasTrabajo(a.dias_trabajo), hora_inicio: a.hora_inicio,
-      hora_fin: a.hora_fin, servicio: a.servicio,
+      hora_fin: a.hora_fin, servicio: { id: a.servicio_id, nombre: serviciosMap[a.servicio_id] ?? 'Servicio' },
     }));
     setAsignaciones(asigs);
     setLoading(false);
