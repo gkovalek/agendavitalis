@@ -40,7 +40,6 @@ interface Servicio {
   id: string;
   nombre: string;
   duracion_minutos: number;
-  costo_base: number;
 }
 
 interface Tratamiento {
@@ -129,30 +128,37 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       });
   }, [centroId, profesionalId]);
 
-  // Cargar servicios filtrados por agenda seleccionada
+  // Cargar servicios del profesional filtrados por agenda
   useEffect(() => {
     setServicioId('');
     setServicios([]);
-    if (!agendaId || !centroId) return;
+    if (!agendaId || !centroId || !profesionalId) return;
+    // Traer servicios asignados al profesional que pertenecen a la agenda seleccionada
     supabase
-      .from('servicios')
-      .select('id, nombre, duracion_minutos, costo_base')
-      .eq('agenda_id', agendaId)
+      .from('profesional_centro_servicio')
+      .select('servicio_id, servicios(id, nombre, duracion_minutos, agenda_id)')
+      .eq('profesional_id', profesionalId)
       .eq('centro_id', centroId)
       .eq('activo', true)
       .then(({ data }) => {
-        const list = ((data as Servicio[]) ?? []).sort((a, b) => a.nombre.localeCompare(b.nombre));
-        setServicios(list);
-        if (list.length === 1) setServicioId(list[0].id);
-        if (list.length === 0) {
+        const list: Servicio[] = (data ?? [])
+          .map((r: any) => r.servicios)
+          .filter((s: any) => s && s.agenda_id === agendaId && s.id)
+          .map((s: any) => ({ id: s.id, nombre: s.nombre, duracion_minutos: s.duracion_minutos }))
+          .sort((a: Servicio, b: Servicio) => a.nombre.localeCompare(b.nombre));
+        // Deduplicar por id
+        const unique = list.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
+        setServicios(unique);
+        if (unique.length === 1) setServicioId(unique[0].id);
+        if (unique.length === 0) {
           toast({
             title: 'Agenda sin servicios',
-            description: 'Esta agenda no tiene servicios asignados. Asigná al menos un servicio en Agendas > Servicios antes de crear un turno.',
+            description: 'Este profesional no tiene servicios asignados para esta agenda. Configuralo en Agendas → Servicios.',
             variant: 'destructive',
           });
         }
       });
-  }, [agendaId, centroId]);
+  }, [agendaId, centroId, profesionalId]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
