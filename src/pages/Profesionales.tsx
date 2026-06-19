@@ -14,7 +14,6 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
 import { InlineAgendasHorarios, type InlineAgendaAsignada } from '@/components/InlineAgendasHorarios';
-import { ArancelesTab } from '@/components/ArancelesTab';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -176,10 +175,9 @@ export default function Profesionales() {
           </Button>
         </div>
         <Tabs defaultValue="info">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="info">Información</TabsTrigger>
             <TabsTrigger value="servicios">Servicios</TabsTrigger>
-            <TabsTrigger value="aranceles">Aranceles</TabsTrigger>
           </TabsList>
           <TabsContent value="info" className="space-y-3 pt-4">
             <p><strong>Nombre:</strong> {selectedProfesional.nombre} {selectedProfesional.apellido}</p>
@@ -190,9 +188,6 @@ export default function Profesionales() {
           </TabsContent>
           <TabsContent value="servicios">
             <ServiciosHorariosTab entityType="profesional" entityId={selectedProfesional.id} />
-          </TabsContent>
-          <TabsContent value="aranceles">
-            <ArancelesTab profesionalId={selectedProfesional.id} />
           </TabsContent>
         </Tabs>
 
@@ -310,8 +305,7 @@ export default function Profesionales() {
                   <TabsList>
                     <TabsTrigger value="info">Información</TabsTrigger>
                     <TabsTrigger value="servicios">Servicios y Horarios</TabsTrigger>
-                    <TabsTrigger value="aranceles">Aranceles</TabsTrigger>
-                  </TabsList>
+                          </TabsList>
                   <TabsContent value="info" className="space-y-3 pt-4">
                     <p><strong>Nombre:</strong> {selectedProfesional.nombre} {selectedProfesional.apellido}</p>
                     <p><strong>DNI:</strong> {selectedProfesional.dni || '—'}</p>
