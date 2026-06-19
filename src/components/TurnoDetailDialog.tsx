@@ -97,7 +97,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
   // Datos principales (tab cita)
   const [paciente, setPaciente] = useState<Paciente | null>(null);
-  const [servicio, setServicio] = useState<{ id: string; nombre: string; costo_base: number; requiere_os: boolean } | null>(null);
+  const [servicio, setServicio] = useState<{ id: string; nombre: string } | null>(null);
+  const [horarioCita, setHorarioCita] = useState<{ acepta_os: boolean; precio_particular: number | null } | null>(null);
   const [tratamientoActual, setTratamientoActual] = useState<{ id: string; total_sesiones: number; sesiones_consumidas: number } | null>(null);
   const [sesionesFinalizadas, setSesionesFinalizadas] = useState(0);
   const [cajaActual, setCajaActual] = useState<{ monto_efectivo: number; monto_transferencia: number; monto_prepaga: number } | null>(null);
@@ -139,7 +140,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
       // Servicio del turno
       turno.servicio_id
-        ? supabase.from('servicios').select('id, nombre, costo_base, requiere_os').eq('id', turno.servicio_id).single()
+        ? supabase.from('servicios').select('id, nombre').eq('id', turno.servicio_id).single()
         : Promise.resolve({ data: null }),
 
       // Tratamiento del turno
@@ -196,12 +197,36 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         .select('id, nombre, variables:fichas_modelo_variables(id, nombre_variable, orden)')
         .eq('centro_id', centroId!)
         .order('nombre'),
-    ]).then(([pacRes, servRes, turnoRes, cajaRes, sesRes, histRes, pagosRes, tratRes, hcRes, fichasRes]) => {
+    ]).then(async ([pacRes, servRes, turnoRes, cajaRes, sesRes, histRes, pagosRes, tratRes, hcRes, fichasRes]) => {
       const pac = (pacRes as any).data as Paciente | null;
       if (!pac) { setLoading(false); return; }
 
       setPaciente(pac);
-      setServicio((servRes as any).data ?? null);
+      const srv = (servRes as any).data ?? null;
+      setServicio(srv);
+
+      // Cargar precio y lógica OS desde pcs_horario_dia
+      if (srv && turno.servicio_id && turno.profesional_id && turno.fecha) {
+        const diaSemana = new Date(turno.fecha + 'T00:00:00').getDay();
+        const { data: pcsData } = await supabase
+          .from('profesional_centro_servicio')
+          .select('id')
+          .eq('profesional_id', turno.profesional_id)
+          .eq('servicio_id', turno.servicio_id)
+          .eq('centro_id', centroId!)
+          .maybeSingle();
+        if (pcsData?.id) {
+          const { data: hData } = await supabase
+            .from('pcs_horario_dia')
+            .select('acepta_os, precio_particular')
+            .eq('pcs_id', pcsData.id)
+            .eq('dia_semana', diaSemana)
+            .eq('activo', true)
+            .limit(1)
+            .maybeSingle();
+          setHorarioCita(hData ?? null);
+        }
+      }
       setTratamientoActual((turnoRes.data as any)?.tratamiento ?? null);
       setCajaActual((cajaRes as any).data ?? null);
       setSesionesFinalizadas((sesRes as any).count ?? 0);
@@ -227,12 +252,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     if (!turno || !paciente) return;
     setSaving(true);
 
-    // Validar OS obligatoria
-    if (servicio?.requiere_os && !prepagaId) {
-      toast({ title: 'Obra social requerida', description: 'Este servicio requiere seleccionar una obra social antes de guardar.', variant: 'destructive' });
-      setSaving(false);
-      return;
-    }
+    // No hay validación de OS obligatoria en el nuevo modelo (acepta_os indica si acepta, no si es obligatoria)
 
     const ops: any[] = [
       supabase.from('turnos').update({ estado }).eq('id', turno.id),
@@ -383,23 +403,21 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
               {tab === 'cita' && (
                 <div className="p-5 space-y-4">
                   {/* Sección OS */}
-                  <div className={`space-y-3 rounded-lg p-3 ${servicio?.requiere_os ? 'border-2 border-blue-200 bg-blue-50/50' : 'border bg-muted/20'}`}>
-                    {servicio?.requiere_os && (
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                        <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">Obra social — obligatorio para este servicio</p>
-                      </div>
-                    )}
-                    {!servicio?.requiere_os && (
+                  <div className={`space-y-3 rounded-lg p-3 ${horarioCita?.acepta_os === false ? 'border bg-amber-50/50 border-amber-200' : 'border bg-muted/20'}`}>
+                    <div className="flex items-center justify-between">
                       <Label className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                         <Building2 className="w-3 h-3" />Obra social
                       </Label>
-                    )}
+                      {horarioCita !== null && (
+                        horarioCita.acepta_os
+                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Acepta OS</span>
+                          : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Solo particular</span>
+                      )}
+                    </div>
+                    {horarioCita?.acepta_os !== false && (
                     <div className="grid grid-cols-1 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">
-                          Obra social {servicio?.requiere_os && <span className="text-red-500">*</span>}
-                        </Label>
+                        <Label className="text-[11px] text-muted-foreground">Obra social</Label>
                         <PrepagaAutocomplete value={prepagaId} onSelect={id => setPrepagaId(id)} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -413,6 +431,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                         </div>
                       </div>
                     </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -436,10 +455,10 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                       <Banknote className="w-3 h-3" />Pagos
                     </p>
                     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                      {servicio?.costo_base != null && (
+                      {horarioCita?.precio_particular != null && (
                         <div className="flex justify-between text-[12px]">
-                          <span className="text-muted-foreground">Precio del servicio</span>
-                          <span className="font-semibold">${servicio.costo_base.toLocaleString('es-AR')}</span>
+                          <span className="text-muted-foreground">Precio particular</span>
+                          <span className="font-semibold">${horarioCita.precio_particular.toLocaleString('es-AR')}</span>
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-2">
