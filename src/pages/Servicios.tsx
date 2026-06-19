@@ -260,8 +260,8 @@ export default function Servicios() {
           capacidad_simultanea: 1,
           // Mantener dias_trabajo para compatibilidad con código existente
           dias_trabajo: franjas.map(f => DIAS.find(d => d.value === f.dia_semana)?.label.toLowerCase().replace('é', 'e').replace('á', 'a') ?? '').filter(Boolean),
-          hora_inicio: franjas[0]?.hora_inicio + ':00' ?? '08:00:00',
-          hora_fin: franjas[0]?.hora_fin + ':00' ?? '20:00:00',
+          hora_inicio: franjas[0]?.hora_inicio ? franjas[0].hora_inicio + ':00' : '08:00:00',
+          hora_fin: franjas[0]?.hora_fin ? franjas[0].hora_fin + ':00' : '20:00:00',
         })
         .select('id')
         .single();
