@@ -746,7 +746,7 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            El horario seleccionado ({pendingSlot?.hora} del {pendingSlot?.fecha}) ya es anterior a la hora actual. ¿Querés cargar el turno igual?
+            El horario seleccionado ({pendingSlot?.hora} horas del {pendingSlot?.fecha ? (() => { const [y,m,d] = pendingSlot.fecha.split('-'); return `${d}/${m}/${y.slice(2)}`; })() : ''}) ya es anterior a la hora actual. ¿Querés cargar el turno igual?
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={() => { setPastWarningOpen(false); setPendingSlot(null); }}>Cancelar</Button>
