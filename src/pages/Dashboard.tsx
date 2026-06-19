@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TURNO_ESTADOS, TurnoEstado, normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +6,8 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Plus, Users, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
 import { TurnoDetailDialog } from '@/components/TurnoDetailDialog';
@@ -96,7 +97,39 @@ export default function Dashboard() {
     x: number; y: number; turno: Turno; profId: string; hora: string; agendaId?: string;
   } | null>(null);
   const [reprogramarTurno, setReprogramarTurno] = useState<Turno | null>(null);
+  const [selectedEstados, setSelectedEstados] = useState<TurnoEstado[]>(
+    ESTADO_COUNTS_LABELS.map(e => e.key)
+  );
+  const [pastWarningOpen, setPastWarningOpen] = useState(false);
+  const [pendingSlot, setPendingSlot] = useState<typeof newTurnoSlot>(null);
+  const [currentTimeStr, setCurrentTimeStr] = useState(() => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+  });
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    const update = () => {
+      const n = new Date();
+      setCurrentTimeStr(`${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`);
+    };
+    const timer = setInterval(update, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isToday = useMemo(() => selectedDate.toDateString() === new Date().toDateString(), [selectedDate]);
+
+  const showTimeLine = useCallback((hora: string, nextHora: string | undefined): boolean => {
+    if (!isToday) return false;
+    const [ch, cm] = currentTimeStr.split(':').map(Number);
+    const curr = ch * 60 + cm;
+    const [h, m] = hora.split(':').map(Number);
+    const slot = h * 60 + m;
+    const next = nextHora
+      ? nextHora.split(':').map(Number).reduce((a, v, i) => i === 0 ? v * 60 : a + v, 0)
+      : Infinity;
+    return curr >= slot && curr < next;
+  }, [isToday, currentTimeStr]);
 
   const dateStr = useMemo(() => {
     const d = selectedDate;
@@ -267,22 +300,26 @@ export default function Dashboard() {
     setContextMenu(null);
   };
 
-  // turnoMap: profId-hora → turnos (vista todos)
+  const filteredTurnos = useMemo(() =>
+    turnos.filter(t => selectedEstados.includes(t.estado)),
+  [turnos, selectedEstados]);
+
+  // turnoMap: profId-hora → turnos (vista todos) — filtrado por estado
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno[]> = {};
-    turnos.forEach(t => {
+    filteredTurnos.forEach(t => {
       const hora = t.hora_inicio?.substring(0, 5);
       const key = `${t.profesional_id}-${hora}`;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     });
     return map;
-  }, [turnos]);
+  }, [filteredTurnos]);
 
-  // turnoMapAgenda: agendaId-hora → turnos (vista por profesional)
+  // turnoMapAgenda: agendaId-hora → turnos (vista por profesional) — filtrado por estado
   const turnoMapAgenda = useMemo(() => {
     const map: Record<string, Turno[]> = {};
-    turnos.forEach(t => {
+    filteredTurnos.forEach(t => {
       if (t.profesional_id !== selectedProfId) return;
       const agendaId = (t.servicio as any)?.agenda_id;
       if (!agendaId) return;
@@ -292,7 +329,7 @@ export default function Dashboard() {
       map[key].push(t);
     });
     return map;
-  }, [turnos, selectedProfId]);
+  }, [filteredTurnos, selectedProfId]);
 
   // capacidad por profesional (vista todos) — sin filtro de día
   const capacityMap = useMemo(() => {
@@ -331,18 +368,29 @@ export default function Dashboard() {
     return count >= (agendaCapacityMap[agendaId] ?? 1);
   };
 
+  const openSlot = (slot: typeof newTurnoSlot) => {
+    if (!slot) return;
+    const slotTime = new Date(`${slot.fecha}T${slot.hora}:00`);
+    if (slotTime < new Date()) {
+      setPendingSlot(slot);
+      setPastWarningOpen(true);
+    } else {
+      setNewTurnoSlot(slot);
+    }
+  };
+
   const handleSlotClick = (profId: string, hora: string) => {
     if (!isSlotAvailable(profId, hora)) return;
     if (isSlotFull(profId, hora)) return;
     const prof = profesionales.find(p => p.id === profId);
-    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
+    openSlot({ fecha: dateStr, hora, profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '' });
   };
 
   const handleAgendaSlotClick = (agendaId: string, hora: string) => {
     if (!isAgendaSlotAvailable(selectedProfId, agendaId, hora)) return;
     if (isAgendaSlotFull(agendaId, hora)) return;
     const prof = profesionales.find(p => p.id === selectedProfId);
-    setNewTurnoSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendaId });
+    openSlot({ fecha: dateStr, hora, profesional_id: selectedProfId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendaId });
   };
 
   const estadoResumen = useMemo(() => {
@@ -387,25 +435,31 @@ export default function Dashboard() {
           </select>
         </div>
 
-        <div className="border rounded-lg overflow-hidden bg-background w-full">
+        <div className="border rounded-lg bg-background w-full">
           <Calendar mode="single" selected={selectedDate} onSelect={d => d && setSelectedDate(d)} className="w-full" />
         </div>
 
         <div>
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-            {selectedProfId === 'todos' ? 'Hoy · todos' : `${selectedProf?.nombre?.split(' ')[0] ?? ''}`}
-          </p>
-          <div className="flex flex-col gap-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Filtrar estados</p>
+          <div className="flex flex-col gap-2">
             {ESTADO_COUNTS_LABELS.map(e => {
               const count = estadoResumen[e.key] ?? 0;
+              const checked = selectedEstados.includes(e.key);
               return (
-                <div key={e.key} className="flex items-center justify-between text-[12px]">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                <label key={e.key} className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={ch => {
+                      if (ch) setSelectedEstados(prev => [...prev, e.key]);
+                      else setSelectedEstados(prev => prev.filter(x => x !== e.key));
+                    }}
+                  />
+                  <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground flex-1">
                     <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
                     {e.label}
                   </span>
-                  <span className="font-medium text-foreground">{count}</span>
-                </div>
+                  <span className="text-[12px] font-medium text-foreground">{count}</span>
+                </label>
               );
             })}
           </div>
@@ -460,7 +514,8 @@ export default function Dashboard() {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
                 const prof = profesionales.find(p => p.id === profId);
                 setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendasDelProf[0]?.id });
-              }}>
+              }}
+            >
               <Plus className="h-3.5 w-3.5" /> Nuevo turno
             </Button>
           </div>
@@ -512,9 +567,13 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {timeAxis.map(hora => (
-                    <tr key={hora} className="border-b border-border/40">
-                      <td className="p-1 px-2 text-[11px] text-muted-foreground font-mono sticky left-0 bg-card w-14">{hora}</td>
+                  {timeAxis.map((hora, idx) => (
+                    <tr key={hora} className="border-b border-border/40"
+                      style={showTimeLine(hora, timeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A', position: 'relative' } : {}}>
+                      <td className="p-1 px-2 text-[11px] font-mono sticky left-0 bg-card w-14"
+                        style={{ color: showTimeLine(hora, timeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, timeAxis[idx + 1]) ? 600 : undefined }}>
+                        {hora}
+                      </td>
                       {visibleProfesionales.map(p => {
                         const slotTurnos = turnoMap[`${p.id}-${hora}`] ?? [];
                         const available = isSlotAvailable(p.id, hora);
@@ -587,9 +646,13 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {timeAxis.map(hora => (
-                    <tr key={hora} className="border-b border-border/40">
-                      <td className="p-1 px-2 text-[11px] text-muted-foreground font-mono sticky left-0 bg-card w-14">{hora}</td>
+                  {timeAxis.map((hora, idx) => (
+                    <tr key={hora} className="border-b border-border/40"
+                      style={showTimeLine(hora, timeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A' } : {}}>
+                      <td className="p-1 px-2 text-[11px] font-mono sticky left-0 bg-card w-14"
+                        style={{ color: showTimeLine(hora, timeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, timeAxis[idx + 1]) ? 600 : undefined }}>
+                        {hora}
+                      </td>
                       {agendasDelProf.length > 0
                         ? agendasDelProf.map(a => {
                             const slotTurnos = turnoMapAgenda[`${a.id}-${hora}`] ?? [];
@@ -672,6 +735,27 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Dialog: advertencia fecha pasada */}
+      <Dialog open={pastWarningOpen} onOpenChange={o => { if (!o) { setPastWarningOpen(false); setPendingSlot(null); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              La fecha ya pasó
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            El horario seleccionado ({pendingSlot?.hora} del {pendingSlot?.fecha}) ya es anterior a la hora actual. ¿Querés cargar el turno igual?
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => { setPastWarningOpen(false); setPendingSlot(null); }}>Cancelar</Button>
+            <Button size="sm" className="bg-[#0F6E56] hover:bg-[#0a5c48] text-white" onClick={() => { setPastWarningOpen(false); setNewTurnoSlot(pendingSlot); setPendingSlot(null); }}>
+              Continuar igual
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialogs */}
       <Dialog open={!!newTurnoSlot} onOpenChange={o => !o && setNewTurnoSlot(null)}>
