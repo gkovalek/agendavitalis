@@ -434,7 +434,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Servicio</p>
                       <p className="text-[13px] font-medium">{servicio?.nombre ?? '—'}</p>
@@ -446,6 +446,13 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                       ) : (
                         <p className="text-[13px] text-muted-foreground">{sesionesFinalizadas > 0 ? `${sesionesFinalizadas} prev.` : 'Sin tratamiento'}</p>
                       )}
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Precio ref.</p>
+                      {horarioCita?.precio_particular != null
+                        ? <p className="text-[13px] font-semibold text-[#0F6E56]">${horarioCita.precio_particular.toLocaleString('es-AR')}</p>
+                        : <p className="text-[13px] text-muted-foreground">—</p>
+                      }
                     </div>
                   </div>
 
