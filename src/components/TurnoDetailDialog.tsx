@@ -310,9 +310,10 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   };
 
   const handleHcFichaChange = async (fichaId: string) => {
-    setHcFichaId(fichaId);
+    const realId = fichaId === '__none' ? '' : fichaId;
+    setHcFichaId(realId);
     setHcValores({});
-    const ficha = hcFichasDisponibles.find(f => f.id === fichaId);
+    const ficha = hcFichasDisponibles.find(f => f.id === realId);
     const vars = (ficha?.variables ?? []).sort((a, b) => a.orden - b.orden);
     setHcVariables(vars);
     const init: Record<string, string> = {};
@@ -527,7 +528,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                         <Select value={hcFichaId} onValueChange={handleHcFichaChange}>
                           <SelectTrigger className="h-8 text-[13px]"><SelectValue placeholder="Sin ficha — texto libre" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin ficha</SelectItem>
+                            <SelectItem value="__none">Sin ficha</SelectItem>
                             {hcFichasDisponibles.map(f => <SelectItem key={f.id} value={f.id}>{f.nombre}</SelectItem>)}
                           </SelectContent>
                         </Select>
