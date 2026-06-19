@@ -128,37 +128,61 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       });
   }, [centroId, profesionalId]);
 
-  // Cargar servicios del profesional filtrados por agenda
+  // Cargar servicios del profesional filtrados por agenda Y por día de la semana del turno
   useEffect(() => {
     setServicioId('');
     setServicios([]);
     if (!agendaId || !centroId || !profesionalId) return;
-    // Traer servicios asignados al profesional que pertenecen a la agenda seleccionada
+
+    const diaSemana = new Date(fecha + 'T00:00:00').getDay(); // 0=Dom, 1=Lun...
+
     supabase
       .from('profesional_centro_servicio')
-      .select('servicio_id, servicios(id, nombre, duracion_minutos, agenda_id)')
+      .select('id, servicio_id, servicios(id, nombre, duracion_minutos, agenda_id)')
       .eq('profesional_id', profesionalId)
       .eq('centro_id', centroId)
       .eq('activo', true)
-      .then(({ data }) => {
-        const list: Servicio[] = (data ?? [])
-          .map((r: any) => r.servicios)
-          .filter((s: any) => s && s.agenda_id === agendaId && s.id)
-          .map((s: any) => ({ id: s.id, nombre: s.nombre, duracion_minutos: s.duracion_minutos }))
+      .then(async ({ data: pcsData }) => {
+        const pcsForAgenda = (pcsData ?? []).filter((r: any) =>
+          r.servicios && r.servicios.agenda_id === agendaId && r.servicio_id
+        );
+        if (pcsForAgenda.length === 0) {
+          toast({ title: 'Agenda sin servicios', description: 'Este profesional no tiene servicios asignados para esta agenda.', variant: 'destructive' });
+          return;
+        }
+
+        // Filtrar por día de la semana usando pcs_horario_dia
+        const pcsIds = pcsForAgenda.map((r: any) => r.id);
+        const { data: horData } = await supabase
+          .from('pcs_horario_dia')
+          .select('pcs_id')
+          .in('pcs_id', pcsIds)
+          .eq('dia_semana', diaSemana)
+          .eq('activo', true);
+
+        const pcsIdsConHorario = new Set((horData ?? []).map((h: any) => h.pcs_id));
+
+        const list: Servicio[] = pcsForAgenda
+          .filter((r: any) => pcsIdsConHorario.has(r.id))
+          .map((r: any) => ({
+            id: r.servicios.id,
+            nombre: r.servicios.nombre,
+            duracion_minutos: r.servicios.duracion_minutos,
+          }))
           .sort((a: Servicio, b: Servicio) => a.nombre.localeCompare(b.nombre));
-        // Deduplicar por id
+
         const unique = list.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
         setServicios(unique);
         if (unique.length === 1) setServicioId(unique[0].id);
         if (unique.length === 0) {
           toast({
-            title: 'Agenda sin servicios',
-            description: 'Este profesional no tiene servicios asignados para esta agenda. Configuralo en Agendas → Servicios.',
+            title: 'Sin servicios para este día',
+            description: 'El profesional no tiene servicios configurados para el día seleccionado.',
             variant: 'destructive',
           });
         }
       });
-  }, [agendaId, centroId, profesionalId]);
+  }, [agendaId, centroId, profesionalId, fecha]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
