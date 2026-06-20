@@ -1,0 +1,99 @@
+{
+  "name": "Vitalis - Recordatorios Manual (desde app)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recordatorios-manual",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook Entrada",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "vitalis-recordatorios-manual"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza los turnos que vienen del payload de la app\nconst body = $input.first().json.body || $input.first().json;\nconst turnos = body.turnos || [];\n\nconst results = [];\nfor (const t of turnos) {\n  let cel = (t.celular || '').replace(/\\D/g, '');\n  if (cel.startsWith('0')) cel = cel.slice(1);\n  if (!cel.startsWith('54')) cel = '54' + cel;\n  if (cel.startsWith('54') && !cel.startsWith('549')) cel = '549' + cel.slice(2);\n\n  const [y, m, d] = (t.fecha || '').split('-');\n  const fechaFmt = `${d}/${m}`;\n  const hora = (t.hora || t.hora_inicio || '').substring(0, 5);\n  const profApellido = (t.profesional || '').split(',')[0].trim();\n\n  results.push({\n    json: {\n      turno_id: t.turno_id,\n      centro_id: body.centro_id,\n      to_whatsapp: 'whatsapp:+' + cel,\n      celular_raw: cel,\n      content_variables: JSON.stringify({\n        '1': t.paciente_nombre || '',\n        '2': fechaFmt,\n        '3': hora,\n        '4': profApellido\n      })\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Preparar Turnos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Loop Turnos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "From", "value": "={{ $env.TWILIO_FROM_WHATSAPP }}" },
+            { "name": "To", "value": "={{ $json.to_whatsapp }}" },
+            { "name": "ContentSid", "value": "={{ $env.TWILIO_TEMPLATE_SID }}" },
+            { "name": "ContentVariables", "value": "={{ $json.content_variables }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Twilio Enviar Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "twilio-basic-auth",
+          "name": "Twilio Basic Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"enviados\": {{ $node[\"Preparar Turnos\"].outputItemsCount }} }"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000005",
+      "name": "Responder 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 160]
+    }
+  ],
+  "connections": {
+    "Webhook Entrada": {
+      "main": [[{ "node": "Preparar Turnos", "type": "main", "index": 0 }]]
+    },
+    "Preparar Turnos": {
+      "main": [[{ "node": "Loop Turnos", "type": "main", "index": 0 }]]
+    },
+    "Loop Turnos": {
+      "main": [
+        [{ "node": "Twilio Enviar Template", "type": "main", "index": 0 }],
+        [{ "node": "Responder 200", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "vitalis" }, { "name": "recordatorios" }],
+  "_readme": "CONFIGURAR VARIABLES DE ENTORNO EN n8n: TWILIO_ACCOUNT_SID, TWILIO_FROM_WHATSAPP (ej: whatsapp:+14155238886), TWILIO_TEMPLATE_SID (HX5111b578b335001ca7d64be9222aff02). Credencial httpBasicAuth: user=TWILIO_ACCOUNT_SID, pass=TWILIO_AUTH_TOKEN. La URL de este webhook va en Supabase tabla centros columna configuracion->n8n_webhook_recordatorios."
+}
