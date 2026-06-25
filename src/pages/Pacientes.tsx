@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -24,26 +24,42 @@ interface Paciente {
 export default function Pacientes() {
   const { centroId } = useAuth();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  useEffect(() => { fetchPacientes(); }, [centroId]);
-
-  const fetchPacientes = async () => {
+  const fetchPacientes = useCallback(async (term: string) => {
     if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase.from('pacientes').select('*').eq('centro_id', centroId).order('apellido', { ascending: true });
+    let q = supabase.from('pacientes').select('*').eq('centro_id', centroId).order('apellido', { ascending: true });
+    if (term.trim()) {
+      q = q.or(`apellido.ilike.%${term}%,nombre.ilike.%${term}%,dni.ilike.%${term}%,celular.ilike.%${term}%`);
+    } else {
+      q = q.limit(100);
+    }
+    const { data } = await q;
     setPacientes(data ?? []);
     setLoading(false);
-  };
+  }, [centroId]);
 
-  const filtered = pacientes.filter((p) => {
-    const term = search.toLowerCase();
-    return (p.nombre?.toLowerCase().includes(term)) || (p.apellido?.toLowerCase().includes(term)) || (p.dni?.includes(term)) || (p.celular?.includes(term));
-  });
+  // Carga inicial con conteo total
+  useEffect(() => {
+    if (!centroId) return;
+    supabase.from('pacientes').select('id', { count: 'exact', head: true }).eq('centro_id', centroId)
+      .then(({ count }) => setTotalCount(count ?? 0));
+    fetchPacientes('');
+  }, [centroId, fetchPacientes]);
+
+  // Debounce búsqueda
+  useEffect(() => {
+    const t = setTimeout(() => fetchPacientes(search), 300);
+    return () => clearTimeout(t);
+  }, [search, fetchPacientes]);
+
+  const filtered = pacientes;
 
   if (selectedId) {
     return (
@@ -61,7 +77,7 @@ export default function Pacientes() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Pacientes</h1>
-          <p className="text-sm text-muted-foreground">{pacientes.length} pacientes registrados</p>
+          <p className="text-sm text-muted-foreground">{totalCount} pacientes registrados</p>
         </div>
         <Button onClick={() => navigate('/pacientes/nuevo')} className="w-full sm:w-auto">
           <UserPlus className="h-4 w-4 mr-2" /> Nuevo Paciente
