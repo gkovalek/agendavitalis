@@ -6,13 +6,15 @@
         "rule": {
           "interval": [
             {
-              "field": "cronExpression",
-              "expression": "0 20 * * *"
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 20,
+              "triggerAtMinute": 0
             }
           ]
         }
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000001",
+      "id": "node-cron",
       "name": "Cron 20:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -20,9 +22,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Calcula la fecha de mañana en formato YYYY-MM-DD\nconst tomorrow = new Date();\ntomorrow.setDate(tomorrow.getDate() + 1);\nconst yyyy = tomorrow.getFullYear();\nconst mm = String(tomorrow.getMonth() + 1).padStart(2, '0');\nconst dd = String(tomorrow.getDate()).padStart(2, '0');\nreturn [{ json: { fecha_manana: `${yyyy}-${mm}-${dd}` } }];"
+        "jsCode": "const tomorrow = new Date();\ntomorrow.setDate(tomorrow.getDate() + 1);\nconst yyyy = tomorrow.getFullYear();\nconst mm = String(tomorrow.getMonth() + 1).padStart(2, '0');\nconst dd = String(tomorrow.getDate()).padStart(2, '0');\nreturn [{ json: { fecha_manana: `${yyyy}-${mm}-${dd}` } }];"
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000002",
+      "id": "node-fecha",
       "name": "Calcular Mañana",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -31,36 +33,36 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/turnos",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/turnos",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "select", "value": "id,fecha,hora_inicio,estado,centro_id,paciente_id,profesional_id,paciente:pacientes(nombre,apellido,celular),profesional:profesionales(apellido),servicio:servicios(nombre)" },
-            { "name": "fecha", "value": "=eq.{{ $json.fecha_manana }}" },
+            { "name": "select", "value": "id,fecha,hora_inicio,estado,centro_id,paciente_id,paciente:pacientes(nombre,apellido,celular),profesional:profesionales(apellido)" },
+            { "name": "fecha", "value": "=eq.{{$json.fecha_manana}}" },
             { "name": "estado", "value": "=in.(reservado,en_sala)" },
             { "name": "order", "value": "hora_inicio" }
           ]
         },
         "options": {}
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000003",
-      "name": "Supabase: Turnos de mañana",
+      "id": "node-sb-turnos",
+      "name": "Supabase Turnos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Filtra turnos con celular y prepara payload para Twilio\nconst results = [];\n\nfor (const item of $input.all()) {\n  const t = item.json;\n  const celular = t.paciente?.celular;\n  if (!celular) continue;\n\n  let cel = celular.replace(/\\D/g, '');\n  if (cel.startsWith('0')) cel = cel.slice(1);\n  if (!cel.startsWith('54')) cel = '54' + cel;\n  if (cel.startsWith('54') && !cel.startsWith('549')) cel = '549' + cel.slice(2);\n\n  const [y, m, d] = (t.fecha || '').split('-');\n  const fechaFmt = `${d}/${m}`;\n  const hora = (t.hora_inicio || '').substring(0, 5);\n\n  results.push({\n    json: {\n      turno_id: t.id,\n      centro_id: t.centro_id,\n      paciente_id: t.paciente_id,\n      fecha_cita: t.fecha,\n      to_whatsapp: 'whatsapp:+' + cel,\n      telefono: '+' + cel,\n      content_variables: JSON.stringify({\n        '1': t.paciente?.nombre || '',\n        '2': fechaFmt,\n        '3': hora,\n        '4': t.profesional?.apellido || ''\n      })\n    }\n  });\n}\n\nreturn results;"
+        "jsCode": "const fecha_manana = $('Calcular Mañana').first().json.fecha_manana;\nconst results = [];\nfor (const item of $input.all()) {\n  const t = item.json;\n  const celular = t.paciente?.celular;\n  if (!celular) continue;\n  let cel = celular.replace(/\\D/g, '');\n  if (cel.startsWith('0')) cel = cel.slice(1);\n  if (!cel.startsWith('54')) cel = '54' + cel;\n  if (cel.startsWith('54') && !cel.startsWith('549')) cel = '549' + cel.slice(2);\n  const [y, m, d] = (t.fecha ?? '').split('-');\n  const fechaFmt = `${d}/${m}`;\n  const hora = (t.hora_inicio ?? '').substring(0, 5);\n  results.push({ json: {\n    turno_id: t.id,\n    centro_id: t.centro_id,\n    paciente_id: t.paciente_id,\n    fecha_cita: t.fecha,\n    telefono: '+' + cel,\n    to_whatsapp: 'whatsapp:+' + cel,\n    content_variables: JSON.stringify({ '1': t.paciente?.nombre ?? '', '2': fechaFmt, '3': hora, '4': t.profesional?.apellido ?? '' })\n  }});\n}\nreturn results;"
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000004",
+      "id": "node-prep-cron",
       "name": "Filtrar y Preparar",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -71,7 +73,7 @@
         "batchSize": 1,
         "options": {}
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000005",
+      "id": "node-loop-cron",
       "name": "Loop Turnos",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -80,63 +82,53 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{$env[\"TWILIO_ACCOUNT_SID\"]}}/Messages.json",
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
-            { "name": "From", "value": "={{ $env.TWILIO_FROM_WHATSAPP }}" },
-            { "name": "To", "value": "={{ $json.to_whatsapp }}" },
-            { "name": "ContentSid", "value": "={{ $env.TWILIO_TEMPLATE_SID }}" },
-            { "name": "ContentVariables", "value": "={{ $json.content_variables }}" }
+            {
+              "name": "Authorization",
+              "value": "=Basic {{Buffer.from($env[\"TWILIO_ACCOUNT_SID\"] + ':' + $env[\"TWILIO_AUTH_TOKEN\"]).toString('base64')}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
           ]
         },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "=From={{encodeURIComponent($env[\"TWILIO_FROM_WHATSAPP\"])}}&To={{encodeURIComponent($json.to_whatsapp)}}&ContentSid={{encodeURIComponent($env[\"TWILIO_TEMPLATE_SID\"])}}&ContentVariables={{encodeURIComponent($json.content_variables)}}",
         "options": {}
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000006",
-      "name": "Twilio Enviar Template",
+      "id": "node-twilio-cron",
+      "name": "Twilio Enviar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1340, 300],
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "twilio-basic-auth",
-          "name": "Twilio Basic Auth"
-        }
-      }
+      "position": [1340, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/recordatorios_log",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/recordatorios_log",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "turno_id", "value": "={{ $('Loop Turnos').item.json.turno_id }}" },
-            { "name": "centro_id", "value": "={{ $('Loop Turnos').item.json.centro_id }}" },
-            { "name": "paciente_id", "value": "={{ $('Loop Turnos').item.json.paciente_id }}" },
-            { "name": "telefono", "value": "={{ $('Loop Turnos').item.json.telefono }}" },
-            { "name": "tipo_mensaje", "value": "recordatorio_cita" },
-            { "name": "estado", "value": "enviado" },
-            { "name": "fecha_cita", "value": "={{ $('Loop Turnos').item.json.fecha_cita }}" },
-            { "name": "fecha_envio", "value": "={{ new Date().toISOString() }}" }
-          ]
-        },
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"turno_id\":\"{{$('Loop Turnos').item.json.turno_id}}\",\"centro_id\":\"{{$('Loop Turnos').item.json.centro_id}}\",\"paciente_id\":\"{{$('Loop Turnos').item.json.paciente_id}}\",\"telefono\":\"{{$('Loop Turnos').item.json.telefono}}\",\"tipo_mensaje\":\"recordatorio_cita\",\"estado\":\"enviado\",\"fecha_cita\":\"{{$('Loop Turnos').item.json.fecha_cita}}\",\"fecha_envio\":\"{{new Date().toISOString()}}\"}",
         "options": {}
       },
-      "id": "b1b2c3d4-0002-0002-0002-000000000007",
-      "name": "Supabase: Insertar Log",
+      "id": "node-sb-log",
+      "name": "Supabase Log",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1560, 300]
@@ -147,9 +139,9 @@
       "main": [[{ "node": "Calcular Mañana", "type": "main", "index": 0 }]]
     },
     "Calcular Mañana": {
-      "main": [[{ "node": "Supabase: Turnos de mañana", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Supabase Turnos", "type": "main", "index": 0 }]]
     },
-    "Supabase: Turnos de mañana": {
+    "Supabase Turnos": {
       "main": [[{ "node": "Filtrar y Preparar", "type": "main", "index": 0 }]]
     },
     "Filtrar y Preparar": {
@@ -157,16 +149,14 @@
     },
     "Loop Turnos": {
       "main": [
-        [{ "node": "Twilio Enviar Template", "type": "main", "index": 0 }],
+        [{ "node": "Twilio Enviar", "type": "main", "index": 0 }],
         []
       ]
     },
-    "Twilio Enviar Template": {
-      "main": [[{ "node": "Supabase: Insertar Log", "type": "main", "index": 0 }]]
+    "Twilio Enviar": {
+      "main": [[{ "node": "Supabase Log", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "vitalis" }, { "name": "recordatorios" }, { "name": "cron" }],
-  "_readme": "CRON: corre todos los días a las 20:00 (hora del servidor Hostinger - verificar zona horaria UTC-3 Argentina). Trae todos los turnos del día siguiente con estado reservado o en_sala, para TODOS los centros. Variables requeridas: SUPABASE_URL, SUPABASE_SERVICE_KEY, TWILIO_ACCOUNT_SID, TWILIO_FROM_WHATSAPP, TWILIO_TEMPLATE_SID."
+  "settings": { "executionOrder": "v1" }
 }
