@@ -181,7 +181,15 @@ export default function Dashboard() {
       if (h) all.add(h);
     });
     return Array.from(all).sort();
-  }, [profSlotMap, selectedProfId, profesionales, turnos]);
+  const allEstadosSelected = selectedEstados.length === ESTADO_COUNTS_LABELS.length;
+
+  const visibleTimeAxis = useMemo(() => {
+    if (allEstadosSelected) return timeAxis;
+    const horasConTurnos = new Set(filteredTurnos.map(t => t.hora_inicio?.substring(0, 5)).filter(Boolean));
+    return timeAxis.filter(h => horasConTurnos.has(h));
+  }, [timeAxis, filteredTurnos, allEstadosSelected]);
+
+
 
   // Agendas del profesional seleccionado (desde PCS)
   const agendasDelProf = useMemo((): Agenda[] => {
