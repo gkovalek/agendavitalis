@@ -152,6 +152,14 @@ export default function Recordatorios() {
   );
 
   /* ─── Enviar un turno ─── */
+  const normalizarCelular = (cel: string): string => {
+    let n = cel.replace(/\D/g, '');
+    if (n.startsWith('0')) n = n.slice(1);
+    if (!n.startsWith('54')) n = '54' + n;
+    if (n.startsWith('54') && !n.startsWith('549')) n = '549' + n.slice(2);
+    return '+' + n;
+  };
+
   const enviarUno = async (turno: TurnoRecordatorio) => {
     if (!webhookUrl) {
       toast({ title: 'Webhook no configurado', description: 'Configuralo en Ajustes del centro.', variant: 'destructive' });
@@ -188,7 +196,7 @@ export default function Recordatorios() {
         centro_id: centroId,
         turno_id: turno.id,
         paciente_id: turno.paciente?.id ?? null,
-        telefono: turno.paciente?.celular,
+        telefono: normalizarCelular(turno.paciente?.celular ?? ''),
         tipo_mensaje: 'recordatorio_cita',
         estado: 'enviado',
         fecha_cita: turno.fecha,
@@ -240,7 +248,7 @@ export default function Recordatorios() {
         centro_id: centroId,
         turno_id: t.id,
         paciente_id: t.paciente?.id ?? null,
-        telefono: t.paciente?.celular,
+        telefono: normalizarCelular(t.paciente?.celular ?? ''),
         tipo_mensaje: 'recordatorio_cita',
         estado: 'enviado',
         fecha_cita: t.fecha,
