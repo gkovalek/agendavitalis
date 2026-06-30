@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronRight, ArrowLeft, Info } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
@@ -28,13 +30,63 @@ interface Profesional {
   mail: string;
   celular: string;
   activo: boolean;
+  profesion_id: string | null;
+  matricula: string | null;
 }
 
-const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true };
+interface Profesion {
+  id: string;
+  nombre: string;
+  tipo: 'generador' | 'receptor';
+}
+
+const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true, profesion_id: '', matricula: '' };
+
+function ProfesionField({
+  profesiones,
+  value,
+  onChange,
+}: {
+  profesiones: Profesion[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        <Label>Profesión</Label>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground hover:text-foreground">
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p><strong>Generador:</strong> médico que emite pedidos médicos (p. ej. clínico, traumatólogo). Define las sesiones autorizadas.</p>
+              <p className="mt-1"><strong>Receptor:</strong> profesional que ejecuta las sesiones (p. ej. kinesiólogo, fisioterapeuta). Se factura según el pedido médico.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
+        <SelectContent>
+          {profesiones.map(p => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.nombre} ({p.tipo === 'generador' ? 'Generador' : 'Receptor'})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 export default function Profesionales() {
   const { centroId } = useAuth();
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
+  const [profesiones, setProfesiones] = useState<Profesion[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -50,8 +102,12 @@ export default function Profesionales() {
   const fetchData = async () => {
     if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase.from('profesionales').select('*').eq('centro_id', centroId).order('apellido');
-    setProfesionales(data ?? []);
+    const [profRes, profesionRes] = await Promise.all([
+      supabase.from('profesionales').select('*').eq('centro_id', centroId).order('apellido'),
+      supabase.from('profesiones').select('id, nombre, tipo').order('nombre'),
+    ]);
+    setProfesionales((profRes.data as Profesional[]) ?? []);
+    setProfesiones((profesionRes.data as Profesion[]) ?? []);
     setLoading(false);
   };
 
@@ -67,7 +123,16 @@ export default function Profesionales() {
   const openEdit = async (p: Profesional) => {
     if (!centroId) return;
     setEditId(p.id);
-    setForm({ nombre: p.nombre, apellido: p.apellido, dni: p.dni || '', mail: p.mail || '', celular: p.celular || '', activo: p.activo });
+    setForm({
+      nombre: p.nombre,
+      apellido: p.apellido,
+      dni: p.dni || '',
+      mail: p.mail || '',
+      celular: p.celular || '',
+      activo: p.activo,
+      profesion_id: p.profesion_id || '',
+      matricula: p.matricula || '',
+    });
 
     const { data: asignaciones } = await supabase
       .from('profesional_centro_servicio')
@@ -97,19 +162,16 @@ export default function Profesionales() {
     setSaving(true);
     let profesionalId = editId;
 
-    console.log('[handleSave] Starting save. centroId:', centroId, 'editId:', editId);
-    console.log('[handleSave] inlineAgendas state:', JSON.stringify(inlineAgendas, null, 2));
+    const payload = { ...form, profesion_id: form.profesion_id || null, matricula: form.matricula || null };
 
     if (editId) {
-      const { error } = await supabase.from('profesionales').update(form).eq('id', editId);
+      const { error } = await supabase.from('profesionales').update(payload).eq('id', editId);
       if (error) { toast({ title: 'Error', description: 'No se pudo actualizar el profesional. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
     } else {
-      const { data, error } = await supabase.from('profesionales').insert({ ...form, centro_id: centroId }).select('id').single();
+      const { data, error } = await supabase.from('profesionales').insert({ ...payload, centro_id: centroId }).select('id').single();
       if (error || !data) { toast({ title: 'Error', description: 'No se pudo crear el profesional. Intentá de nuevo.', variant: 'destructive' }); setSaving(false); return; }
       profesionalId = data.id;
     }
-
-    console.log('[handleSave] profesionalId for services:', profesionalId);
 
     const srvError = await saveInlineAgendas(profesionalId!);
     if (srvError) {
@@ -163,6 +225,35 @@ export default function Profesionales() {
     else { toast({ title: 'Profesional desactivado' }); if (selectedProfesional?.id === deleteId) setSelectedProfesional(null); fetchData(); }
   };
 
+  const FormFields = (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} /></div>
+        <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm({...form, apellido: e.target.value})} /></div>
+        <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} onChange={e => setForm({...form, dni: e.target.value})} /></div>
+        <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} /></div>
+      </div>
+      <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <ProfesionField profesiones={profesiones} value={form.profesion_id} onChange={v => setForm({...form, profesion_id: v})} />
+        <div className="space-y-1"><Label>Matrícula</Label><Input value={form.matricula} onChange={e => setForm({...form, matricula: e.target.value})} placeholder="Ej: MP 12345" /></div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={form.activo} onCheckedChange={v => setForm({...form, activo: v})} />
+        <Label>Activo</Label>
+      </div>
+      <div className="border-t pt-3 mt-3">
+        <InlineAgendasHorarios centroId={centroId} agendas={inlineAgendas} onChange={setInlineAgendas} />
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
+          {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
+        </Button>
+        <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
+      </div>
+    </div>
+  );
+
   if (isMobile && selectedProfesional) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -195,30 +286,7 @@ export default function Profesionales() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-2xl w-full">
             <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Profesional</DialogTitle></DialogHeader>
-            <ScrollArea className="max-h-[70vh] pr-3">
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm({...form, apellido: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} onChange={e => setForm({...form, dni: e.target.value})} /></div>
-                  <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} /></div>
-                </div>
-                <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.activo} onCheckedChange={v => setForm({...form, activo: v})} />
-                  <Label>Activo</Label>
-                </div>
-                <div className="border-t pt-3 mt-3">
-                  <InlineAgendasHorarios centroId={centroId} agendas={inlineAgendas} onChange={setInlineAgendas} />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
-                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
-                  </Button>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
-                </div>
-              </div>
-            </ScrollArea>
+            <ScrollArea className="max-h-[70vh] pr-3">{FormFields}</ScrollArea>
           </DialogContent>
         </Dialog>
       </div>
@@ -306,13 +374,21 @@ export default function Profesionales() {
                   <TabsList>
                     <TabsTrigger value="info">Información</TabsTrigger>
                     <TabsTrigger value="servicios">Servicios y Horarios</TabsTrigger>
-                          </TabsList>
+                    <TabsTrigger value="aranceles">Aranceles</TabsTrigger>
+                  </TabsList>
                   <TabsContent value="info" className="space-y-3 pt-4">
                     <p><strong>Nombre:</strong> {selectedProfesional.nombre} {selectedProfesional.apellido}</p>
                     <p><strong>DNI:</strong> {selectedProfesional.dni || '—'}</p>
                     <p><strong>Mail:</strong> {selectedProfesional.mail || '—'}</p>
                     <p><strong>Celular:</strong> {selectedProfesional.celular || '—'}</p>
                     <p><strong>Estado:</strong> {selectedProfesional.activo ? 'Activo' : 'Inactivo'}</p>
+                    {selectedProfesional.profesion_id && (() => {
+                      const prof = profesiones.find(p => p.id === selectedProfesional.profesion_id);
+                      return prof ? (
+                        <p><strong>Profesión:</strong> {prof.nombre} <span className="text-xs text-muted-foreground">({prof.tipo === 'generador' ? 'Generador' : 'Receptor'})</span></p>
+                      ) : null;
+                    })()}
+                    {selectedProfesional.matricula && <p><strong>Matrícula:</strong> {selectedProfesional.matricula}</p>}
                   </TabsContent>
                   <TabsContent value="servicios">
                     <ServiciosHorariosTab entityType="profesional" entityId={selectedProfesional.id} />
@@ -332,30 +408,7 @@ export default function Profesionales() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl w-full">
           <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} Profesional</DialogTitle></DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-3">
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} /></div>
-                <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm({...form, apellido: e.target.value})} /></div>
-                <div className="space-y-1"><Label>DNI</Label><Input value={form.dni} onChange={e => setForm({...form, dni: e.target.value})} /></div>
-                <div className="space-y-1"><Label>Celular</Label><Input value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} /></div>
-              </div>
-              <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
-              <div className="flex items-center gap-2">
-                <Switch checked={form.activo} onCheckedChange={v => setForm({...form, activo: v})} />
-                <Label>Activo</Label>
-              </div>
-              <div className="border-t pt-3 mt-3">
-                <InlineAgendasHorarios centroId={centroId} agendas={inlineAgendas} onChange={setInlineAgendas} />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving || !form.nombre || !form.apellido} className="flex-1 sm:flex-none">
-                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar
-                </Button>
-                <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">Cancelar</Button>
-              </div>
-            </div>
-          </ScrollArea>
+          <ScrollArea className="max-h-[70vh] pr-3">{FormFields}</ScrollArea>
         </DialogContent>
       </Dialog>
 
