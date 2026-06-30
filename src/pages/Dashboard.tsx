@@ -308,6 +308,15 @@ export default function Dashboard() {
     turnos.filter(t => selectedEstados.includes(t.estado)),
   [turnos, selectedEstados]);
 
+  const allEstadosSelected = selectedEstados.length === ESTADO_COUNTS_LABELS.length;
+
+  const visibleTimeAxis = useMemo(() => {
+    if (allEstadosSelected) return timeAxis;
+    const horasConTurnos = new Set(filteredTurnos.map(t => t.hora_inicio?.substring(0, 5)).filter(Boolean));
+    return timeAxis.filter(h => horasConTurnos.has(h));
+  }, [timeAxis, filteredTurnos, allEstadosSelected]);
+
+
   // turnoMap: profId-hora → turnos (vista todos) — filtrado por estado
   const turnoMap = useMemo(() => {
     const map: Record<string, Turno[]> = {};
