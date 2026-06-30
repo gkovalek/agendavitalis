@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Phone, CreditCard, CalendarDays, Banknote, ArrowLeftRight, Building2, FileText, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Loader2, X, Phone, CreditCard, CalendarDays, Banknote, FileText, ChevronDown, ChevronUp, Plus, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
 
@@ -95,7 +95,6 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Datos principales (tab cita)
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [servicio, setServicio] = useState<{ id: string; nombre: string } | null>(null);
   const [horarioCita, setHorarioCita] = useState<{ acepta_os: boolean; precio_particular: number | null } | null>(null);
@@ -103,7 +102,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [sesionesFinalizadas, setSesionesFinalizadas] = useState(0);
   const [cajaActual, setCajaActual] = useState<{ monto_efectivo: number; monto_transferencia: number; monto_prepaga: number } | null>(null);
 
-  // Editables
+  const [profesionalTipo, setProfesionalTipo] = useState<'generador' | 'receptor' | null>(null);
+
   const [estado, setEstado] = useState<TurnoEstado>('reservado');
   const [prepagaId, setPrepagaId] = useState<string | null>(null);
   const [nroCredencial, setNroCredencial] = useState('');
@@ -112,12 +112,16 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [montoTransferencia, setMontoTransferencia] = useState(0);
   const [montoPrepaga, setMontoPrepaga] = useState(0);
 
-  // Otras tabs
+  const [pedidoMatricula, setPedidoMatricula] = useState('');
+  const [pedidoFecha, setPedidoFecha] = useState('');
+  const [pedidoSesiones, setPedidoSesiones] = useState<number | ''>('');
+  const [pedidoCIE, setPedidoCIE] = useState('');
+  const [codigoPractica, setCodigoPractica] = useState('');
+
   const [historial, setHistorial] = useState<TurnoHistorial[]>([]);
   const [pagos, setPagos] = useState<PagoRow[]>([]);
   const [tratamientos, setTratamientos] = useState<TratamientoRow[]>([]);
 
-  // Historia clínica
   const [historiaEntradas, setHistoriaEntradas] = useState<HistoriaEntrada[]>([]);
   const [hcComentario, setHcComentario] = useState('');
   const [hcFichasDisponibles, setHcFichasDisponibles] = useState<{ id: string; nombre: string; variables: { id: string; nombre_variable: string; orden: number }[] }[]>([]);
@@ -133,71 +137,56 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     setTab('cita');
 
     Promise.all([
-      // Paciente completo
       supabase.from('pacientes')
         .select('id, nombre, apellido, dni, celular, fecha_nacimiento, prepaga_id, obra_social_id, numero_afiliado, plan_os, prepaga:prepagas(id, nombre)')
         .eq('id', turno.paciente_id).single(),
-
-      // Servicio del turno
       turno.servicio_id
         ? supabase.from('servicios').select('id, nombre').eq('id', turno.servicio_id).single()
-        : Promise.resolve({ data: null }),
-
-      // Tratamiento del turno
+        : Promise.resolve({ data: null } as any),
       supabase.from('turnos')
-        .select('tratamiento_id, tratamiento:tratamientos(id, total_sesiones, sesiones_consumidas)')
+        .select('tratamiento_id, tratamiento:tratamientos(id, total_sesiones, sesiones_consumidas), pedido_matricula, pedido_fecha, pedido_sesiones_autorizadas, pedido_cie, codigo_practica')
         .eq('id', turno.id).single(),
-
-      // Movimiento de caja de este turno
+      supabase.from('profesionales')
+        .select('profesion:profesiones(tipo)')
+        .eq('id', turno.profesional_id)
+        .single(),
       supabase.from('caja_movimientos')
         .select('monto_efectivo, monto_transferencia, monto_prepaga')
         .eq('turno_id', turno.id).maybeSingle(),
-
-      // Sesiones finalizadas del paciente en este servicio
       turno.servicio_id
         ? supabase.from('turnos').select('id', { count: 'exact', head: true })
             .eq('paciente_id', turno.paciente_id)
             .eq('servicio_id', turno.servicio_id)
             .eq('estado', 'finalizado')
-        : Promise.resolve({ count: 0 }),
-
-      // Historial de turnos del paciente en este centro
+        : Promise.resolve({ count: 0 } as any),
       supabase.from('turnos')
         .select('id, fecha, hora_inicio, estado, profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
         .eq('paciente_id', turno.paciente_id)
         .eq('centro_id', centroId)
         .order('fecha', { ascending: false })
         .limit(100),
-
-      // Todos los pagos del paciente en este centro
       supabase.from('caja_movimientos')
         .select('id, fecha, monto_efectivo, monto_transferencia, monto_prepaga, turno:turnos(hora_inicio, profesional:profesionales(nombre, apellido), servicio:servicios(nombre))')
         .eq('paciente_id', turno.paciente_id)
         .eq('centro_id', centroId)
         .order('fecha', { ascending: false })
         .limit(100),
-
-      // Tratamientos del paciente
       supabase.from('tratamientos')
         .select('id, total_sesiones, sesiones_consumidas, estado, fecha_inicio, servicio:servicios(nombre), profesional:profesionales(nombre, apellido)')
         .eq('paciente_id', turno.paciente_id)
         .eq('centro_id', centroId)
         .order('fecha_inicio', { ascending: false }),
-
-      // Historia clínica del paciente
       supabase.from('historia_clinica')
         .select('id, fecha, comentario_evolucion, comentarios_extras, variables_json, ficha_modelo:fichas_modelo(nombre), profesional:profesionales(nombre, apellido)')
         .eq('paciente_id', turno.paciente_id)
         .eq('centro_id', centroId!)
         .order('fecha', { ascending: false })
         .limit(50),
-
-      // Fichas modelo disponibles
       supabase.from('fichas_modelo')
         .select('id, nombre, variables:fichas_modelo_variables(id, nombre_variable, orden)')
         .eq('centro_id', centroId!)
         .order('nombre'),
-    ]).then(async ([pacRes, servRes, turnoRes, cajaRes, sesRes, histRes, pagosRes, tratRes, hcRes, fichasRes]) => {
+    ]).then(async ([pacRes, servRes, turnoRes, profTipoRes, cajaRes, sesRes, histRes, pagosRes, tratRes, hcRes, fichasRes]) => {
       const pac = (pacRes as any).data as Paciente | null;
       if (!pac) { setLoading(false); return; }
 
@@ -205,7 +194,6 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       const srv = (servRes as any).data ?? null;
       setServicio(srv);
 
-      // Cargar precio y lógica OS desde pcs_horario_dia
       if (srv && turno.servicio_id && turno.profesional_id && turno.fecha) {
         const diaSemana = new Date(turno.fecha + 'T00:00:00').getDay();
         const { data: pcsData } = await supabase
@@ -228,6 +216,17 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         }
       }
       setTratamientoActual((turnoRes.data as any)?.tratamiento ?? null);
+
+      const tipo = ((profTipoRes as any).data?.profesion?.tipo ?? null) as 'generador' | 'receptor' | null;
+      setProfesionalTipo(tipo);
+
+      const td = (turnoRes.data as any);
+      setPedidoMatricula(td?.pedido_matricula ?? '');
+      setPedidoFecha(td?.pedido_fecha ?? '');
+      setPedidoSesiones(td?.pedido_sesiones_autorizadas ?? '');
+      setPedidoCIE(td?.pedido_cie ?? '');
+      setCodigoPractica(td?.codigo_practica ?? '');
+
       setCajaActual((cajaRes as any).data ?? null);
       setSesionesFinalizadas((sesRes as any).count ?? 0);
       setHistorial(((histRes as any).data ?? []) as TurnoHistorial[]);
@@ -237,7 +236,6 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       setHcFichasDisponibles(((fichasRes as any).data ?? []) as any);
 
       setEstado(turno.estado);
-      // Preferir obra_social_id (tabla nueva), fallback a prepaga_id (tabla vieja)
       setPrepagaId(pac.obra_social_id ?? pac.prepaga_id);
       setNroCredencial(pac.numero_afiliado ?? '');
       setPlanOs(pac.plan_os ?? '');
@@ -246,16 +244,22 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       setMontoPrepaga((cajaRes as any).data?.monto_prepaga ?? 0);
       setLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turno?.id]);
 
   const handleSave = async () => {
     if (!turno || !paciente) return;
     setSaving(true);
 
-    // No hay validación de OS obligatoria en el nuevo modelo (acepta_os indica si acepta, no si es obligatoria)
-
     const ops: any[] = [
-      supabase.from('turnos').update({ estado }).eq('id', turno.id),
+      supabase.from('turnos').update({
+        estado,
+        pedido_matricula: pedidoMatricula || null,
+        pedido_fecha: pedidoFecha || null,
+        pedido_sesiones_autorizadas: pedidoSesiones || null,
+        pedido_cie: pedidoCIE || null,
+        codigo_practica: codigoPractica || null,
+      }).eq('id', turno.id),
       supabase.from('pacientes').update({ obra_social_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
 
@@ -337,44 +341,32 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
     { key: 'historial', label: 'Historial de citas' },
   ];
 
-  const estadoBadge = (e: TurnoEstado) => {
-    const cfg = TURNO_ESTADOS[e] ?? TURNO_ESTADOS.reservado;
-    return (
-      <span
-        className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-        style={{ backgroundColor: `${cfg.color}22`, color: cfg.color }}
-      >
-        {cfg.label}
-      </span>
-    );
-  };
-
   return (
-    <Dialog open={!!turno} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="p-0 max-w-2xl overflow-hidden gap-0">
+    <Dialog open={!!turno} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl p-0 gap-0 max-h-[90vh] flex flex-col">
         {/* Header verde */}
-        <div className="bg-[#0F6E56] text-white px-5 py-4 relative">
-          <button onClick={onClose} className="absolute right-4 top-4 text-white/60 hover:text-white">
+        <div className="bg-[#0F6E56] text-white px-5 py-4 relative shrink-0">
+          <button onClick={onClose} className="absolute top-3 right-3 text-white/80 hover:text-white">
             <X className="w-4 h-4" />
           </button>
           {paciente ? (
             <>
-              <p className="text-[17px] font-bold uppercase tracking-tight">
+              <div className="text-base font-semibold leading-tight">
                 {paciente.apellido}, {paciente.nombre}
-              </p>
-              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-[12px] text-white/80">
-                <span className="flex items-center gap-1"><CreditCard className="w-3 h-3" />DI {paciente.dni}</span>
-                {paciente.celular && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />Tel: {paciente.celular}</span>}
-                {paciente.fecha_nacimiento && <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />Nac. {fmt(paciente.fecha_nacimiento)}</span>}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px] text-white/85">
+                <span>DNI {paciente.dni}</span>
+                {paciente.celular && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {paciente.celular}</span>}
+                {paciente.fecha_nacimiento && <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Nac. {fmt(paciente.fecha_nacimiento)}</span>}
               </div>
             </>
           ) : (
-            <p className="text-[16px] font-bold">Detalle del Turno</p>
+            <div className="text-base font-semibold">Detalle del Turno</div>
           )}
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b bg-background overflow-x-auto shrink-0">
+        <div className="flex border-b bg-background shrink-0 overflow-x-auto">
           {TABS.map(t => (
             <button
               key={t.key}
@@ -391,120 +383,163 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 160px)' }}>
+        <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : !paciente ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">No se pudo cargar el turno</div>
+            <p className="p-8 text-center text-muted-foreground">No se pudo cargar el turno</p>
           ) : (
             <>
               {/* ── CITA ── */}
               {tab === 'cita' && (
-                <div className="p-5 space-y-4">
+                <div className="p-5 space-y-5">
                   {/* Sección OS */}
-                  <div className={`space-y-3 rounded-lg p-3 ${horarioCita?.acepta_os === false ? 'border bg-amber-50/50 border-amber-200' : 'border bg-muted/20'}`}>
+                  <div className="border rounded-lg p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        <Building2 className="w-3 h-3" />Obra social
-                      </Label>
+                      <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <Building2 className="w-3.5 h-3.5" /> Obra social
+                      </div>
                       {horarioCita !== null && (
                         horarioCita.acepta_os
-                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Acepta OS</span>
-                          : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Solo particular</span>
+                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">Acepta OS</span>
+                          : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Solo particular</span>
                       )}
                     </div>
                     {horarioCita?.acepta_os !== false && (
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">Obra social</Label>
-                        <PrepagaAutocomplete value={prepagaId} onSelect={id => setPrepagaId(id)} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[11px] text-muted-foreground">Nro. credencial</Label>
-                          <Input value={nroCredencial} onChange={e => setNroCredencial(e.target.value)} placeholder="—" className="h-8 text-[12px]" />
+                      <div className="space-y-2">
+                        <div>
+                          <Label className="text-[11px]">Obra social</Label>
+                          <PrepagaAutocomplete value={prepagaId} onChange={(id) => setPrepagaId(id)} />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] text-muted-foreground">Plan</Label>
-                          <Input value={planOs} onChange={e => setPlanOs(e.target.value)} placeholder="Ej: 210, Gold, etc." className="h-8 text-[12px]" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-[11px]">Nro. credencial</Label>
+                            <Input value={nroCredencial} onChange={(e) => setNroCredencial(e.target.value)} placeholder="—" className="h-8 text-[12px]" />
+                          </div>
+                          <div>
+                            <Label className="text-[11px]">Plan</Label>
+                            <Input value={planOs} onChange={(e) => setPlanOs(e.target.value)} placeholder="Ej: 210, Gold, etc." className="h-8 text-[12px]" />
+                          </div>
                         </div>
                       </div>
-                    </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Servicio</p>
-                      <p className="text-[13px] font-medium">{servicio?.nombre ?? '—'}</p>
+                  {/* Pedido Médico — solo receptores */}
+                  {profesionalTipo === 'receptor' && (
+                    <div className="border rounded-lg p-3 space-y-3">
+                      <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <FileText className="w-3.5 h-3.5" /> Pedido Médico
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[11px]">Matrícula médico derivante</Label>
+                          <Input value={pedidoMatricula} onChange={(e) => setPedidoMatricula(e.target.value)} placeholder="MP 12345" className="h-8 text-[12px]" />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Sesiones autorizadas</Label>
+                          <Input type="number" value={pedidoSesiones} onChange={(e) => setPedidoSesiones(e.target.value ? Number(e.target.value) : '')} placeholder="Ej: 20" className="h-8 text-[12px]" />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Fecha del pedido</Label>
+                          <Input type="date" value={pedidoFecha} onChange={(e) => setPedidoFecha(e.target.value)} className="h-8 text-[12px]" />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Vencimiento (30 días)</Label>
+                          <Input
+                            value={pedidoFecha ? (() => { const d = new Date(pedidoFecha + 'T00:00:00'); d.setDate(d.getDate() + 30); return d.toLocaleDateString('es-AR'); })() : '—'}
+                            readOnly
+                            className="h-8 text-[12px] bg-muted/50 cursor-default"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-[11px]">Código CIE / Diagnóstico</Label>
+                        <Input value={pedidoCIE} onChange={(e) => setPedidoCIE(e.target.value)} placeholder="Ej: M54.5 — Lumbago" className="h-8 text-[12px]" />
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Sesiones</p>
+                  )}
+
+                  {/* Código de práctica — solo generadores */}
+                  {profesionalTipo === 'generador' && (
+                    <div className="border rounded-lg p-3 space-y-2">
+                      <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Código de práctica</Label>
+                      <Input value={codigoPractica} onChange={(e) => setCodigoPractica(e.target.value)} placeholder="Ej: 1301" className="h-8 text-[12px]" />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="border rounded-lg p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Servicio</p>
+                      <p className="text-[13px] font-medium mt-1">{servicio?.nombre ?? '—'}</p>
+                    </div>
+                    <div className="border rounded-lg p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sesiones</p>
                       {tratamientoActual ? (
-                        <p className="text-[13px] font-medium">Sesión {nroSesion} / {tratamientoActual.total_sesiones}</p>
+                        <p className="text-[13px] font-medium mt-1">Sesión {nroSesion} / {tratamientoActual.total_sesiones}</p>
                       ) : (
-                        <p className="text-[13px] text-muted-foreground">{sesionesFinalizadas > 0 ? `${sesionesFinalizadas} prev.` : 'Sin tratamiento'}</p>
+                        <p className="text-[13px] font-medium mt-1">{sesionesFinalizadas > 0 ? `${sesionesFinalizadas} prev.` : 'Sin tratamiento'}</p>
                       )}
                     </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Precio ref.</p>
+                    <div className="border rounded-lg p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Precio ref.</p>
                       {horarioCita?.precio_particular != null
-                        ? <p className="text-[13px] font-semibold text-[#0F6E56]">${horarioCita.precio_particular.toLocaleString('es-AR')}</p>
-                        : <p className="text-[13px] text-muted-foreground">—</p>
+                        ? <p className="text-[13px] font-medium mt-1">${horarioCita.precio_particular.toLocaleString('es-AR')}</p>
+                        : <p className="text-[13px] font-medium mt-1">—</p>
                       }
                     </div>
                   </div>
 
                   {/* Pagos */}
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <Banknote className="w-3 h-3" />Pagos
-                    </p>
-                    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <CreditCard className="w-3.5 h-3.5" /> Pagos
+                    </div>
+                    <div className="space-y-2">
                       {horarioCita?.precio_particular != null && (
                         <div className="flex justify-between text-[12px]">
                           <span className="text-muted-foreground">Precio particular</span>
-                          <span className="font-semibold">${horarioCita.precio_particular.toLocaleString('es-AR')}</span>
+                          <span className="font-medium">${horarioCita.precio_particular.toLocaleString('es-AR')}</span>
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><Banknote className="w-3 h-3" />Efectivo</Label>
-                          <Input type="number" min={0} value={montoEfectivo || ''} onChange={e => setMontoEfectivo(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                        <div>
+                          <Label className="text-[11px] flex items-center gap-1"><Banknote className="w-3 h-3" />Efectivo</Label>
+                          <Input type="number" value={montoEfectivo} onChange={(e) => setMontoEfectivo(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><ArrowLeftRight className="w-3 h-3" />Transferencia</Label>
-                          <Input type="number" min={0} value={montoTransferencia || ''} onChange={e => setMontoTransferencia(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                        <div>
+                          <Label className="text-[11px]">Transferencia</Label>
+                          <Input type="number" value={montoTransferencia} onChange={(e) => setMontoTransferencia(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" />Obra social</Label>
-                          <Input type="number" min={0} value={montoPrepaga || ''} onChange={e => setMontoPrepaga(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                        <div>
+                          <Label className="text-[11px]">Obra social</Label>
+                          <Input type="number" value={montoPrepaga} onChange={(e) => setMontoPrepaga(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
                         </div>
                       </div>
                       {(montoEfectivo + montoTransferencia + montoPrepaga) > 0 && (
-                        <div className="flex justify-between text-[12px] pt-1 border-t">
-                          <span className="text-muted-foreground">Total cobrado</span>
-                          <span className="font-bold text-[#0F6E56]">${(montoEfectivo + montoTransferencia + montoPrepaga).toLocaleString('es-AR')}</span>
+                        <div className="flex justify-between text-[12px] pt-2 border-t">
+                          <span className="font-semibold">Total cobrado</span>
+                          <span className="font-semibold">${(montoEfectivo + montoTransferencia + montoPrepaga).toLocaleString('es-AR')}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Estado</Label>
-                    <Select value={estado} onValueChange={v => setEstado(v as TurnoEstado)}>
-                      <SelectTrigger className="h-9">
+                  <div>
+                    <Label className="text-[11px]">Estado</Label>
+                    <Select value={estado} onValueChange={(v) => setEstado(v as TurnoEstado)}>
+                      <SelectTrigger className="h-9 text-[12px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {Object.entries(TURNO_ESTADOS).map(([key, val]) => (
                           <SelectItem key={key} value={key}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: val.color }} />
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: val.color }} />
                               {val.label}
-                            </span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -515,18 +550,16 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
               {/* ── HISTORIA CLÍNICA ── */}
               {tab === 'historia' && (
-                <div className="p-4 space-y-4">
-                  {/* Formulario nueva entrada */}
-                  <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <div className="p-5 space-y-4">
+                  <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                       <Plus className="w-3.5 h-3.5" /> Nueva entrada para esta cita
-                    </p>
-
+                    </div>
                     {hcFichasDisponibles.length > 0 && (
-                      <div className="space-y-1">
-                        <Label className="text-[12px]">Ficha modelo (opcional)</Label>
-                        <Select value={hcFichaId} onValueChange={handleHcFichaChange}>
-                          <SelectTrigger className="h-8 text-[13px]"><SelectValue placeholder="Sin ficha — texto libre" /></SelectTrigger>
+                      <div>
+                        <Label className="text-[11px]">Ficha modelo (opcional)</Label>
+                        <Select value={hcFichaId || '__none'} onValueChange={handleHcFichaChange}>
+                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none">Sin ficha</SelectItem>
                             {hcFichasDisponibles.map(f => <SelectItem key={f.id} value={f.id}>{f.nombre}</SelectItem>)}
@@ -534,33 +567,29 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                         </Select>
                       </div>
                     )}
-
                     {hcVariables.length > 0 && (
                       <div className="space-y-2">
                         {hcVariables.map(v => (
-                          <div key={v.id} className="grid grid-cols-2 gap-2 items-center">
-                            <Label className="text-[12px] font-normal">{v.nombre_variable}</Label>
+                          <div key={v.id}>
+                            <Label className="text-[11px]">{v.nombre_variable}</Label>
                             <Input
-                              className="h-8 text-[13px]"
+                              className="h-8 text-[12px]"
                               value={hcValores[v.id] ?? ''}
-                              onChange={e => setHcValores(prev => ({ ...prev, [v.id]: e.target.value }))}
+                              onChange={(e) => setHcValores(prev => ({ ...prev, [v.id]: e.target.value }))}
                               placeholder="Valor..."
                             />
                           </div>
                         ))}
                       </div>
                     )}
-
-                    <div className="space-y-1">
-                      <Label className="text-[12px]">Comentarios / Evolución</Label>
+                    <div>
+                      <Label className="text-[11px]">Comentarios / Evolución</Label>
                       <Textarea
-                        className="min-h-[80px] text-[13px] resize-none"
-                        placeholder="Evolución del paciente, indicaciones, observaciones..."
+                        className="text-[12px] min-h-[80px]"
                         value={hcComentario}
-                        onChange={e => setHcComentario(e.target.value)}
+                        onChange={(e) => setHcComentario(e.target.value)}
                       />
                     </div>
-
                     <Button
                       size="sm"
                       onClick={handleGuardarHC}
@@ -572,8 +601,6 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                       Guardar entrada clínica
                     </Button>
                   </div>
-
-                  {/* Entradas anteriores */}
                   {historiaEntradas.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
