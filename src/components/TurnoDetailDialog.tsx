@@ -411,7 +411,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                       <div className="space-y-2">
                         <div>
                           <Label className="text-[11px]">Obra social</Label>
-                          <PrepagaAutocomplete value={prepagaId} onChange={(id) => setPrepagaId(id)} />
+                          <PrepagaAutocomplete value={prepagaId} onSelect={(id) => setPrepagaId(id)} />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
