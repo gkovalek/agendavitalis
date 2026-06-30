@@ -439,13 +439,25 @@ export default function Recordatorios() {
                     <TableCell>
                       {!tieneCelular ? (
                         <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[11px]">Sin datos</Badge>
-                      ) : yaEnviado ? (
-                        <Badge variant="outline" className="text-[#0F6E56] border-[#9FE1CB] bg-[#E1F5EE] text-[11px] gap-1">
-                          <CheckCircle className="h-3 w-3" /> Enviado
-                        </Badge>
-                      ) : (
+                      ) : !yaEnviado ? (
                         <Badge variant="outline" className="text-muted-foreground text-[11px] gap-1">
                           <Clock className="h-3 w-3" /> Pendiente
+                        </Badge>
+                      ) : log.estado === 'confirmado' ? (
+                        <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50 text-[11px] gap-1">
+                          <CheckCircle className="h-3 w-3" /> Confirmado
+                        </Badge>
+                      ) : log.estado === 'cancelado' ? (
+                        <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-[11px] gap-1">
+                          <AlertCircle className="h-3 w-3" /> Cancelado
+                        </Badge>
+                      ) : log.estado === 'reagendar' ? (
+                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[11px] gap-1">
+                          <Clock className="h-3 w-3" /> Reagendar
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[#0F6E56] border-[#9FE1CB] bg-[#E1F5EE] text-[11px] gap-1">
+                          <CheckCircle className="h-3 w-3" /> Enviado
                         </Badge>
                       )}
                     </TableCell>
