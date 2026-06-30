@@ -34,7 +34,7 @@ interface RecordatorioLog {
 interface Profesional { id: string; nombre: string; apellido: string; }
 interface Servicio { id: string; nombre: string; }
 
-const ESTADOS_VALIDOS = ['reservado', 'confirmado', 'en_sala'];
+const ESTADOS_VALIDOS = ['reservado', 'confirmado', 'en_sala', 'cancelado', 'ausente'];
 
 function getMesActual() {
   const now = new Date();
