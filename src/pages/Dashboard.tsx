@@ -183,6 +183,10 @@ export default function Dashboard() {
     return Array.from(all).sort();
   }, [profSlotMap, selectedProfId, profesionales, turnos]);
 
+
+
+
+
   // Agendas del profesional seleccionado (desde PCS)
   const agendasDelProf = useMemo((): Agenda[] => {
     if (selectedProfId === 'todos') return [];
@@ -303,6 +307,15 @@ export default function Dashboard() {
   const filteredTurnos = useMemo(() =>
     turnos.filter(t => selectedEstados.includes(t.estado)),
   [turnos, selectedEstados]);
+
+  const allEstadosSelected = selectedEstados.length === ESTADO_COUNTS_LABELS.length;
+
+  const visibleTimeAxis = useMemo(() => {
+    if (allEstadosSelected) return timeAxis;
+    const horasConTurnos = new Set(filteredTurnos.map(t => t.hora_inicio?.substring(0, 5)).filter(Boolean));
+    return timeAxis.filter(h => horasConTurnos.has(h));
+  }, [timeAxis, filteredTurnos, allEstadosSelected]);
+
 
   // turnoMap: profId-hora → turnos (vista todos) — filtrado por estado
   const turnoMap = useMemo(() => {
@@ -567,11 +580,11 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {timeAxis.map((hora, idx) => (
+                  {visibleTimeAxis.map((hora, idx) => (
                     <tr key={hora} className="border-b border-border/40"
-                      style={showTimeLine(hora, timeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A', position: 'relative' } : {}}>
+                      style={showTimeLine(hora, visibleTimeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A', position: 'relative' } : {}}>
                       <td className="p-1 px-2 text-[11px] font-mono sticky left-0 bg-card w-14"
-                        style={{ color: showTimeLine(hora, timeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, timeAxis[idx + 1]) ? 600 : undefined }}>
+                        style={{ color: showTimeLine(hora, visibleTimeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, visibleTimeAxis[idx + 1]) ? 600 : undefined }}>
                         {hora}
                       </td>
                       {visibleProfesionales.map(p => {
@@ -646,11 +659,11 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {timeAxis.map((hora, idx) => (
+                  {visibleTimeAxis.map((hora, idx) => (
                     <tr key={hora} className="border-b border-border/40"
-                      style={showTimeLine(hora, timeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A' } : {}}>
+                      style={showTimeLine(hora, visibleTimeAxis[idx + 1]) ? { borderBottom: '2px solid #E24B4A' } : {}}>
                       <td className="p-1 px-2 text-[11px] font-mono sticky left-0 bg-card w-14"
-                        style={{ color: showTimeLine(hora, timeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, timeAxis[idx + 1]) ? 600 : undefined }}>
+                        style={{ color: showTimeLine(hora, visibleTimeAxis[idx + 1]) ? '#E24B4A' : undefined, fontWeight: showTimeLine(hora, visibleTimeAxis[idx + 1]) ? 600 : undefined }}>
                         {hora}
                       </td>
                       {agendasDelProf.length > 0
