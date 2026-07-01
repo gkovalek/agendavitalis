@@ -21,6 +21,7 @@ interface ObraSocial {
   nombre: string;
   valor_sesion: number;
   activa: boolean;
+  factura_con_token: boolean;
   id_vitalis: string;
   profesional_id: string;
   profesional?: { nombre: string; apellido: string } | null;
@@ -37,6 +38,7 @@ const emptyForm = {
   nombre: '',
   valor_sesion: 0,
   activa: true,
+  factura_con_token: false,
   profesional_id: '',
 };
 
@@ -67,7 +69,7 @@ export default function ObrasSociales() {
     const [osRes, profRes] = await Promise.all([
       supabase
         .from('obras_sociales')
-        .select('id, codigo, nombre, valor_sesion, activa, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
+        .select('id, codigo, nombre, valor_sesion, activa, factura_con_token, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
         .eq('centro_id', centroId!)
         .order('nombre'),
       supabase
@@ -100,6 +102,7 @@ export default function ObrasSociales() {
       nombre: os.nombre,
       valor_sesion: os.valor_sesion,
       activa: os.activa,
+      factura_con_token: os.factura_con_token ?? false,
       profesional_id: os.profesional_id,
     });
     setDialogOpen(true);
@@ -118,6 +121,7 @@ export default function ObrasSociales() {
       nombre: form.nombre,
       valor_sesion: Number(form.valor_sesion) || 0,
       activa: form.activa,
+      factura_con_token: form.factura_con_token,
       profesional_id: form.profesional_id,
       id_vitalis,
       centro_id: centroId,
@@ -254,7 +258,12 @@ export default function ObrasSociales() {
                 {filtered.map(os => (
                   <TableRow key={os.id} className={!os.activa ? 'opacity-50' : ''}>
                     <TableCell className="text-muted-foreground font-mono text-xs">{os.codigo}</TableCell>
-                    <TableCell className="font-medium">{os.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {os.nombre}
+                        {os.factura_con_token && <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-300">Token</Badge>}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {(os.profesional as any)?.apellido}, {(os.profesional as any)?.nombre}
                     </TableCell>
@@ -356,6 +365,19 @@ export default function ObrasSociales() {
                 <span className="font-mono text-sm font-semibold text-[#0F6E56]">{previewIdVitalis}</span>
               </div>
             )}
+
+            {/* Factura con token */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Factura con token</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">OSDE, Swiss Medical — factura por sesión realizada</p>
+              </div>
+              <Switch
+                checked={form.factura_con_token}
+                onCheckedChange={v => setForm({ ...form, factura_con_token: v })}
+                className="data-[state=checked]:bg-blue-600"
+              />
+            </div>
 
             {/* Activa */}
             <div className="flex items-center justify-between">

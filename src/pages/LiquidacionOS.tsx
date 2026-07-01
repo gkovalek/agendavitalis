@@ -15,6 +15,7 @@ interface ObraSocial {
   codigo: string;
   nombre: string;
   valor_sesion: number;
+  factura_con_token: boolean;
   profesional_id: string;
 }
 
@@ -22,6 +23,7 @@ interface Turno {
   id: string;
   fecha: string;
   profesional_id: string;
+  pedido_sesiones_autorizadas: number | null;
   paciente: {
     nombre: string;
     apellido: string;
@@ -41,6 +43,7 @@ interface FilaLiquidacion {
   total: number;
   pacientes: Set<string>;
   sin_valor: boolean;
+  tipo_facturacion: 'generador' | 'receptor_token' | 'receptor_pedido';
 }
 
 interface TurnoSinOS {
@@ -70,17 +73,20 @@ export default function LiquidacionOS() {
 
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [obrasSociales, setObrasSociales] = useState<ObraSocial[]>([]);
-  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string; apellido: string }[]>([]);
+  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string; apellido: string; tipo: 'generador' | 'receptor' | null }[]>([]);
   const [prepagas, setPrepagas] = useState<{ id: string; nombre: string; codigo: string | null }[]>([]);
 
   useEffect(() => {
     if (!centroId) return;
     Promise.all([
-      supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('obras_sociales').select('id, codigo, nombre, valor_sesion, profesional_id').eq('centro_id', centroId).eq('activa', true),
+      supabase.from('profesionales').select('id, nombre, apellido, profesion:profesiones(tipo)').eq('centro_id', centroId).eq('activo', true).order('apellido'),
+      supabase.from('obras_sociales').select('id, codigo, nombre, valor_sesion, factura_con_token, profesional_id').eq('centro_id', centroId).eq('activa', true),
       supabase.from('prepagas').select('id, nombre, codigo'),
     ]).then(([profRes, osRes, prepRes]) => {
-      setProfesionales((profRes.data as any[]) ?? []);
+      setProfesionales(((profRes.data as any[]) ?? []).map((p: any) => ({
+        id: p.id, nombre: p.nombre, apellido: p.apellido,
+        tipo: Array.isArray(p.profesion) ? (p.profesion[0]?.tipo ?? null) : (p.profesion?.tipo ?? null),
+      })));
       setObrasSociales((osRes.data as ObraSocial[]) ?? []);
       setPrepagas((prepRes.data as any[]) ?? []);
     });
@@ -100,7 +106,7 @@ export default function LiquidacionOS() {
     const { data, error } = await supabase
       .from('turnos')
       .select(`
-        id, fecha, profesional_id,
+        id, fecha, profesional_id, pedido_sesiones_autorizadas,
         paciente:pacientes(nombre, apellido, obra_social_id, prepaga_id),
         profesional:profesionales(nombre, apellido)
       `)
@@ -128,6 +134,13 @@ export default function LiquidacionOS() {
     obrasSociales.forEach(os => { m[os.id] = os; });
     return m;
   }, [obrasSociales]);
+
+  // Mapeo profesional_id → tipo (generador/receptor)
+  const profTipoMap = useMemo(() => {
+    const m: Record<string, 'generador' | 'receptor' | null> = {};
+    profesionales.forEach(p => { m[p.id] = p.tipo; });
+    return m;
+  }, [profesionales]);
 
   // Buscar OS por codigo + profesional_id (fallback cuando no hay obra_social_id directo)
   const findOS = (codigoOrNombre: string | null, profId: string): ObraSocial | null => {
@@ -184,6 +197,22 @@ export default function LiquidacionOS() {
         return;
       }
 
+      const tipo = profTipoMap[t.profesional_id] ?? null;
+      const esFacToken = os.factura_con_token;
+
+      let sesionesATurno: number;
+      let tipoFac: FilaLiquidacion['tipo_facturacion'];
+      if (tipo === 'generador') {
+        sesionesATurno = 1;
+        tipoFac = 'generador';
+      } else if (esFacToken) {
+        sesionesATurno = 1;
+        tipoFac = 'receptor_token';
+      } else {
+        sesionesATurno = t.pedido_sesiones_autorizadas ?? 1;
+        tipoFac = 'receptor_pedido';
+      }
+
       const key = `${os.id}`;
       if (!mapa[key]) {
         mapa[key] = {
@@ -196,17 +225,18 @@ export default function LiquidacionOS() {
           total: 0,
           pacientes: new Set(),
           sin_valor: os.valor_sesion === 0,
+          tipo_facturacion: tipoFac,
         };
       }
-      mapa[key].sesiones += 1;
-      mapa[key].total += os.valor_sesion;
+      mapa[key].sesiones += sesionesATurno;
+      mapa[key].total += os.valor_sesion * sesionesATurno;
       mapa[key].pacientes.add(pacNombre);
       if (os.valor_sesion === 0) sinValorSet.add(os.nombre);
     });
 
     const filas = Object.values(mapa).sort((a, b) => a.nombre.localeCompare(b.nombre));
     return { filas, sinOS: sinOSList, sinValor: Array.from(sinValorSet) };
-  }, [turnos, profFilter, osMap, prepagaCodigoMap, prepagas, obrasSociales]);
+  }, [turnos, profFilter, osMap, prepagaCodigoMap, prepagas, obrasSociales, profTipoMap]);
 
   const totales = useMemo(() => ({
     sesiones: filas.reduce((s, f) => s + f.sesiones, 0),
@@ -218,13 +248,17 @@ export default function LiquidacionOS() {
       ? 'Todos los profesionales'
       : (() => { const p = profesionales.find(p => p.id === profFilter); return p ? `${p.apellido} ${p.nombre}` : ''; })();
 
+    const tipoLabel = (t: FilaLiquidacion['tipo_facturacion']) =>
+      t === 'generador' ? 'Consulta' : t === 'receptor_token' ? 'Por sesión (token)' : 'Por pedido médico';
+
     const data = filas.map(f => ({
       'Código': f.codigo,
       'Obra Social': f.nombre,
       'Profesional': f.profesional,
+      'Tipo': tipoLabel(f.tipo_facturacion),
       'Pacientes únicos': f.pacientes.size,
-      'Sesiones': f.sesiones,
-      'Valor x sesión': f.valor_sesion,
+      'Sesiones / Consultas': f.sesiones,
+      'Valor unitario': f.valor_sesion,
       'Total': f.total,
     }));
 
@@ -233,9 +267,10 @@ export default function LiquidacionOS() {
       'Código': '',
       'Obra Social': 'TOTAL',
       'Profesional': '',
+      'Tipo': '',
       'Pacientes únicos': 0,
-      'Sesiones': totales.sesiones,
-      'Valor x sesión': 0,
+      'Sesiones / Consultas': totales.sesiones,
+      'Valor unitario': 0,
       'Total': totales.total,
     });
 
@@ -243,7 +278,7 @@ export default function LiquidacionOS() {
 
     // Ancho de columnas
     ws['!cols'] = [
-      { wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+      { wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 14 },
     ];
 
     const wb = XLSX.utils.book_new();
@@ -380,8 +415,13 @@ export default function LiquidacionOS() {
                   <TableRow key={f.obra_social_id} className={f.sin_valor ? 'opacity-60' : ''}>
                     <TableCell className="font-mono text-xs text-muted-foreground">{f.codigo}</TableCell>
                     <TableCell className="font-medium">
-                      {f.nombre}
-                      {f.sin_valor && <Badge variant="outline" className="ml-2 text-[10px] text-amber-600 border-amber-300">sin valor</Badge>}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {f.nombre}
+                        {f.tipo_facturacion === 'generador' && <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-300">Consulta</Badge>}
+                        {f.tipo_facturacion === 'receptor_token' && <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-300">Token</Badge>}
+                        {f.tipo_facturacion === 'receptor_pedido' && <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">Pedido</Badge>}
+                        {f.sin_valor && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">sin valor</Badge>}
+                      </div>
                     </TableCell>
                     {profFilter === 'todos' && <TableCell className="text-sm text-muted-foreground">{f.profesional}</TableCell>}
                     <TableCell className="text-center text-sm">{f.pacientes.size}</TableCell>
