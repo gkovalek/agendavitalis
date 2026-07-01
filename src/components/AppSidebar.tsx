@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell, BarChart2, ClipboardList, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell, BarChart2, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -25,7 +25,6 @@ const menuItems = [
   { title: 'Servicios', url: '/servicios', icon: Wrench },
   { title: 'Tratamientos', url: '/tratamientos', icon: Activity },
   { title: 'Historia Clínica', url: '/historia-clinica', icon: FileText },
-  { title: 'Pedidos Médicos', url: '/pedidos-medicos', icon: ClipboardList },
   { title: 'Recordatorios', url: '/recordatorios', icon: Bell },
   { title: 'Obras Sociales', url: '/obras-sociales', icon: Building2 },
   { title: 'Caja', url: '/caja', icon: DollarSign },

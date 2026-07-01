@@ -20,7 +20,6 @@ import Tratamientos from "@/pages/Tratamientos";
 import Recordatorios from "@/pages/Recordatorios";
 import HistoriaClinica from "@/pages/HistoriaClinica";
 import Reportes from "@/pages/Reportes";
-import PedidosMedicos from "@/pages/PedidosMedicos";
 import Configuracion from "@/pages/Configuracion";
 import PortalPublico from "@/pages/PortalPublico";
 import NotFound from "@/pages/NotFound";
@@ -80,7 +79,6 @@ function AppRoutes() {
       <Route path="/recordatorios" element={<ProtectedRoute><Recordatorios /></ProtectedRoute>} />
       <Route path="/historia-clinica" element={<ProtectedRoute><HistoriaClinica /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
-      <Route path="/pedidos-medicos" element={<ProtectedRoute><PedidosMedicos /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
