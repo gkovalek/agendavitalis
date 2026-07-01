@@ -74,6 +74,7 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
   { key: 'finalizado', label: 'Finalizados', color: '#1D9E75' },
   { key: 'confirmado', label: 'Confirmados', color: '#378ADD' },
   { key: 'en_sala', label: 'En sala', color: '#EF9F27' },
+  { key: 'siendo_atendido', label: 'Siendo atendidos', color: '#60A5FA' },
   { key: 'cancelado', label: 'Cancelados / Ausentes', color: '#E24B4A' },
   { key: 'reservado', label: 'Reservados', color: '#7F77DD' },
 ];
