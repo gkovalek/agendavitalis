@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCentroConfig } from '@/hooks/use-centro-config';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail, ShieldCheck, CalendarOff, Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SQL_SCRIPT = `-- Ejecutar en Supabase SQL Editor para habilitar configuración por centro
@@ -86,6 +87,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+interface DiaNolaboral {
+  id: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  profesional_id: string | null;
+  profesional?: { nombre: string; apellido: string } | null;
+}
+
+interface ProfSimple { id: string; nombre: string; apellido: string; }
+
 export default function Configuracion() {
   const { centroId } = useAuth();
   const { get, getNumber, set, loading, tableExists } = useCentroConfig(centroId);
@@ -96,6 +107,70 @@ export default function Configuracion() {
   // Local state para edición
   const [vals, setVals] = useState<Record<string, string>>({});
   const [initialized, setInitialized] = useState(false);
+
+  // Días no laborales
+  const [diasNL, setDiasNL] = useState<DiaNolaboral[]>([]);
+  const [profesionales, setProfesionales] = useState<ProfSimple[]>([]);
+  const [nlDesde, setNlDesde] = useState('');
+  const [nlHasta, setNlHasta] = useState('');
+  const [nlProfId, setNlProfId] = useState('centro');
+  const [savingNL, setSavingNL] = useState(false);
+
+  const fetchDiasNL = async () => {
+    if (!centroId) return;
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('dias_no_laborales')
+      .select('id, fecha_desde, fecha_hasta, profesional_id, profesional:profesionales(nombre, apellido)')
+      .eq('centro_id', centroId)
+      .gte('fecha_hasta', today)
+      .order('fecha_desde');
+    setDiasNL(
+      ((data as any[]) ?? []).map(r => ({
+        ...r,
+        profesional: Array.isArray(r.profesional) ? r.profesional[0] ?? null : r.profesional,
+      }))
+    );
+  };
+
+  useEffect(() => {
+    if (!centroId) return;
+    supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido')
+      .then(({ data }) => setProfesionales((data as ProfSimple[]) ?? []));
+    fetchDiasNL();
+  }, [centroId]);
+
+  const handleAddNL = async () => {
+    if (!nlDesde || !nlHasta || !centroId) return;
+    if (nlHasta < nlDesde) {
+      toast({ title: 'La fecha "hasta" debe ser igual o posterior a "desde"', variant: 'destructive' });
+      return;
+    }
+    setSavingNL(true);
+    const { error } = await supabase.from('dias_no_laborales').insert({
+      centro_id: centroId,
+      profesional_id: nlProfId === 'centro' ? null : nlProfId,
+      fecha_desde: nlDesde,
+      fecha_hasta: nlHasta,
+    });
+    setSavingNL(false);
+    if (error) { toast({ title: 'Error al guardar', variant: 'destructive' }); return; }
+    toast({ title: 'Período no laboral guardado' });
+    setNlDesde('');
+    setNlHasta('');
+    setNlProfId('centro');
+    fetchDiasNL();
+  };
+
+  const handleDeleteNL = async (id: string) => {
+    await supabase.from('dias_no_laborales').delete().eq('id', id);
+    fetchDiasNL();
+  };
+
+  const fmtDate = (s: string) => {
+    const [y, m, d] = s.split('-');
+    return `${d}/${m}/${y}`;
+  };
 
   useEffect(() => {
     if (!loading && !initialized) {
@@ -285,6 +360,61 @@ export default function Configuracion() {
           {saving === 'permisos' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
+      </Section>
+
+      {/* Días no laborales */}
+      <Section
+        title="Días no laborales"
+        description="Bloqueá períodos para todo el centro o para un profesional específico"
+        icon={<CalendarOff className="h-4 w-4 text-muted-foreground" />}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Desde">
+            <Input type="date" value={nlDesde} onChange={e => { setNlDesde(e.target.value); if (!nlHasta || e.target.value > nlHasta) setNlHasta(e.target.value); }} />
+          </Field>
+          <Field label="Hasta">
+            <Input type="date" value={nlHasta} min={nlDesde} onChange={e => setNlHasta(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Aplica a">
+          <Select value={nlProfId} onValueChange={setNlProfId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="centro">Todo el centro</SelectItem>
+              {profesionales.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.nombre} {p.apellido}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Button size="sm" disabled={!nlDesde || !nlHasta || savingNL} onClick={handleAddNL}>
+          {savingNL ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+          Agregar período
+        </Button>
+
+        {diasNL.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Períodos próximos</p>
+            {diasNL.map(d => (
+              <div key={d.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-[12px]">
+                <div className="flex items-center gap-2">
+                  <CalendarOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="font-medium">
+                    {d.fecha_desde === d.fecha_hasta ? fmtDate(d.fecha_desde) : `${fmtDate(d.fecha_desde)} → ${fmtDate(d.fecha_hasta)}`}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {d.profesional ? `${d.profesional.nombre} ${d.profesional.apellido}` : 'Todo el centro'}
+                  </span>
+                </div>
+                <button onClick={() => handleDeleteNL(d.id)} className="text-muted-foreground hover:text-destructive transition-colors ml-2">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* Link del portal público */}
