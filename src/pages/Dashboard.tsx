@@ -15,6 +15,8 @@ import { TurnoContextMenu } from '@/components/TurnoContextMenu';
 import { ReprogramarTurnoDialog } from '@/components/ReprogramarTurnoDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+interface DiaNolaboral { profesional_id: string | null; fecha_desde: string; fecha_hasta: string; }
+
 interface Profesional { id: string; nombre: string; apellido: string; }
 
 interface Agenda { id: string; nombre: string; }
@@ -88,6 +90,7 @@ export default function Dashboard() {
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
+  const [diasNL, setDiasNL] = useState<DiaNolaboral[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProfId, setSelectedProfId] = useState<string>('todos');
 
@@ -214,7 +217,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     if (!centroId) return;
     setLoading(true);
-    const [profRes, turnosRes, pcsRes] = await Promise.all([
+    const [profRes, turnosRes, pcsRes, nlRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select(`
         id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id, motivo_cancelacion, tratamiento_id,
@@ -225,6 +228,11 @@ export default function Dashboard() {
       supabase.from('profesional_centro_servicio')
         .select('profesional_id, agenda_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, nombre, duracion_minutos, sesiones_por_bloque)')
         .eq('centro_id', centroId).eq('activo', true),
+      supabase.from('dias_no_laborales')
+        .select('profesional_id, fecha_desde, fecha_hasta')
+        .eq('centro_id', centroId)
+        .lte('fecha_desde', dateStr)
+        .gte('fecha_hasta', dateStr),
     ]);
     const turnosList: Turno[] = (turnosRes.data as any[]) ?? [];
     const pcsListRaw: PCSRecord[] = ((pcsRes.data as any[]) ?? []).map((r: any) => ({
@@ -276,6 +284,7 @@ export default function Dashboard() {
     setProfesionales(profRes.data ?? []);
     setTurnos(enriched);
     setPcsRecords(pcsListRaw);
+    setDiasNL((nlRes.data as DiaNolaboral[]) ?? []);
     setLoading(false);
   };
 
@@ -373,6 +382,10 @@ export default function Dashboard() {
     });
     return map;
   }, [pcsRecords]);
+
+  // Retorna true si el profesional (o el centro completo) está marcado como no laboral hoy
+  const isProfNolaboral = (profId: string) =>
+    diasNL.some(d => d.profesional_id === null || d.profesional_id === profId);
 
   const isSlotAvailable = (profId: string, hora: string) => profSlotMap[profId]?.has(hora) ?? false;
 
@@ -598,10 +611,19 @@ export default function Dashboard() {
                         {hora}
                       </td>
                       {visibleProfesionales.map(p => {
+                        const nolaboral = isProfNolaboral(p.id);
                         const slotTurnos = turnoMap[`${p.id}-${hora}`] ?? [];
                         const available = isSlotAvailable(p.id, hora);
                         const full = isSlotFull(p.id, hora);
                         const capacity = capacityMap[p.id] ?? 1;
+                        if (nolaboral) return (
+                          <td key={p.id} title="No laboral"
+                            className="p-1 align-top min-h-[36px] bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed">
+                            <div className="h-full flex items-center justify-center">
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 select-none">No laboral</span>
+                            </div>
+                          </td>
+                        );
                         return (
                           <td key={p.id}
                             className={`p-1 align-top min-h-[36px] transition-colors
@@ -678,10 +700,19 @@ export default function Dashboard() {
                       </td>
                       {agendasDelProf.length > 0
                         ? agendasDelProf.map(a => {
+                            const nolaboral = isProfNolaboral(selectedProfId);
                             const slotTurnos = turnoMapAgenda[`${a.id}-${hora}`] ?? [];
                             const cap = agendaCapacityMap[a.id] ?? 1;
                             const full = slotTurnos.length >= cap;
                             const available = isAgendaSlotAvailable(selectedProfId, a.id, hora);
+                            if (nolaboral) return (
+                              <td key={a.id} title="No laboral"
+                                className="p-1 align-top min-h-[48px] bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed">
+                                <div className="h-full flex items-center justify-center">
+                                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 select-none">No laboral</span>
+                                </div>
+                              </td>
+                            );
                             return (
                               <td key={a.id}
                                 className={`p-1 align-top min-h-[48px] transition-colors
