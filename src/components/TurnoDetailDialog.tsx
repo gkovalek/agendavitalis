@@ -215,7 +215,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
           setHorarioCita(hData ?? null);
         }
       }
-      setTratamientoActual((turnoRes.data as any)?.tratamiento ?? null);
+      const trat = (turnoRes.data as any)?.tratamiento ?? null;
+      setTratamientoActual(trat);
 
       const tipo = ((profTipoRes as any).data?.profesion?.tipo ?? null) as 'generador' | 'receptor' | null;
       setProfesionalTipo(tipo);
@@ -223,7 +224,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       const td = (turnoRes.data as any);
       setPedidoMatricula(td?.pedido_matricula ?? '');
       setPedidoFecha(td?.pedido_fecha ?? '');
-      setPedidoSesiones(td?.pedido_sesiones_autorizadas ?? '');
+      // Espejo: si no hay sesiones en el pedido, tomar del tratamiento
+      setPedidoSesiones(td?.pedido_sesiones_autorizadas ?? trat?.total_sesiones ?? '');
       setPedidoCIE(td?.pedido_cie ?? '');
       setCodigoPractica(td?.codigo_practica ?? '');
 
@@ -262,6 +264,15 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       }).eq('id', turno.id),
       supabase.from('pacientes').update({ obra_social_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
+
+    // Espejo: sincronizar total_sesiones del tratamiento con sesiones autorizadas del pedido
+    if (tratamientoActual && pedidoSesiones !== '') {
+      ops.push(
+        supabase.from('tratamientos')
+          .update({ total_sesiones: Number(pedidoSesiones) })
+          .eq('id', tratamientoActual.id)
+      );
+    }
 
     const totalPago = montoEfectivo + montoTransferencia + montoPrepaga;
     if (totalPago > 0 || cajaActual) {
