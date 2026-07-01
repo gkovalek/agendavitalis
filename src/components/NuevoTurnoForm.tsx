@@ -63,7 +63,7 @@ interface TurnoHistorial {
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
 export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -310,6 +310,9 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
       forma_pago: formaPago,
       centro_id: centroId,
+      created_by_name: perfil?.nombre ?? null,
+      updated_by_name: perfil?.nombre ?? null,
+      updated_at: new Date().toISOString(),
     };
     console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
     const { data: newTurno, error: turnoErr } = await supabase.from('turnos').insert(turnoPayload).select('id').single();

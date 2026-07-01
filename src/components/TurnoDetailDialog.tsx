@@ -88,7 +88,7 @@ interface Props {
 }
 
 export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
   const { toast } = useToast();
 
   const [tab, setTab] = useState<Tab>('cita');
@@ -111,6 +111,11 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   const [montoEfectivo, setMontoEfectivo] = useState(0);
   const [montoTransferencia, setMontoTransferencia] = useState(0);
   const [montoPrepaga, setMontoPrepaga] = useState(0);
+
+  const [createdByName, setCreatedByName] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [updatedByName, setUpdatedByName] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const [pedidoMatricula, setPedidoMatricula] = useState('');
   const [pedidoFecha, setPedidoFecha] = useState('');
@@ -144,7 +149,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         ? supabase.from('servicios').select('id, nombre').eq('id', turno.servicio_id).single()
         : Promise.resolve({ data: null } as any),
       supabase.from('turnos')
-        .select('tratamiento_id, tratamiento:tratamientos(id, total_sesiones, sesiones_consumidas), pedido_matricula, pedido_fecha, pedido_sesiones_autorizadas, pedido_cie, codigo_practica')
+        .select('tratamiento_id, tratamiento:tratamientos(id, total_sesiones, sesiones_consumidas), pedido_matricula, pedido_fecha, pedido_sesiones_autorizadas, pedido_cie, codigo_practica, created_by_name, created_at, updated_by_name, updated_at')
         .eq('id', turno.id).single(),
       supabase.from('profesionales')
         .select('profesion:profesiones(tipo)')
@@ -224,8 +229,11 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
       const td = (turnoRes.data as any);
       setPedidoMatricula(td?.pedido_matricula ?? '');
       setPedidoFecha(td?.pedido_fecha ?? '');
-      // Espejo: si no hay sesiones en el pedido, tomar del tratamiento
       setPedidoSesiones(td?.pedido_sesiones_autorizadas ?? trat?.total_sesiones ?? '');
+      setCreatedByName(td?.created_by_name ?? null);
+      setCreatedAt(td?.created_at ?? null);
+      setUpdatedByName(td?.updated_by_name ?? null);
+      setUpdatedAt(td?.updated_at ?? null);
       setPedidoCIE(td?.pedido_cie ?? '');
       setCodigoPractica(td?.codigo_practica ?? '');
 
@@ -261,6 +269,8 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
         pedido_sesiones_autorizadas: pedidoSesiones || null,
         pedido_cie: pedidoCIE || null,
         codigo_practica: codigoPractica || null,
+        updated_by_name: perfil?.nombre ?? null,
+        updated_at: new Date().toISOString(),
       }).eq('id', turno.id),
       supabase.from('pacientes').update({ obra_social_id: prepagaId, numero_afiliado: nroCredencial || null, plan_os: planOs || null }).eq('id', paciente.id),
     ];
@@ -343,6 +353,17 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
   };
 
   const nroSesion = turno?.estado === 'finalizado' ? sesionesFinalizadas : sesionesFinalizadas + 1;
+
+  const fmtDatetime = (iso: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}hs`;
+  };
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'cita', label: 'Cita' },
@@ -812,12 +833,28 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
 
         {/* Footer */}
         {paciente && tab === 'cita' && (
-          <div className="flex justify-end gap-2 px-5 py-3 border-t bg-background shrink-0">
-            <Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>
-            <Button size="sm" className="bg-[#0F6E56] hover:bg-[#0a5c48] text-white" onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-              Guardar
-            </Button>
+          <div className="border-t bg-background shrink-0">
+            {(createdByName || updatedByName) && (
+              <div className="px-5 pt-2 pb-0 space-y-0.5">
+                {createdByName && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Creado por <span className="font-medium">{createdByName}</span>{createdAt ? ` ${fmtDatetime(createdAt)}` : ''}
+                  </p>
+                )}
+                {updatedByName && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Modificado por <span className="font-medium">{updatedByName}</span>{updatedAt ? ` ${fmtDatetime(updatedAt)}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 px-5 py-3">
+              <Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>
+              <Button size="sm" className="bg-[#0F6E56] hover:bg-[#0a5c48] text-white" onClick={handleSave} disabled={saving}>
+                {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Guardar
+              </Button>
+            </div>
           </div>
         )}
         {paciente && tab !== 'cita' && (
