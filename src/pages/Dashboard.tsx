@@ -80,15 +80,18 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
 ];
 
 export default function Dashboard() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
   const { toast } = useToast();
   const { getNumber, loading: configLoading } = useCentroConfig(centroId);
+  const esProfesional = perfil?.rol_nombre === 'profesional';
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProfId, setSelectedProfId] = useState<string>('todos');
+  const [selectedProfId, setSelectedProfId] = useState<string>(
+    perfil?.profesional_id ?? 'todos'
+  );
   const [newTurnoSlot, setNewTurnoSlot] = useState<{
     fecha: string; hora: string; profesional_id: string; profesional_nombre: string; agenda_id?: string;
   } | null>(null);
@@ -435,19 +438,21 @@ export default function Dashboard() {
     <div className="flex h-[calc(100vh-40px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
       <aside className="w-[300px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
-        <div>
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
-          <select
-            value={selectedProfId}
-            onChange={e => { setSelectedProfId(e.target.value); setMobileColIndex(0); }}
-            className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="todos">Todos</option>
-            {profesionales.map(p => (
-              <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
-            ))}
-          </select>
-        </div>
+        {!esProfesional && (
+          <div>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
+            <select
+              value={selectedProfId}
+              onChange={e => { setSelectedProfId(e.target.value); setMobileColIndex(0); }}
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="todos">Todos</option>
+              {profesionales.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="border rounded-lg bg-background w-full">
           <Calendar mode="single" selected={selectedDate} onSelect={d => d && setSelectedDate(d)} className="w-full" />
