@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SQL_SCRIPT = `-- Ejecutar en Supabase SQL Editor para habilitar configuración por centro
@@ -105,6 +106,8 @@ export default function Configuracion() {
         centro_ciudad: get('centro_ciudad'),
         centro_mail: get('centro_mail'),
         centro_web: get('centro_web'),
+        secretario_ver_caja: get('secretario_ver_caja') || 'true',
+        secretario_ver_liquidacion: get('secretario_ver_liquidacion') || 'true',
         intervalo_turnos: String(getNumber('intervalo_turnos')),
         hora_inicio_agenda: get('hora_inicio_agenda') || '08:00',
         hora_fin_agenda: get('hora_fin_agenda') || '20:00',
@@ -238,6 +241,48 @@ export default function Configuracion() {
           onClick={() => handleSave('agenda', ['intervalo_turnos', 'hora_inicio_agenda', 'hora_fin_agenda'])}
         >
           {saving === 'agenda' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          <Save className="w-4 h-4 mr-2" /> Guardar
+        </Button>
+      </Section>
+
+      {/* Permisos de secretarios */}
+      <Section
+        title="Permisos de secretarios"
+        description="Los secretarios ven todo el sistema excepto lo que desactives aquí"
+        icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Caja del día</p>
+              <p className="text-xs text-muted-foreground">Puede ver y registrar movimientos de caja</p>
+            </div>
+            <Switch
+              checked={vals.secretario_ver_caja !== 'false'}
+              onCheckedChange={v => setVals(prev => ({ ...prev, secretario_ver_caja: v ? 'true' : 'false' }))}
+              className="data-[state=checked]:bg-[#0F6E56]"
+              disabled={!tableExists}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Liquidación mensual OS</p>
+              <p className="text-xs text-muted-foreground">Puede ver la liquidación de obras sociales</p>
+            </div>
+            <Switch
+              checked={vals.secretario_ver_liquidacion !== 'false'}
+              onCheckedChange={v => setVals(prev => ({ ...prev, secretario_ver_liquidacion: v ? 'true' : 'false' }))}
+              className="data-[state=checked]:bg-[#0F6E56]"
+              disabled={!tableExists}
+            />
+          </div>
+        </div>
+        <Button
+          size="sm"
+          disabled={saving === 'permisos' || !tableExists}
+          onClick={() => handleSave('permisos', ['secretario_ver_caja', 'secretario_ver_liquidacion'])}
+        >
+          {saving === 'permisos' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </Section>

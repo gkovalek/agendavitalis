@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Heart, Settings, LogOut, ChevronDown } from 'lucide-react';
 
 interface NavItem {
@@ -15,14 +16,13 @@ interface NavGroup {
   disabled?: boolean;
 }
 
-const NAV_GROUPS: NavGroup[] = [
+const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: 'Pacientes',
     items: [
       { label: 'Base de pacientes', href: '/pacientes' },
       { label: 'Nuevo paciente', href: '/pacientes/nuevo' },
       { label: 'Historias clínicas', href: '/historia-clinica' },
-      { label: 'Pedidos médicos', href: '/pedidos-medicos' },
     ],
   },
   {
@@ -114,10 +114,44 @@ function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (hre
 
 export function TopNavbar() {
   const navigate = useNavigate();
-  const { perfil, signOut } = useAuth();
+  const { perfil, centroId, signOut } = useAuth();
+  const { get } = useCentroConfig(centroId);
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const rol = perfil?.rol_nombre ?? 'admin';
+  const esAdmin = rol === 'admin' || !perfil?.rol_nombre;
+  const esSecretario = rol === 'secretario';
+  const esProfesional = rol === 'profesional';
+
+  const navGroups = useMemo(() => {
+    return BASE_NAV_GROUPS
+      .map(group => {
+        let items = group.items;
+
+        // Profesional: no ve gestión de profesionales ni servicios
+        if (esProfesional) {
+          items = items.filter(i => i.href !== '/profesionales' && i.href !== '/servicios');
+        }
+
+        // Secretario: filtra según config
+        if (esSecretario) {
+          const verCaja = get('secretario_ver_caja') !== 'false';
+          const verLiquidacion = get('secretario_ver_liquidacion') !== 'false';
+          if (!verCaja && group.label === 'Caja') return null;
+          if (!verLiquidacion) {
+            items = items.filter(i => i.href !== '/liquidacion-os');
+          }
+        }
+
+        if (items.length === 0) return null;
+        return { ...group, items };
+      })
+      .filter(Boolean) as NavGroup[];
+  }, [rol, esSecretario, esProfesional, get]);
+
+  const mostrarConfig = esAdmin;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -156,20 +190,22 @@ export function TopNavbar() {
         >
           Panel principal
         </button>
-        {NAV_GROUPS.map((group, i) => (
+        {navGroups.map((group, i) => (
           <DropdownMenu key={i} group={group} onNavigate={navigate} />
         ))}
       </nav>
 
       {/* Right */}
       <div className="flex items-center gap-0.5 px-2 shrink-0 border-l border-white/20">
-        <button
-          onClick={() => navigate('/configuracion')}
-          className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-          title="Configuración"
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
+        {mostrarConfig && (
+          <button
+            onClick={() => navigate('/configuracion')}
+            className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            title="Configuración"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         <div className="relative" ref={userMenuRef}>
           <button
@@ -188,12 +224,14 @@ export function TopNavbar() {
                 <p className="text-[13px] font-medium text-zinc-800 dark:text-zinc-100">{perfil?.nombre}</p>
                 <p className="text-[11px] text-zinc-400 truncate mt-0.5">{perfil?.mail}</p>
               </div>
-              <button
-                onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left"
-              >
-                <Settings className="w-3.5 h-3.5 opacity-60" /> Configuración
-              </button>
+              {mostrarConfig && (
+                <button
+                  onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left"
+                >
+                  <Settings className="w-3.5 h-3.5 opacity-60" /> Configuración
+                </button>
+              )}
               <button
                 onClick={() => { setUserMenuOpen(false); signOut(); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"

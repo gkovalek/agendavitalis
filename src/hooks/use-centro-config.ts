@@ -13,6 +13,11 @@ export interface CentroConfig {
   centro_nombre: string;
   centro_telefono: string;
   centro_direccion: string;
+  centro_ciudad: string;
+  centro_mail: string;
+  centro_web: string;
+  secretario_ver_caja: string;
+  secretario_ver_liquidacion: string;
 }
 
 const DEFAULTS: CentroConfig = {
@@ -25,6 +30,11 @@ const DEFAULTS: CentroConfig = {
   centro_nombre: '',
   centro_telefono: '',
   centro_direccion: '',
+  centro_ciudad: '',
+  centro_mail: '',
+  centro_web: '',
+  secretario_ver_caja: 'true',
+  secretario_ver_liquidacion: 'true',
 };
 
 export function useCentroConfig(centroId: string | null) {
