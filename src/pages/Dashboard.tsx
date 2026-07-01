@@ -89,9 +89,13 @@ export default function Dashboard() {
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [pcsRecords, setPcsRecords] = useState<PCSRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProfId, setSelectedProfId] = useState<string>(
-    perfil?.profesional_id ?? 'todos'
-  );
+  const [selectedProfId, setSelectedProfId] = useState<string>('todos');
+
+  useEffect(() => {
+    if (esProfesional && perfil?.profesional_id) {
+      setSelectedProfId(perfil.profesional_id);
+    }
+  }, [esProfesional, perfil?.profesional_id]);
   const [newTurnoSlot, setNewTurnoSlot] = useState<{
     fecha: string; hora: string; profesional_id: string; profesional_nombre: string; agenda_id?: string;
   } | null>(null);
