@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, Settings, Clock, MessageSquare, CreditCard, AlertTriangle, Copy, Check } from 'lucide-react';
+import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SQL_SCRIPT = `-- Ejecutar en Supabase SQL Editor para habilitar configuración por centro
@@ -102,12 +102,12 @@ export default function Configuracion() {
         centro_nombre: get('centro_nombre'),
         centro_telefono: get('centro_telefono'),
         centro_direccion: get('centro_direccion'),
+        centro_ciudad: get('centro_ciudad'),
+        centro_mail: get('centro_mail'),
+        centro_web: get('centro_web'),
         intervalo_turnos: String(getNumber('intervalo_turnos')),
         hora_inicio_agenda: get('hora_inicio_agenda') || '08:00',
         hora_fin_agenda: get('hora_fin_agenda') || '20:00',
-        n8n_webhook_recordatorios: get('n8n_webhook_recordatorios'),
-        mp_access_token: get('mp_access_token'),
-        mp_public_key: get('mp_public_key'),
       });
       setInitialized(true);
     }
@@ -179,13 +179,24 @@ export default function Configuracion() {
             <Input value={vals.centro_telefono ?? ''} onChange={e => setVals(v => ({ ...v, centro_telefono: e.target.value }))} placeholder="Ej: +54 11 4567-8900" />
           </Field>
           <Field label="Dirección">
-            <Input value={vals.centro_direccion ?? ''} onChange={e => setVals(v => ({ ...v, centro_direccion: e.target.value }))} placeholder="Ej: Av. Corrientes 1234, CABA" />
+            <Input value={vals.centro_direccion ?? ''} onChange={e => setVals(v => ({ ...v, centro_direccion: e.target.value }))} placeholder="Ej: Av. Corrientes 1234" />
           </Field>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label={<span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Ciudad</span>}>
+            <Input value={vals.centro_ciudad ?? ''} onChange={e => setVals(v => ({ ...v, centro_ciudad: e.target.value }))} placeholder="Ej: Resistencia, Chaco" />
+          </Field>
+          <Field label={<span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Mail institucional (opcional)</span>}>
+            <Input type="email" value={vals.centro_mail ?? ''} onChange={e => setVals(v => ({ ...v, centro_mail: e.target.value }))} placeholder="Ej: info@kineplus.com.ar" />
+          </Field>
+        </div>
+        <Field label={<span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Sitio web (opcional)</span>}>
+          <Input value={vals.centro_web ?? ''} onChange={e => setVals(v => ({ ...v, centro_web: e.target.value }))} placeholder="Ej: https://kineplus.com.ar" />
+        </Field>
         <Button
           size="sm"
           disabled={saving === 'centro' || !tableExists}
-          onClick={() => handleSave('centro', ['centro_nombre', 'centro_telefono', 'centro_direccion'])}
+          onClick={() => handleSave('centro', ['centro_nombre', 'centro_telefono', 'centro_direccion', 'centro_ciudad', 'centro_mail', 'centro_web'])}
         >
           {saving === 'centro' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
@@ -227,67 +238,6 @@ export default function Configuracion() {
           onClick={() => handleSave('agenda', ['intervalo_turnos', 'hora_inicio_agenda', 'hora_fin_agenda'])}
         >
           {saving === 'agenda' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          <Save className="w-4 h-4 mr-2" /> Guardar
-        </Button>
-      </Section>
-
-      {/* n8n / Recordatorios */}
-      <Section
-        title="Recordatorios (n8n + WhatsApp)"
-        description="URL del webhook de n8n que recibe los turnos para enviar recordatorios por WhatsApp"
-        icon={<MessageSquare className="h-4 w-4 text-muted-foreground" />}
-      >
-        <Field label="Webhook URL">
-          <Input
-            value={vals.n8n_webhook_recordatorios ?? ''}
-            onChange={e => setVals(v => ({ ...v, n8n_webhook_recordatorios: e.target.value }))}
-            placeholder="https://tu-n8n.app/webhook/recordatorios"
-            className="font-mono text-sm"
-          />
-        </Field>
-        <p className="text-xs text-muted-foreground">
-          El módulo de Recordatorios enviará un POST a esta URL con la lista de turnos del día siguiente.
-        </p>
-        <Button
-          size="sm"
-          disabled={saving === 'n8n' || !tableExists}
-          onClick={() => handleSave('n8n', ['n8n_webhook_recordatorios'])}
-        >
-          {saving === 'n8n' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          <Save className="w-4 h-4 mr-2" /> Guardar
-        </Button>
-      </Section>
-
-      {/* Mercado Pago */}
-      <Section
-        title="Mercado Pago"
-        description="Credenciales para generar links de pago al momento de reservar un turno"
-        icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
-      >
-        <div className="flex items-start gap-2 mb-2 p-3 rounded-md bg-yellow-50 border border-yellow-200">
-          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
-          <div className="text-xs text-yellow-800">
-            <p className="font-semibold">El Access Token nunca se guarda en el navegador</p>
-            <p className="mt-1">
-              Por seguridad, el token privado de Mercado Pago debe almacenarse como Edge Function Secret en Lovable Cloud / Supabase
-              y usarse únicamente desde el servidor. Sólo la Public Key puede vivir en el cliente.
-            </p>
-          </div>
-        </div>
-        <Field label="Public Key">
-          <Input
-            value={vals.mp_public_key ?? ''}
-            onChange={e => setVals(v => ({ ...v, mp_public_key: e.target.value }))}
-            placeholder="APP_USR-..."
-            className="font-mono text-sm"
-          />
-        </Field>
-        <Button
-          size="sm"
-          disabled={saving === 'mp' || !tableExists}
-          onClick={() => handleSave('mp', ['mp_public_key'])}
-        >
-          {saving === 'mp' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </Section>
