@@ -62,9 +62,9 @@ function ProfesionField({
                 <Info className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p><strong>Generador:</strong> médico que emite pedidos médicos (p. ej. clínico, traumatólogo). Define las sesiones autorizadas.</p>
-              <p className="mt-1"><strong>Receptor:</strong> profesional que ejecuta las sesiones (p. ej. kinesiólogo, fisioterapeuta). Se factura según el pedido médico.</p>
+            <TooltipContent className="max-w-md">
+              <p className="text-sm leading-relaxed"><strong>Generador:</strong> médico que emite pedidos médicos (p. ej. clínico, traumatólogo). Define las sesiones autorizadas.</p>
+              <p className="mt-1 text-sm leading-relaxed"><strong>Receptor:</strong> profesional que ejecuta las sesiones (p. ej. kinesiólogo, fisioterapeuta). Se factura según el pedido médico.</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
