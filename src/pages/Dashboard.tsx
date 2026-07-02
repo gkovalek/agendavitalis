@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { TURNO_ESTADOS, TurnoEstado, normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +7,7 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, ChevronRight, Plus, Users, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users, AlertTriangle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
@@ -82,6 +83,7 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
   const { getNumber, loading: configLoading } = useCentroConfig(centroId);
@@ -452,7 +454,7 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   return (
-    <div className="flex h-[calc(100vh-40px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-48px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
       <aside className="w-[300px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
         {!esProfesional && (
@@ -536,7 +538,7 @@ export default function Dashboard() {
                 return (
                   <button key={i} onClick={() => setSelectedDate(d)}
                     className={`w-7 h-7 rounded-full text-[12px] font-medium transition-colors
-                      ${isSelected ? 'bg-[#0F6E56] text-white' : isToday ? 'border border-[#0F6E56] text-[#0F6E56]' : 'text-muted-foreground hover:bg-muted'}`}>
+                      ${isSelected ? 'bg-primary text-primary-foreground' : isToday ? 'border border-primary text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
                     {d.getDate()}
                   </button>
                 );
@@ -545,7 +547,7 @@ export default function Dashboard() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Button size="sm" className="h-8 bg-[#0F6E56] hover:bg-[#0a5c48] text-white text-[12px] gap-1"
+            <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1"
               onClick={() => {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
                 const prof = profesionales.find(p => p.id === profId);
@@ -560,10 +562,36 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-full"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            <div className="p-4 animate-pulse">
+              <div className="flex gap-2 mb-3 border-b pb-2">
+                <div className="w-14 h-5 bg-muted rounded" />
+                {[1,2,3,4].map(i => <div key={i} className="flex-1 h-5 bg-muted rounded" />)}
+              </div>
+              {[...Array(10)].map((_, i) => (
+                <div key={i} className="flex gap-2 border-b py-1.5">
+                  <div className="w-14 h-4 bg-muted/60 rounded" />
+                  {[1,2,3,4].map(j => (
+                    <div key={j} className="flex-1 min-h-[40px]">
+                      {(i === 1 && j === 2) || (i === 3 && j === 0) || (i === 5 && j === 3) ? (
+                        <div className="h-10 bg-muted rounded" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           ) : profesionales.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              No hay profesionales activos. Agregá uno desde el menú Agendas → Profesionales.
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-8">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <Users className="h-7 w-7 text-muted-foreground/40" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Sin profesionales activos</p>
+                <p className="text-sm text-muted-foreground mt-1">Agregá un profesional para comenzar a gestionar turnos</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => navigate('/profesionales')}>
+                Ir a Profesionales
+              </Button>
             </div>
           ) : timeAxis.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
@@ -593,8 +621,8 @@ export default function Dashboard() {
                         <div className="flex flex-col items-center gap-0.5">
                           <span>{p.nombre} {p.apellido}</span>
                           {(capacityMap[p.id] ?? 1) > 1 && (
-                            <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-normal">
-                              <Users className="h-2.5 w-2.5" />{capacityMap[p.id]} lugares
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground font-normal">
+                              <Users className="h-3 w-3" />{capacityMap[p.id]} lugares
                             </span>
                           )}
                         </div>
@@ -618,9 +646,9 @@ export default function Dashboard() {
                         const capacity = capacityMap[p.id] ?? 1;
                         if (nolaboral) return (
                           <td key={p.id} title="No laboral"
-                            className="p-1 align-top min-h-[36px] bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed">
+                            className="p-1 align-top min-h-[36px] bg-muted/60 cursor-not-allowed">
                             <div className="h-full flex items-center justify-center">
-                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 select-none">No laboral</span>
+                              <span className="text-xs text-muted-foreground/50 select-none">No laboral</span>
                             </div>
                           </td>
                         );
@@ -634,29 +662,32 @@ export default function Dashboard() {
                                 const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                 return (
                                   <div key={t.id}
-                                    className="relative rounded px-1.5 py-1 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
-                                    style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
+                                    className="relative rounded px-2 py-1.5 text-xs border-l-[3px] cursor-pointer hover:brightness-95"
+                                    style={{ borderLeftColor: est.color, backgroundColor: `${est.color}18` }}
                                     onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                     onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: p.id, hora }); }}>
-                                    <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
-                                      {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
-                                      {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                    <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                                      {t.tiene_pago && <span className="text-[11px] font-bold text-emerald-600">$</span>}
+                                      {t.sesiones_total && <span className="text-[11px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
                                     </div>
-                                    <p className="font-semibold text-foreground truncate leading-tight pr-7">
+                                    <p className="font-semibold text-foreground truncate leading-tight pr-8">
                                       {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                     </p>
-                                    <p className="leading-tight truncate" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
+                                    {t.servicio?.nombre && (
+                                      <p className="text-[11px] leading-tight text-muted-foreground truncate">{t.servicio.nombre}</p>
+                                    )}
+                                    <p className="text-[11px] leading-tight font-medium" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                   </div>
                                 );
                               })}
                               {capacity > 1 && slotTurnos.length > 0 && (
                                 <div className="flex items-center gap-1">
-                                  <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                  <p className={`text-xs px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
                                     {slotTurnos.length}/{capacity}
                                   </p>
                                   {!full && available && (
                                     <button onClick={e => { e.stopPropagation(); handleSlotClick(p.id, hora); }}
-                                      className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none">
+                                      className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/30 leading-none">
                                       + turno
                                     </button>
                                   )}
@@ -707,9 +738,9 @@ export default function Dashboard() {
                             const available = isAgendaSlotAvailable(selectedProfId, a.id, hora);
                             if (nolaboral) return (
                               <td key={a.id} title="No laboral"
-                                className="p-1 align-top min-h-[48px] bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed">
+                                className="p-1 align-top min-h-[48px] bg-muted/60 cursor-not-allowed">
                                 <div className="h-full flex items-center justify-center">
-                                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 select-none">No laboral</span>
+                                  <span className="text-xs text-muted-foreground/50 select-none">No laboral</span>
                                 </div>
                               </td>
                             );
@@ -723,30 +754,32 @@ export default function Dashboard() {
                                     const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                     return (
                                       <div key={t.id}
-                                        className="relative rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
-                                        style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
+                                        className="relative rounded px-2 py-1.5 text-xs border-l-[3px] cursor-pointer hover:brightness-95"
+                                        style={{ borderLeftColor: est.color, backgroundColor: `${est.color}18` }}
                                         onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora, agendaId: a.id }); }}>
-                                        <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
-                                          {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
-                                          {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                        <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                                          {t.tiene_pago && <span className="text-[11px] font-bold text-emerald-600">$</span>}
+                                          {t.sesiones_total && <span className="text-[11px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
                                         </div>
                                         <p className="font-semibold text-foreground leading-tight pr-8">
                                           {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}
                                         </p>
-                                        <p className="text-[10px] leading-tight text-muted-foreground">{t.servicio?.nombre}</p>
-                                        <p className="leading-tight mt-0.5" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
+                                        {t.servicio?.nombre && (
+                                          <p className="text-[11px] leading-tight text-muted-foreground">{t.servicio.nombre}</p>
+                                        )}
+                                        <p className="text-[11px] leading-tight font-medium mt-0.5" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                       </div>
                                     );
                                   })}
                                   {cap > 1 && (
                                     <div className="flex items-center gap-1">
-                                      <p className={`text-[10px] px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                      <p className={`text-xs px-1 font-medium ${full ? 'text-destructive' : 'text-muted-foreground'}`}>
                                         {slotTurnos.length}/{cap} {full ? '· completo' : '· disponible'}
                                       </p>
                                       {!full && available && slotTurnos.length > 0 && (
                                         <button onClick={e => { e.stopPropagation(); handleAgendaSlotClick(a.id, hora); }}
-                                          className="text-[10px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 leading-none">
+                                          className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-900/30 leading-none">
                                           + turno
                                         </button>
                                       )}
@@ -764,16 +797,16 @@ export default function Dashboard() {
                                   const est = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
                                   return (
                                     <div key={t.id}
-                                      className="relative rounded px-2 py-1.5 text-[11px] border-l-[3px] cursor-pointer hover:brightness-95"
-                                      style={{ borderLeftColor: est.color, backgroundColor: `${est.color}22` }}
+                                      className="relative rounded px-2 py-1.5 text-xs border-l-[3px] cursor-pointer hover:brightness-95"
+                                      style={{ borderLeftColor: est.color, backgroundColor: `${est.color}18` }}
                                       onClick={e => { e.stopPropagation(); setSelectedTurno(t); }}
                                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, turno: t, profId: selectedProfId, hora }); }}>
-                                      <div className="absolute top-0.5 right-1 flex items-center gap-0.5">
-                                        {t.tiene_pago && <span className="text-[9px] font-bold text-emerald-600">$</span>}
-                                        {t.sesiones_total && <span className="text-[9px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
+                                      <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                                        {t.tiene_pago && <span className="text-[11px] font-bold text-emerald-600">$</span>}
+                                        {t.sesiones_total && <span className="text-[11px] font-medium text-muted-foreground">{t.sesion_num}/{t.sesiones_total}</span>}
                                       </div>
-                                      <p className="font-semibold pr-8">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
-                                      <p style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
+                                      <p className="font-semibold text-foreground pr-8 leading-tight">{t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : 'Paciente'}</p>
+                                      <p className="text-[11px] font-medium leading-tight" style={{ color: est.color }}>{t.estado === 'cancelado' ? getCancelLabel(t.motivo_cancelacion) : est.label}</p>
                                     </div>
                                   );
                                 })}
@@ -804,7 +837,7 @@ export default function Dashboard() {
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={() => { setPastWarningOpen(false); setPendingSlot(null); }}>Cancelar</Button>
-            <Button size="sm" className="bg-[#0F6E56] hover:bg-[#0a5c48] text-white" onClick={() => { setPastWarningOpen(false); setNewTurnoSlot(pendingSlot); setPendingSlot(null); }}>
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setPastWarningOpen(false); setNewTurnoSlot(pendingSlot); setPendingSlot(null); }}>
               Continuar igual
             </Button>
           </div>
