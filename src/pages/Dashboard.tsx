@@ -548,11 +548,7 @@ export default function Dashboard() {
               </Button>
             </div>
             <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1"
-              onClick={() => {
-                const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
-                const prof = profesionales.find(p => p.id === profId);
-                setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendasDelProf[0]?.id });
-              }}
+              onClick={() => setNewTurnoSlot({ fecha: '', hora: '', profesional_id: '', profesional_nombre: '' })}
             >
               <Plus className="h-3.5 w-3.5" /> Nuevo turno
             </Button>

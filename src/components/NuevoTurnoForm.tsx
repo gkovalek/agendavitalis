@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Search, X, UserPlus, ChevronRight, Eye, Plus, FileText } from 'lucide-react';
+import { Loader2, Save, Search, UserPlus, ChevronRight, Eye, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
@@ -18,10 +18,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 
 interface Props {
-  fecha: string;
-  hora: string;
-  profesionalId: string;
-  profesionalNombre: string;
+  fecha?: string;
+  hora?: string;
+  profesionalId?: string;
+  profesionalNombre?: string;
   preselectedAgendaId?: string;
   onSuccess: () => void;
   onCancel: () => void;
@@ -44,6 +44,12 @@ interface Servicio {
   duracion_minutos: number;
 }
 
+interface ProfesionalOption {
+  id: string;
+  nombre: string;
+  apellido: string;
+}
+
 interface Tratamiento {
   id: string;
   servicio_id: string;
@@ -63,11 +69,19 @@ interface TurnoHistorial {
 }
 
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
+type Step = 'fecha' | 'profesional' | 'servicio' | 'paciente';
 
-export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
+export function NuevoTurnoForm({ fecha = '', hora = '', profesionalId = '', profesionalNombre = '', preselectedAgendaId, onSuccess, onCancel }: Props) {
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedFecha, setSelectedFecha] = useState(fecha || todayStr);
+  const [selectedHora, setSelectedHora] = useState(hora || '');
+  const [selectedProfesionalId, setSelectedProfesionalId] = useState(profesionalId || '');
+  const [profesionales, setProfesionales] = useState<ProfesionalOption[]>([]);
+  const [currentStep, setCurrentStep] = useState<Step>(fecha && hora && profesionalId ? 'servicio' : 'fecha');
 
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,14 +121,26 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const [historial, setHistorial] = useState<TurnoHistorial[]>([]);
   const [loadingTabs, setLoadingTabs] = useState(false);
 
+  useEffect(() => {
+    if (!centroId) return;
+    supabase
+      .from('profesionales')
+      .select('id, nombre, apellido')
+      .eq('centro_id', centroId)
+      .eq('activo', true)
+      .order('apellido')
+      .then(({ data }) => setProfesionales((data as ProfesionalOption[]) ?? []));
+  }, [centroId]);
+
   // Cargar agendas del profesional (vía PCS → agendas)
   useEffect(() => {
-    if (!centroId || !profesionalId) return;
+    setAgendas([]);
+    if (!centroId || !selectedProfesionalId) return;
     supabase
       .from('profesional_centro_servicio')
       .select('agenda:agendas(id, nombre)')
       .eq('centro_id', centroId)
-      .eq('profesional_id', profesionalId)
+      .eq('profesional_id', selectedProfesionalId)
       .eq('activo', true)
       .then(({ data }) => {
         const seen = new Set<string>();
@@ -129,36 +155,30 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         const pre = preselectedAgendaId && unique.find(a => a.id === preselectedAgendaId);
         if (pre) setAgendaId(pre.id);
         else if (unique.length === 1) setAgendaId(unique[0].id);
+        else if (agendaId && !unique.some(a => a.id === agendaId)) setAgendaId('');
       });
-  }, [centroId, profesionalId]);
+  }, [centroId, selectedProfesionalId, preselectedAgendaId]);
 
   // Cargar servicios del profesional filtrados por agenda Y por día de la semana del turno
   useEffect(() => {
     setServicioId('');
     setServicios([]);
-    if (!agendaId || !centroId || !profesionalId) return;
+    if (!centroId || !selectedProfesionalId || !selectedFecha) return;
 
-    const diaSemana = new Date(fecha + 'T00:00:00').getDay(); // 0=Dom, 1=Lun...
-    console.log('[NuevoTurno DEBUG] Buscando servicios', { centroId, profesionalId, agendaId, fecha, diaSemana });
+    const diaSemana = new Date(selectedFecha + 'T00:00:00').getDay(); // 0=Dom, 1=Lun...
 
     supabase
       .from('profesional_centro_servicio')
       .select('id, servicio_id, activo, servicios(id, nombre, duracion_minutos, agenda_id)')
-      .eq('profesional_id', profesionalId)
+      .eq('profesional_id', selectedProfesionalId)
       .eq('centro_id', centroId)
       .eq('activo', true)
       .then(async ({ data: pcsData, error: pcsError }) => {
-        console.log('[NuevoTurno DEBUG] PCS crudo (activo=true) para este profesional/centro:', pcsData, 'error:', pcsError);
+        if (pcsError) return;
         const pcsForAgenda = (pcsData ?? []).filter((r: any) =>
-          r.servicios && r.servicios.agenda_id === agendaId && r.servicio_id
+          r.servicios && (!agendaId || r.servicios.agenda_id === agendaId) && r.servicio_id
         );
-        console.log('[NuevoTurno DEBUG] PCS filtrado por agendaId =', agendaId, '→', pcsForAgenda);
-        if (pcsForAgenda.length === 0) {
-          console.warn('[NuevoTurno DEBUG] Ningún PCS coincide con agenda_id. agenda_id de cada servicio:',
-            (pcsData ?? []).map((r: any) => ({ pcs_id: r.id, servicio: r.servicios?.nombre, agenda_id_servicio: r.servicios?.agenda_id })));
-          toast({ title: 'Agenda sin servicios', description: 'Este profesional no tiene servicios asignados para esta agenda.', variant: 'destructive' });
-          return;
-        }
+        if (pcsForAgenda.length === 0) return;
 
         // Filtrar por día de la semana usando pcs_horario_dia
         const pcsIds = pcsForAgenda.map((r: any) => r.id);
@@ -168,7 +188,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
           .in('pcs_id', pcsIds)
           .eq('dia_semana', diaSemana)
           .eq('activo', true);
-        console.log('[NuevoTurno DEBUG] pcs_horario_dia para dia_semana =', diaSemana, '→', horData, 'error:', horError);
+        if (horError) return;
 
         const pcsIdsConHorario = new Set((horData ?? []).map((h: any) => h.pcs_id));
 
@@ -182,18 +202,10 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
           .sort((a: Servicio, b: Servicio) => a.nombre.localeCompare(b.nombre));
 
         const unique = list.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
-        console.log('[NuevoTurno DEBUG] Servicios finales a mostrar:', unique);
         setServicios(unique);
         if (unique.length === 1) setServicioId(unique[0].id);
-        if (unique.length === 0) {
-          toast({
-            title: 'Sin servicios para este día',
-            description: 'El profesional no tiene servicios configurados para el día seleccionado.',
-            variant: 'destructive',
-          });
-        }
       });
-  }, [agendaId, centroId, profesionalId, fecha]);
+  }, [agendaId, centroId, selectedProfesionalId, selectedFecha]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (q.length < 3 || !centroId) { setSearchResults([]); setShowResults(false); return; }
@@ -270,7 +282,13 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   };
 
   const selectedServicio = servicios.find(s => s.id === servicioId);
-  const horaFin = selectedServicio ? calcEndTime(hora, selectedServicio.duracion_minutos) : '';
+  const horaFin = selectedServicio && selectedHora ? calcEndTime(selectedHora, selectedServicio.duracion_minutos) : '';
+  const selectedProfesional = profesionales.find(p => p.id === selectedProfesionalId);
+  const selectedProfesionalNombre = selectedProfesional ? `${selectedProfesional.nombre} ${selectedProfesional.apellido}` : profesionalNombre;
+  const selectedAgenda = agendas.find(a => a.id === agendaId);
+  const canContinueFecha = !!selectedFecha && !!selectedHora;
+  const canContinueProfesional = !!selectedProfesionalId;
+  const canContinueServicio = !!servicioId;
 
   const montoTotal = formaPago === 'efectivo' ? montoEfectivo
     : formaPago === 'transferencia' ? montoTransferencia
@@ -285,8 +303,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const selectedTratamiento = tratamientos.find(t => t.id === tratamientoId);
 
   const handleSave = async () => {
-    if (!selectedPaciente || !servicioId || !centroId) {
-      toast({ title: 'Error', description: 'Seleccioná paciente y servicio', variant: 'destructive' });
+    if (!selectedPaciente || !servicioId || !centroId || !selectedFecha || !selectedHora || !selectedProfesionalId) {
+      toast({ title: 'Error', description: 'Completá fecha, hora, profesional, servicio y paciente', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -296,13 +314,13 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (esTratamiento && nuevoTratamiento) {
       const { data: trat, error: tErr } = await supabase.from('tratamientos').insert({
         paciente_id: selectedPaciente.id,
-        profesional_id: profesionalId,
+        profesional_id: selectedProfesionalId,
         servicio_id: servicioId,
         total_sesiones: totalSesiones,
         sesiones_consumidas: 0,
         sesiones_restantes: totalSesiones,
         estado: 'activo',
-        fecha_inicio: fecha,
+        fecha_inicio: selectedFecha,
         centro_id: centroId,
       }).select('id').single();
       if (tErr || !trat) {
@@ -316,8 +334,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     }
 
     const turnoPayload = {
-      fecha, hora_inicio: hora, hora_fin: horaFin || hora,
-      profesional_id: profesionalId, paciente_id: selectedPaciente.id,
+      fecha: selectedFecha, hora_inicio: selectedHora, hora_fin: horaFin || selectedHora,
+      profesional_id: selectedProfesionalId, paciente_id: selectedPaciente.id,
       servicio_id: servicioId, estado: estadoInicial, tratamiento_id: finalTratamientoId,
       forma_pago: formaPago,
       centro_id: centroId,
@@ -325,7 +343,6 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
       updated_by_name: perfil?.nombre ?? null,
       updated_at: new Date().toISOString(),
     };
-    console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
     const { data: newTurno, error: turnoErr } = await supabase.from('turnos').insert(turnoPayload).select('id').single();
 
     if (turnoErr || !newTurno) {
@@ -340,9 +357,9 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
         turno_id: newTurno.id,
         centro_id: centroId,
         paciente_id: selectedPaciente.id,
-        profesional_id: profesionalId,
+        profesional_id: selectedProfesionalId,
         equipo_id: null,
-        fecha,
+        fecha: selectedFecha,
         monto_efectivo: formaPago === 'efectivo' || formaPago === 'mixto' ? montoEfectivo : 0,
         monto_transferencia: formaPago === 'transferencia' || formaPago === 'mixto' ? montoTransferencia : 0,
         monto_prepaga: formaPago === 'obra_social' || formaPago === 'mixto' ? montoPrepaga : 0,
@@ -351,7 +368,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     }
 
     setSaving(false);
-    toast({ title: 'Turno creado', description: `${selectedPaciente.apellido}, ${selectedPaciente.nombre} — ${fecha} ${hora}` });
+    toast({ title: 'Turno creado', description: `${selectedPaciente.apellido}, ${selectedPaciente.nombre} — ${selectedFecha} ${selectedHora}` });
     onSuccess();
   };
 
@@ -359,11 +376,122 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
   const finalizados = historial.filter(t => t.estado === 'finalizado').length;
   const cancelados = historial.filter(t => t.estado === 'cancelado').length;
 
+  const steps: { key: Step; label: string }[] = [
+    { key: 'fecha', label: 'Día y hora' },
+    { key: 'profesional', label: 'Profesional' },
+    { key: 'servicio', label: 'Servicio' },
+    { key: 'paciente', label: 'Paciente' },
+  ];
+  const stepIndex = steps.findIndex(s => s.key === currentStep);
+
+  const StepHeader = (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      {steps.map((s, i) => (
+        <div key={s.key} className="flex items-center gap-2">
+          <span className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-medium ${i <= stepIndex ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground'}`}>{i + 1}</span>
+          <span className={i === stepIndex ? 'font-medium text-foreground' : ''}>{s.label}</span>
+          {i < steps.length - 1 && <ChevronRight className="h-3 w-3" />}
+        </div>
+      ))}
+    </div>
+  );
+
+  if (currentStep !== 'paciente') {
+    return (
+      <div className="space-y-4">
+        {StepHeader}
+
+        {currentStep === 'fecha' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Día *</Label>
+                <Input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Hora *</Label>
+                <Input type="time" value={selectedHora} onChange={e => setSelectedHora(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+              <Button onClick={() => setCurrentStep('profesional')} disabled={!canContinueFecha}>Continuar</Button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'profesional' && (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              {selectedFecha} — <strong>{selectedHora}</strong>
+            </div>
+            <div className="space-y-1">
+              <Label>Profesional *</Label>
+              <Select value={selectedProfesionalId} onValueChange={v => { setSelectedProfesionalId(v); setAgendaId(''); setServicioId(''); }}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar profesional" /></SelectTrigger>
+                <SelectContent>
+                  {profesionales.map(p => <SelectItem key={p.id} value={p.id}>{p.apellido}, {p.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-between gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCurrentStep('fecha')}>Volver</Button>
+              <Button onClick={() => setCurrentStep('servicio')} disabled={!canContinueProfesional}>Continuar</Button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'servicio' && (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              {selectedFecha} — <strong>{selectedHora}</strong><br />
+              <span className="text-foreground">{selectedProfesionalNombre || 'Profesional seleccionado'}</span>
+            </div>
+            {agendas.length > 1 && (
+              <div className="space-y-1">
+                <Label>Agenda</Label>
+                <Select value={agendaId || '__all'} onValueChange={v => setAgendaId(v === '__all' ? '' : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all">Todas las agendas</SelectItem>
+                    {agendas.map(a => (<SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {agendas.length === 1 && (
+              <div className="rounded-md border bg-secondary/40 p-3 text-sm">
+                Agenda: <strong>{agendas[0].nombre}</strong>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>Servicio *</Label>
+              <Select value={servicioId} onValueChange={v => { setServicioId(v); setTratamientoId(''); setNuevoTratamiento(false); }}>
+                <SelectTrigger><SelectValue placeholder={servicios.length === 0 ? 'Sin servicios disponibles para ese día' : 'Seleccionar servicio'} /></SelectTrigger>
+                <SelectContent>
+                  {servicios.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre} ({s.duracion_minutos} min)</SelectItem>))}
+                </SelectContent>
+              </Select>
+              {horaFin && <p className="text-xs text-muted-foreground">Finaliza a las {horaFin}</p>}
+              {servicios.length === 0 && <p className="text-xs text-muted-foreground">No hay servicios activos para este profesional en el día seleccionado.</p>}
+            </div>
+            <div className="flex justify-between gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCurrentStep('profesional')}>Volver</Button>
+              <Button onClick={() => setCurrentStep('paciente')} disabled={!canContinueServicio}>Continuar</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {StepHeader}
       <div className="border-b pb-3">
-        <p className="text-sm text-muted-foreground">{fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
-        <p className="text-sm font-medium text-foreground">{profesionalNombre}</p>
+        <p className="text-sm text-muted-foreground">{selectedFecha} — <strong>{selectedHora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
+        <p className="text-sm font-medium text-foreground">{selectedProfesionalNombre}</p>
+        <p className="text-sm text-muted-foreground">{selectedServicio?.nombre}{selectedAgenda ? ` · ${selectedAgenda.nombre}` : ''}</p>
       </div>
 
       {!selectedPaciente ? (
@@ -393,6 +521,8 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
             className="text-sm text-primary hover:underline flex items-center gap-1">
             <UserPlus className="h-3.5 w-3.5" /> + Paciente no encontrado, crear nuevo
           </button>
+
+          <Button variant="outline" size="sm" onClick={() => setCurrentStep('servicio')}>Volver</Button>
 
           {showNewPatientForm && (
             <Card className="border-primary/30">
@@ -426,7 +556,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                   {selectedPaciente.prepaga && <> — <span className="text-primary">{(selectedPaciente.prepaga as any).nombre}</span></>}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => { setSelectedPaciente(null); setSearchQuery(''); }}>Cambiar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedPaciente(null); setSearchQuery(''); }}>Cambiar</Button>
             </CardContent>
           </Card>
 
@@ -439,30 +569,12 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
             </TabsList>
 
             <TabsContent value="turno" className="space-y-4 mt-4">
-              {/* Agenda */}
-              <div className="space-y-1">
-                <Label>Agenda *</Label>
-                <Select value={agendaId} onValueChange={setAgendaId}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar agenda" /></SelectTrigger>
-                  <SelectContent>
-                    {agendas.map(a => (<SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <p><strong>Día y hora:</strong> {selectedFecha} — {selectedHora}{horaFin ? ` a ${horaFin}` : ''}</p>
+                <p><strong>Profesional:</strong> {selectedProfesionalNombre}</p>
+                <p><strong>Servicio:</strong> {selectedServicio?.nombre ?? '—'}{selectedAgenda ? ` · ${selectedAgenda.nombre}` : ''}</p>
+                <Button variant="ghost" size="sm" className="mt-2 px-0" onClick={() => setCurrentStep('servicio')}>Cambiar servicio</Button>
               </div>
-
-              {/* Servicio (variante de facturación) */}
-              {agendaId && (
-                <div className="space-y-1">
-                  <Label>Servicio *</Label>
-                  <Select value={servicioId} onValueChange={setServicioId}>
-                    <SelectTrigger><SelectValue placeholder={servicios.length === 0 ? 'Sin servicios para esta agenda' : 'Seleccionar servicio'} /></SelectTrigger>
-                    <SelectContent>
-                      {servicios.map(s => (<SelectItem key={s.id} value={s.id}>{s.nombre} ({s.duracion_minutos} min)</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                  {horaFin && <p className="text-xs text-muted-foreground">Finaliza a las {horaFin}</p>}
-                </div>
-              )}
 
               <div className="flex items-center gap-2"><Switch checked={esTratamiento} onCheckedChange={setEsTratamiento} /><Label>¿Es parte de un tratamiento?</Label></div>
 
@@ -517,7 +629,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} disabled={saving || (!!agendaId && servicios.length === 0)}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Turno</Button>
+                <Button onClick={handleSave} disabled={saving || !selectedFecha || !selectedHora || !selectedProfesionalId || !servicioId}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Guardar Turno</Button>
                 <Button variant="outline" onClick={onCancel}>Cancelar</Button>
               </div>
             </TabsContent>
