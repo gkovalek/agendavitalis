@@ -139,30 +139,36 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     if (!agendaId || !centroId || !profesionalId) return;
 
     const diaSemana = new Date(fecha + 'T00:00:00').getDay(); // 0=Dom, 1=Lun...
+    console.log('[NuevoTurno DEBUG] Buscando servicios', { centroId, profesionalId, agendaId, fecha, diaSemana });
 
     supabase
       .from('profesional_centro_servicio')
-      .select('id, servicio_id, servicios(id, nombre, duracion_minutos, agenda_id)')
+      .select('id, servicio_id, activo, servicios(id, nombre, duracion_minutos, agenda_id)')
       .eq('profesional_id', profesionalId)
       .eq('centro_id', centroId)
       .eq('activo', true)
-      .then(async ({ data: pcsData }) => {
+      .then(async ({ data: pcsData, error: pcsError }) => {
+        console.log('[NuevoTurno DEBUG] PCS crudo (activo=true) para este profesional/centro:', pcsData, 'error:', pcsError);
         const pcsForAgenda = (pcsData ?? []).filter((r: any) =>
           r.servicios && r.servicios.agenda_id === agendaId && r.servicio_id
         );
+        console.log('[NuevoTurno DEBUG] PCS filtrado por agendaId =', agendaId, '→', pcsForAgenda);
         if (pcsForAgenda.length === 0) {
+          console.warn('[NuevoTurno DEBUG] Ningún PCS coincide con agenda_id. agenda_id de cada servicio:',
+            (pcsData ?? []).map((r: any) => ({ pcs_id: r.id, servicio: r.servicios?.nombre, agenda_id_servicio: r.servicios?.agenda_id })));
           toast({ title: 'Agenda sin servicios', description: 'Este profesional no tiene servicios asignados para esta agenda.', variant: 'destructive' });
           return;
         }
 
         // Filtrar por día de la semana usando pcs_horario_dia
         const pcsIds = pcsForAgenda.map((r: any) => r.id);
-        const { data: horData } = await supabase
+        const { data: horData, error: horError } = await supabase
           .from('pcs_horario_dia')
-          .select('pcs_id')
+          .select('pcs_id, dia_semana, activo')
           .in('pcs_id', pcsIds)
           .eq('dia_semana', diaSemana)
           .eq('activo', true);
+        console.log('[NuevoTurno DEBUG] pcs_horario_dia para dia_semana =', diaSemana, '→', horData, 'error:', horError);
 
         const pcsIdsConHorario = new Set((horData ?? []).map((h: any) => h.pcs_id));
 
@@ -176,6 +182,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
           .sort((a: Servicio, b: Servicio) => a.nombre.localeCompare(b.nombre));
 
         const unique = list.filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
+        console.log('[NuevoTurno DEBUG] Servicios finales a mostrar:', unique);
         setServicios(unique);
         if (unique.length === 1) setServicioId(unique[0].id);
         if (unique.length === 0) {
