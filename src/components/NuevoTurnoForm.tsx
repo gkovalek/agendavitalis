@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Search, X, UserPlus, ChevronRight, Eye, Plus, FileText } from 'lucide-react';
+import { Loader2, Save, Search, UserPlus, ChevronRight, Eye, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
@@ -343,7 +343,6 @@ export function NuevoTurnoForm({ fecha = '', hora = '', profesionalId = '', prof
       updated_by_name: perfil?.nombre ?? null,
       updated_at: new Date().toISOString(),
     };
-    console.log('[NuevoTurnoForm] Inserting turno:', JSON.stringify(turnoPayload));
     const { data: newTurno, error: turnoErr } = await supabase.from('turnos').insert(turnoPayload).select('id').single();
 
     if (turnoErr || !newTurno) {
@@ -522,6 +521,8 @@ export function NuevoTurnoForm({ fecha = '', hora = '', profesionalId = '', prof
             className="text-sm text-primary hover:underline flex items-center gap-1">
             <UserPlus className="h-3.5 w-3.5" /> + Paciente no encontrado, crear nuevo
           </button>
+
+          <Button variant="outline" size="sm" onClick={() => setCurrentStep('servicio')}>Volver</Button>
 
           {showNewPatientForm && (
             <Card className="border-primary/30">
