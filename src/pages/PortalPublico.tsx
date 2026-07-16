@@ -71,7 +71,7 @@ export default function PortalPublico() {
     Promise.all([
       supabase.from('centros').select('id, nombre, direccion, telefono').eq('id', centroId).single(),
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, duracion_minutos, sesiones_por_bloque)').eq('centro_id', centroId).eq('activo', true),
     ]).then(([cRes, pRes, pcsRes]) => {
       setCentro(cRes.data);
       setProfesionales(pRes.data ?? []);
