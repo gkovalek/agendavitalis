@@ -152,6 +152,10 @@ export default function GestionAgendas() {
         sesiones_por_bloque: form.sesiones_por_bloque,
       }).eq('id', editId);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); setSaving(false); return; }
+      // Sincronizar capacidad_simultanea en todos los PCS de esta agenda
+      await supabase.from('profesional_centro_servicio')
+        .update({ capacidad_simultanea: form.sesiones_por_bloque })
+        .eq('agenda_id', editId);
     } else {
       const { data, error } = await supabase.from('agendas').insert({
         nombre: form.nombre,
@@ -170,6 +174,7 @@ export default function GestionAgendas() {
       dias_trabajo: normalizeDiasTrabajo(form.dias_trabajo),
       hora_inicio: form.hora_inicio,
       hora_fin: form.hora_fin,
+      capacidad_simultanea: form.sesiones_por_bloque,
       activo: true,
     };
 
