@@ -1,7 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical } from 'lucide-react';
+import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical, Paperclip, ImageIcon, FileIcon, ExternalLink, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PacienteAutocomplete, PacienteOption } from '@/components/PacienteAutocomplete';
@@ -44,21 +42,37 @@ interface FichaVariable {
 }
 
 interface Profesional { id: string; nombre: string; apellido: string; }
-interface Paciente { id: string; nombre: string; apellido: string; dni: string; }
+
+interface Adjunto {
+  id: string;
+  nombre: string;
+  tipo_mime: string | null;
+  storage_path: string;
+  created_at: string;
+}
 
 const HOY = new Date().toISOString().split('T')[0];
+const BUCKET = 'historia-clinica';
+const MAX_MB = 20;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 /* ═══════════════════════════════════════════════════ */
 export default function HistoriaClinica() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Lista de entradas
   const [entradas, setEntradas] = useState<EntradaHistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedEntrada, setSelectedEntrada] = useState<EntradaHistoria | null>(null);
+
+  // Adjuntos
+  const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
+  const [loadingAdjuntos, setLoadingAdjuntos] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Dialog nueva entrada
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -79,7 +93,6 @@ export default function HistoriaClinica() {
   const [fichaForm, setFichaForm] = useState({ nombre: '' });
   const [fichaVarsForm, setFichaVarsForm] = useState<{ nombre: string }[]>([{ nombre: '' }]);
   const [savingFicha, setSavingFicha] = useState(false);
-
 
   /* ─── Fetching ─── */
   const fetchEntradas = useCallback(async () => {
@@ -116,29 +129,91 @@ export default function HistoriaClinica() {
     setProfesionales(data ?? []);
   }, [centroId]);
 
+  const fetchAdjuntos = useCallback(async (historiaId: string) => {
+    setLoadingAdjuntos(true);
+    const { data } = await supabase
+      .from('historia_adjuntos')
+      .select('id, nombre, tipo_mime, storage_path, created_at')
+      .eq('historia_id', historiaId)
+      .order('created_at', { ascending: false });
+    setAdjuntos((data ?? []) as Adjunto[]);
+    setLoadingAdjuntos(false);
+  }, []);
+
   useEffect(() => { fetchEntradas(); }, [fetchEntradas]);
   useEffect(() => { fetchFichas(); }, [fetchFichas]);
   useEffect(() => { fetchProfesionales(); }, [fetchProfesionales]);
 
-  /* ─── Preselección desde otras vistas (ej: Nuevo Turno → Hist. Clínica) ─── */
-  const location = useLocation();
-  const navigate = useNavigate();
   useEffect(() => {
-    const state = location.state as { filtroPaciente?: PacienteOption; nuevaEntradaPaciente?: PacienteOption } | null;
-    if (!state) return;
-    if (state.filtroPaciente) {
-      setSearch(state.filtroPaciente.apellido);
+    if (selectedEntrada) {
+      fetchAdjuntos(selectedEntrada.id);
+    } else {
+      setAdjuntos([]);
     }
-    if (state.nuevaEntradaPaciente) {
-      setPacienteSeleccionado(state.nuevaEntradaPaciente);
-      setResetAutocomplete(n => n + 1);
-      setDialogOpen(true);
+  }, [selectedEntrada, fetchAdjuntos]);
+
+  /* ─── Adjuntos: subir ─── */
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedEntrada || !centroId) return;
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({ title: 'Tipo no permitido', description: 'Solo se admiten PDF, JPG, PNG y WebP.', variant: 'destructive' });
+      return;
     }
-    // limpiar el state para no reabrir al volver
-    navigate(location.pathname, { replace: true, state: null });
-  }, [location, navigate]);
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast({ title: 'Archivo muy grande', description: `Máximo ${MAX_MB}MB.`, variant: 'destructive' });
+      return;
+    }
 
+    setUploading(true);
+    const ext = file.name.split('.').pop();
+    const path = `${centroId}/${selectedEntrada.id}/${Date.now()}.${ext}`;
 
+    const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
+    if (uploadErr) {
+      toast({ title: 'Error al subir', description: uploadErr.message, variant: 'destructive' });
+      setUploading(false);
+      return;
+    }
+
+    const { error: dbErr } = await supabase.from('historia_adjuntos').insert({
+      centro_id: centroId,
+      historia_id: selectedEntrada.id,
+      nombre: file.name,
+      tipo_mime: file.type,
+      storage_path: path,
+      subido_por: perfil?.id ?? null,
+    });
+
+    if (dbErr) {
+      toast({ title: 'Error al registrar adjunto', description: dbErr.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Archivo adjuntado' });
+      fetchAdjuntos(selectedEntrada.id);
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  /* ─── Adjuntos: abrir ─── */
+  const handleAbrirAdjunto = async (adjunto: Adjunto) => {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(adjunto.storage_path, 60);
+    if (error || !data?.signedUrl) {
+      toast({ title: 'Error al abrir archivo', variant: 'destructive' });
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
+  };
+
+  /* ─── Adjuntos: eliminar ─── */
+  const handleEliminarAdjunto = async (adjunto: Adjunto) => {
+    if (!confirm(`¿Eliminar "${adjunto.nombre}"?`)) return;
+    await supabase.storage.from(BUCKET).remove([adjunto.storage_path]);
+    await supabase.from('historia_adjuntos').delete().eq('id', adjunto.id);
+    setAdjuntos(prev => prev.filter(a => a.id !== adjunto.id));
+    toast({ title: 'Adjunto eliminado' });
+  };
 
   /* ─── Cambio de ficha modelo ─── */
   const handleFichaChange = async (fichaId: string) => {
@@ -172,7 +247,6 @@ export default function HistoriaClinica() {
     }
     setSaving(true);
 
-    // Construir variables_json desde los valores ingresados
     const variablesJson: Record<string, string> = {};
     fichaVariables.forEach(v => { if (valoresVariables[v.id]) variablesJson[v.nombre_variable] = valoresVariables[v.id]; });
 
@@ -253,6 +327,11 @@ export default function HistoriaClinica() {
 
   const formatFecha = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
 
+  const AdjuntoIcon = ({ mime }: { mime: string | null }) => {
+    if (mime?.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-[#00ADBB] shrink-0" />;
+    return <FileIcon className="w-4 h-4 text-orange-400 shrink-0" />;
+  };
+
   /* ─── Panel detalle ─── */
   const PanelDetalle = () => {
     if (!selectedEntrada) {
@@ -330,6 +409,85 @@ export default function HistoriaClinica() {
             </div>
           </>
         )}
+
+        {/* ── Adjuntos ── */}
+        <Separator />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide flex items-center gap-1.5">
+              <Paperclip className="w-3.5 h-3.5" /> Archivos adjuntos
+              {adjuntos.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#00ADBB]/10 text-[#00ADBB] text-[10px] font-bold">{adjuntos.length}</span>
+              )}
+            </p>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</>
+                  : <><Plus className="w-3 h-3" /> Adjuntar</>
+                }
+              </Button>
+            </div>
+          </div>
+
+          {loadingAdjuntos ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-[#00ADBB]" />
+            </div>
+          ) : adjuntos.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic py-2">
+              Sin archivos adjuntos. Podés adjuntar recetas, radiografías, informes (PDF, JPG, PNG · máx. {MAX_MB}MB).
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {adjuntos.map(adj => (
+                <div
+                  key={adj.id}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors group"
+                >
+                  <AdjuntoIcon mime={adj.tipo_mime} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{adj.nombre}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatFecha(adj.created_at.split('T')[0])}</p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Abrir"
+                      onClick={() => handleAbrirAdjunto(adj)}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      title="Eliminar"
+                      onClick={() => handleEliminarAdjunto(adj)}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -435,16 +593,13 @@ export default function HistoriaClinica() {
           <ScrollArea className="max-h-[78vh] pr-2">
             <div className="space-y-4 pb-2">
 
-              {/* Paciente — autocomplete por DNI, nombre o apellido */}
               <div className="space-y-1.5">
                 <Label>Paciente *</Label>
                 <PacienteAutocomplete
                   key={resetAutocomplete}
                   onSelect={setPacienteSeleccionado}
                   placeholder="Buscar por apellido, nombre o DNI..."
-                  initialValue={pacienteSeleccionado ? `${pacienteSeleccionado.apellido}, ${pacienteSeleccionado.nombre}` : ''}
                 />
-
                 {pacienteSeleccionado && (
                   <p className="text-xs text-[#00ADBB]">
                     ✓ {pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre} — DNI {pacienteSeleccionado.dni}
@@ -452,7 +607,6 @@ export default function HistoriaClinica() {
                 )}
               </div>
 
-              {/* Profesional + Fecha en fila */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Profesional *</Label>
@@ -469,7 +623,6 @@ export default function HistoriaClinica() {
                 </div>
               </div>
 
-              {/* Ficha modelo */}
               <div className="space-y-1">
                 <Label>Ficha modelo</Label>
                 <Select value={fichaModeloId} onValueChange={handleFichaChange}>
@@ -483,7 +636,6 @@ export default function HistoriaClinica() {
                 )}
               </div>
 
-              {/* Variables de la ficha seleccionada */}
               {fichaVariables.length > 0 && (
                 <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Variables de la ficha</p>
@@ -501,7 +653,6 @@ export default function HistoriaClinica() {
                 </div>
               )}
 
-              {/* Comentarios extras */}
               <div className="space-y-1">
                 <Label>Comentarios extras</Label>
                 <Textarea
@@ -536,7 +687,6 @@ export default function HistoriaClinica() {
           <ScrollArea className="max-h-[78vh] pr-2">
             <div className="space-y-5 pb-2">
 
-              {/* Nombre */}
               <div className="space-y-1">
                 <Label>Nombre de la ficha *</Label>
                 <Input
@@ -546,7 +696,6 @@ export default function HistoriaClinica() {
                 />
               </div>
 
-              {/* Variables */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Variables a evaluar *</Label>
@@ -584,7 +733,6 @@ export default function HistoriaClinica() {
                 </div>
               </div>
 
-              {/* Preview */}
               {fichaForm.nombre && fichaVarsForm.some(v => v.nombre.trim()) && (
                 <div className="border rounded-lg p-4 bg-muted/20 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista previa de la ficha</p>
