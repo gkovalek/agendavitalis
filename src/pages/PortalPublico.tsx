@@ -110,8 +110,8 @@ export default function PortalPublico() {
     if (pcsActivos.length === 0) { setSlots([]); setLoadingSlots(false); return; }
 
     const servicio = servicios.find(s => s.id === selectedServicioId);
-    const intervalo = servicio?.duracion_minutos ?? 30;
-    const capacidad = Math.max(...pcsActivos.map(p => p.capacidad_simultanea ?? 1));
+    const intervalo = pcsActivos[0]?.agenda?.duracion_minutos ?? servicio?.duracion_minutos ?? 30;
+    const capacidad = Math.max(...pcsActivos.map(p => p.agenda?.sesiones_por_bloque ?? p.capacidad_simultanea ?? 1));
 
     const allSlots = new Set<string>();
     pcsActivos.forEach(pcs => generateSlots(pcs.hora_inicio, pcs.hora_fin, intervalo).forEach(s => allSlots.add(s)));
