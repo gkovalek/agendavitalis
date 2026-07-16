@@ -24,7 +24,7 @@ const reservaSchema = z.object({
 interface Centro { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
 interface Servicio { id: string; nombre: string; duracion_minutos: number; costo_base: number; }
-interface PCS { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; }
+interface PCS { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; agenda?: { id: string; duracion_minutos: number | null; sesiones_por_bloque: number | null } | null; }
 interface SlotInfo { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
 type Step = 'profesional' | 'fecha_hora' | 'datos' | 'confirmado';
@@ -71,11 +71,11 @@ export default function PortalPublico() {
     Promise.all([
       supabase.from('centros').select('id, nombre, direccion, telefono').eq('id', centroId).single(),
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, duracion_minutos, sesiones_por_bloque)').eq('centro_id', centroId).eq('activo', true),
     ]).then(([cRes, pRes, pcsRes]) => {
       setCentro(cRes.data);
       setProfesionales(pRes.data ?? []);
-      setPcsRecords(((pcsRes.data as PCS[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+      setPcsRecords(((pcsRes.data as unknown as PCS[]) ?? []).map(r => ({ ...r, agenda: Array.isArray(r.agenda) ? r.agenda[0] ?? null : r.agenda ?? null, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
       setLoadingInit(false);
     });
   }, [centroId]);
@@ -110,8 +110,8 @@ export default function PortalPublico() {
     if (pcsActivos.length === 0) { setSlots([]); setLoadingSlots(false); return; }
 
     const servicio = servicios.find(s => s.id === selectedServicioId);
-    const intervalo = servicio?.duracion_minutos ?? 30;
-    const capacidad = Math.max(...pcsActivos.map(p => p.capacidad_simultanea ?? 1));
+    const intervalo = pcsActivos[0]?.agenda?.duracion_minutos ?? servicio?.duracion_minutos ?? 30;
+    const capacidad = Math.max(...pcsActivos.map(p => p.agenda?.sesiones_por_bloque ?? p.capacidad_simultanea ?? 1));
 
     const allSlots = new Set<string>();
     pcsActivos.forEach(pcs => generateSlots(pcs.hora_inicio, pcs.hora_fin, intervalo).forEach(s => allSlots.add(s)));
