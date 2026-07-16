@@ -121,6 +121,7 @@ export default function PortalPublico() {
       .select('hora_inicio')
       .eq('centro_id', centroId)
       .eq('profesional_id', selectedProfId)
+      .eq('servicio_id', selectedServicioId)
       .eq('fecha', dateStr)
       .neq('estado', 'cancelado');
 
