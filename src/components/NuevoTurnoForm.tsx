@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Search, X, UserPlus, ChevronRight } from 'lucide-react';
+import { Loader2, Save, Search, X, UserPlus, ChevronRight, Eye, Plus, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
