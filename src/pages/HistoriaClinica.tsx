@@ -442,7 +442,9 @@ export default function HistoriaClinica() {
                   key={resetAutocomplete}
                   onSelect={setPacienteSeleccionado}
                   placeholder="Buscar por apellido, nombre o DNI..."
+                  initialValue={pacienteSeleccionado ? `${pacienteSeleccionado.apellido}, ${pacienteSeleccionado.nombre}` : ''}
                 />
+
                 {pacienteSeleccionado && (
                   <p className="text-xs text-[#00ADBB]">
                     ✓ {pacienteSeleccionado.apellido}, {pacienteSeleccionado.nombre} — DNI {pacienteSeleccionado.dni}
