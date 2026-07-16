@@ -177,13 +177,24 @@ export default function HistoriaClinica() {
       return;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    let subidoPor: string | null = null;
+    if (user?.id) {
+      const { data: usuarioRow } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+      subidoPor = usuarioRow?.id ?? null;
+    }
+
     const { error: dbErr } = await supabase.from('historia_adjuntos').insert({
       centro_id: centroId,
       historia_id: selectedEntrada.id,
       nombre: file.name,
       tipo_mime: file.type,
       storage_path: path,
-      subido_por: perfil?.id ?? null,
+      subido_por: subidoPor,
     });
 
     if (dbErr) {
