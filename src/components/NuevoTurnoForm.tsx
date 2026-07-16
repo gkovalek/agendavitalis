@@ -515,7 +515,27 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               </div>
             </TabsContent>
 
-            <TabsContent value="hc" className="mt-4">
+            <TabsContent value="hc" className="mt-4 space-y-3">
+              {selectedPaciente && (
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => navigate('/historia-clinica', { state: { filtroPaciente: selectedPaciente } })}
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Ver historia completa
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
+                    onClick={() => navigate('/historia-clinica', { state: { nuevaEntradaPaciente: selectedPaciente } })}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Nueva entrada
+                  </Button>
+                </div>
+              )}
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : historiaClinica.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Aún no hay historia clínica para este paciente</p>
               ) : (
@@ -526,6 +546,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                 </div>
               )}
             </TabsContent>
+
 
             <TabsContent value="sesiones" className="mt-4">
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : tratamientos.length === 0 ? (
