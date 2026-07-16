@@ -75,7 +75,7 @@ export default function PortalPublico() {
     ]).then(([cRes, pRes, pcsRes]) => {
       setCentro(cRes.data);
       setProfesionales(pRes.data ?? []);
-      setPcsRecords(((pcsRes.data as PCS[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+      setPcsRecords(((pcsRes.data as unknown as PCS[]) ?? []).map(r => ({ ...r, agenda: Array.isArray(r.agenda) ? r.agenda[0] ?? null : r.agenda ?? null, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
       setLoadingInit(false);
     });
   }, [centroId]);
