@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Search, X, UserPlus, ChevronRight } from 'lucide-react';
+import { Loader2, Save, Search, X, UserPlus, ChevronRight, Eye, Plus, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
 import { PrepagaAutocomplete } from '@/components/PrepagaAutocomplete';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -65,6 +67,8 @@ type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paciente[]>([]);
@@ -511,7 +515,27 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
               </div>
             </TabsContent>
 
-            <TabsContent value="hc" className="mt-4">
+            <TabsContent value="hc" className="mt-4 space-y-3">
+              {selectedPaciente && (
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => navigate('/historia-clinica', { state: { filtroPaciente: selectedPaciente } })}
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Ver historia completa
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
+                    onClick={() => navigate('/historia-clinica', { state: { nuevaEntradaPaciente: selectedPaciente } })}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Nueva entrada
+                  </Button>
+                </div>
+              )}
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : historiaClinica.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Aún no hay historia clínica para este paciente</p>
               ) : (
@@ -522,6 +546,7 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
                 </div>
               )}
             </TabsContent>
+
 
             <TabsContent value="sesiones" className="mt-4">
               {loadingTabs ? <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /> : tratamientos.length === 0 ? (
