@@ -120,6 +120,25 @@ export default function HistoriaClinica() {
   useEffect(() => { fetchFichas(); }, [fetchFichas]);
   useEffect(() => { fetchProfesionales(); }, [fetchProfesionales]);
 
+  /* ─── Preselección desde otras vistas (ej: Nuevo Turno → Hist. Clínica) ─── */
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const state = location.state as { filtroPaciente?: PacienteOption; nuevaEntradaPaciente?: PacienteOption } | null;
+    if (!state) return;
+    if (state.filtroPaciente) {
+      setSearch(state.filtroPaciente.apellido);
+    }
+    if (state.nuevaEntradaPaciente) {
+      setPacienteSeleccionado(state.nuevaEntradaPaciente);
+      setResetAutocomplete(n => n + 1);
+      setDialogOpen(true);
+    }
+    // limpiar el state para no reabrir al volver
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location, navigate]);
+
+
 
   /* ─── Cambio de ficha modelo ─── */
   const handleFichaChange = async (fichaId: string) => {
