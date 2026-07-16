@@ -142,7 +142,7 @@ export default function PortalPublico() {
         const ocupados = ocupadoMap[hora] ?? 0;
         return {
           hora,
-          disponible: ocupados < capacidad && (!isToday || slotMinutes > nowMinutes + 30),
+          disponible: ocupados < capacidad && (!isToday || slotMinutes > nowMinutes),
           ocupados,
           capacidad,
         };
