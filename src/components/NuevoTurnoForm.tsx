@@ -67,6 +67,8 @@ type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paciente[]>([]);
