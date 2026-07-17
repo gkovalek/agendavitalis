@@ -202,19 +202,15 @@ export default function PortalPublico() {
     const dateStr  = formatDate(selectedDate);
     const servicio = servicios.find(s => s.id === selectedServicioId);
 
-    let pacienteId: string | null = null;
-    if (data.dni) {
-      const { data: existing } = await supabase
-        .from('pacientes').select('id').eq('centro_id', centroId).eq('dni', data.dni).maybeSingle();
-      pacienteId = existing?.id ?? null;
-    }
-    if (!pacienteId) {
-      const { data: newPac } = await supabase
-        .from('pacientes')
-        .insert({ centro_id: centroId, nombre: data.nombre, apellido: data.apellido, dni: data.dni || null, celular: data.celular || null, email: data.email || null })
-        .select('id').single();
-      pacienteId = newPac?.id ?? null;
-    }
+    const { data: pacienteIdResult, error: rpcError } = await supabase.rpc('buscar_o_crear_paciente', {
+      p_centro_id: centroId,
+      p_nombre:    data.nombre,
+      p_apellido:  data.apellido,
+      p_dni:       data.dni    || null,
+      p_celular:   data.celular || null,
+      p_email:     data.email  || null,
+    });
+    const pacienteId = rpcError ? null : (pacienteIdResult as string | null);
     if (!pacienteId) { setSaving(false); return; }
 
     const horaFin = (() => {
