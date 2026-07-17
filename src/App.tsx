@@ -29,7 +29,7 @@ import { Loader2 } from "lucide-react";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, perfil, perfilError, loading } = useAuth();
 
   if (loading) {
     return (
@@ -40,6 +40,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) return <Navigate to="/login" replace />;
+
+  if (perfilError && !perfil) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-3 max-w-sm">
+          <p className="text-destructive font-medium">{perfilError}</p>
+          <button
+            className="text-sm text-primary hover:underline"
+            onClick={() => window.location.href = '/login'}
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return <AppLayout>{children}</AppLayout>;
 }

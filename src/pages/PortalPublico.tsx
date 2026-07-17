@@ -102,6 +102,8 @@ export default function PortalPublico() {
       setProfesionales(pRes.data ?? []);
       setPcsRecords(((pcsRes.data as PCS[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
       setLoadingInit(false);
+    }).catch(() => {
+      setLoadingInit(false);
     });
   }, [centroId]);
 
@@ -114,7 +116,7 @@ export default function PortalPublico() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   useEffect(() => {
     if (serviciosDelProf.length === 0) { setServicios([]); return; }
-    supabase.from('servicios').select('id, nombre, duracion_minutos, costo_base').in('id', serviciosDelProf).eq('activo', true)
+    supabase.from('servicios').select('id, nombre, duracion_minutos').in('id', serviciosDelProf).eq('activo', true)
       .then(({ data }) => setServicios(data ?? []));
   }, [serviciosDelProf]);
 
@@ -182,7 +184,7 @@ export default function PortalPublico() {
     setLoadingSlots(false);
   };
 
-  useEffect(() => { if (step === 'fecha_hora') fetchSlots(); }, [selectedDate, step]);
+  useEffect(() => { if (step === 'fecha_hora') fetchSlots(); }, [selectedDate, step, selectedProfId, selectedServicioId]);
 
   // ── Confirmar reserva ────────────────────────────────────────────────────
   const handleConfirmarReserva = async () => {

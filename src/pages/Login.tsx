@@ -24,7 +24,7 @@ export default function Login() {
     e.preventDefault();
     setResetLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://primal-sparkle.lovable.app/reset-password',
+      redirectTo: 'https://agendavitalis.lovable.app/reset-password',
     });
     setResetLoading(false);
     if (error) {

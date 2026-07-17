@@ -56,6 +56,151 @@ const BUCKET = 'historia-clinica';
 const MAX_MB = 20;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
+/* ─────────────────── AdjuntoIcon (fuera del render) ─── */
+function AdjuntoIcon({ mime }: { mime: string | null }) {
+  if (mime?.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-[#00ADBB] shrink-0" />;
+  return <FileIcon className="w-4 h-4 text-orange-400 shrink-0" />;
+}
+
+/* ─────────────────── PanelDetalle (fuera del render para evitar remount) ─── */
+interface PanelDetalleProps {
+  selectedEntrada: EntradaHistoria | null;
+  adjuntos: Adjunto[];
+  loadingAdjuntos: boolean;
+  uploading: boolean;
+  isMobile: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleAbrirAdjunto: (adj: Adjunto) => void;
+  handleEliminarAdjunto: (adj: Adjunto) => void;
+  onBack: () => void;
+}
+
+function formatFechaPanel(fecha: string) {
+  const [y, m, d] = fecha.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function PanelDetalle({
+  selectedEntrada, adjuntos, loadingAdjuntos, uploading,
+  isMobile, fileInputRef, handleFileSelect, handleAbrirAdjunto, handleEliminarAdjunto, onBack,
+}: PanelDetalleProps) {
+  if (!selectedEntrada) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground gap-3">
+        <FileText className="w-10 h-10 opacity-30" />
+        <p className="text-sm">Seleccioná una entrada para ver el detalle</p>
+      </div>
+    );
+  }
+  const vars = selectedEntrada.variables_json;
+  return (
+    <div className="space-y-4">
+      {isMobile && (
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+        </Button>
+      )}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-lg font-bold text-foreground">
+          <User className="w-5 h-5 text-[#00ADBB]" />
+          {selectedEntrada.paciente?.apellido}, {selectedEntrada.paciente?.nombre}
+        </div>
+        {selectedEntrada.paciente?.dni && (
+          <p className="text-xs text-muted-foreground ml-7">DNI {selectedEntrada.paciente.dni}</p>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          <span>{formatFechaPanel(selectedEntrada.fecha)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4" />
+          <span>{selectedEntrada.profesional?.apellido}, {selectedEntrada.profesional?.nombre}</span>
+        </div>
+        {selectedEntrada.ficha_modelo?.nombre && (
+          <div className="flex items-center gap-2">
+            <LayoutTemplate className="w-4 h-4" />
+            <span className="text-[#00ADBB] font-medium">{selectedEntrada.ficha_modelo.nombre}</span>
+          </div>
+        )}
+      </div>
+      {vars && Object.keys(vars).length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Variables clínicas</p>
+            <div className="grid grid-cols-1 gap-2">
+              {Object.entries(vars).map(([nombre, valor]) => (
+                <div key={nombre} className="flex justify-between items-start gap-3 py-1.5 border-b border-dashed border-zinc-100 last:border-0">
+                  <span className="text-sm text-muted-foreground shrink-0 min-w-[140px]">{nombre}</span>
+                  <span className="text-sm font-medium text-foreground text-right">{valor || '—'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {(selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion) && (
+        <>
+          <Separator />
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Comentarios extras</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+              {selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion}
+            </p>
+          </div>
+        </>
+      )}
+      <Separator />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide flex items-center gap-1.5">
+            <Paperclip className="w-3.5 h-3.5" /> Archivos adjuntos
+            {adjuntos.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#00ADBB]/10 text-[#00ADBB] text-[10px] font-bold">{adjuntos.length}</span>
+            )}
+          </p>
+          <div>
+            <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileSelect} />
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+              {uploading ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</> : <><Plus className="w-3 h-3" /> Adjuntar</>}
+            </Button>
+          </div>
+        </div>
+        {loadingAdjuntos ? (
+          <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-[#00ADBB]" /></div>
+        ) : adjuntos.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic py-2">
+            Sin archivos adjuntos. Podés adjuntar recetas, radiografías, informes (PDF, JPG, PNG · máx. {MAX_MB}MB).
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {adjuntos.map(adj => (
+              <div key={adj.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors group">
+                <AdjuntoIcon mime={adj.tipo_mime} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{adj.nombre}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatFechaPanel(adj.created_at.split('T')[0])}</p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Abrir" onClick={() => handleAbrirAdjunto(adj)}>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Eliminar" onClick={() => handleEliminarAdjunto(adj)}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════ */
 export default function HistoriaClinica() {
   const { centroId, perfil } = useAuth();
@@ -338,175 +483,23 @@ export default function HistoriaClinica() {
 
   const formatFecha = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
 
-  const AdjuntoIcon = ({ mime }: { mime: string | null }) => {
-    if (mime?.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-[#00ADBB] shrink-0" />;
-    return <FileIcon className="w-4 h-4 text-orange-400 shrink-0" />;
-  };
-
-  /* ─── Panel detalle ─── */
-  const PanelDetalle = () => {
-    if (!selectedEntrada) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground gap-3">
-          <FileText className="w-10 h-10 opacity-30" />
-          <p className="text-sm">Seleccioná una entrada para ver el detalle</p>
-        </div>
-      );
-    }
-    const vars = selectedEntrada.variables_json;
-    return (
-      <div className="space-y-4">
-        {isMobile && (
-          <Button variant="ghost" size="sm" onClick={() => setSelectedEntrada(null)}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Volver
-          </Button>
-        )}
-
-        {/* Encabezado */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-lg font-bold text-foreground">
-            <User className="w-5 h-5 text-[#00ADBB]" />
-            {selectedEntrada.paciente?.apellido}, {selectedEntrada.paciente?.nombre}
-          </div>
-          {selectedEntrada.paciente?.dni && (
-            <p className="text-xs text-muted-foreground ml-7">DNI {selectedEntrada.paciente.dni}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            <span>{formatFecha(selectedEntrada.fecha)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            <span>{selectedEntrada.profesional?.apellido}, {selectedEntrada.profesional?.nombre}</span>
-          </div>
-          {selectedEntrada.ficha_modelo?.nombre && (
-            <div className="flex items-center gap-2">
-              <LayoutTemplate className="w-4 h-4" />
-              <span className="text-[#00ADBB] font-medium">{selectedEntrada.ficha_modelo.nombre}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Variables de la ficha */}
-        {vars && Object.keys(vars).length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Variables clínicas</p>
-              <div className="grid grid-cols-1 gap-2">
-                {Object.entries(vars).map(([nombre, valor]) => (
-                  <div key={nombre} className="flex justify-between items-start gap-3 py-1.5 border-b border-dashed border-zinc-100 last:border-0">
-                    <span className="text-sm text-muted-foreground shrink-0 min-w-[140px]">{nombre}</span>
-                    <span className="text-sm font-medium text-foreground text-right">{valor || '—'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Comentarios extras / evolución */}
-        {(selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion) && (
-          <>
-            <Separator />
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Comentarios extras</p>
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {selectedEntrada.comentarios_extras || selectedEntrada.comentario_evolucion}
-              </p>
-            </div>
-          </>
-        )}
-
-        {/* ── Adjuntos ── */}
-        <Separator />
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide flex items-center gap-1.5">
-              <Paperclip className="w-3.5 h-3.5" /> Archivos adjuntos
-              {adjuntos.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#00ADBB]/10 text-[#00ADBB] text-[10px] font-bold">{adjuntos.length}</span>
-              )}
-            </p>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1"
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {uploading
-                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</>
-                  : <><Plus className="w-3 h-3" /> Adjuntar</>
-                }
-              </Button>
-            </div>
-          </div>
-
-          {loadingAdjuntos ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-[#00ADBB]" />
-            </div>
-          ) : adjuntos.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-2">
-              Sin archivos adjuntos. Podés adjuntar recetas, radiografías, informes (PDF, JPG, PNG · máx. {MAX_MB}MB).
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {adjuntos.map(adj => (
-                <div
-                  key={adj.id}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors group"
-                >
-                  <AdjuntoIcon mime={adj.tipo_mime} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{adj.nombre}</p>
-                    <p className="text-[10px] text-muted-foreground">{formatFecha(adj.created_at.split('T')[0])}</p>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Abrir"
-                      onClick={() => handleAbrirAdjunto(adj)}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      title="Eliminar"
-                      onClick={() => handleEliminarAdjunto(adj)}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const panelProps: PanelDetalleProps = {
+    selectedEntrada,
+    adjuntos,
+    loadingAdjuntos,
+    uploading,
+    isMobile,
+    fileInputRef,
+    handleFileSelect,
+    handleAbrirAdjunto,
+    handleEliminarAdjunto,
+    onBack: () => setSelectedEntrada(null),
   };
 
   if (isMobile && selectedEntrada) {
     return (
       <div className="space-y-4 animate-fade-in px-1 py-2">
-        <PanelDetalle />
+        <PanelDetalle {...panelProps} />
       </div>
     );
   }
@@ -588,7 +581,7 @@ export default function HistoriaClinica() {
           <Card className="shadow-sm lg:col-span-3">
             <CardContent className="p-4 sm:p-6">
               <ScrollArea className="h-[calc(100vh-280px)]">
-                <PanelDetalle />
+                <PanelDetalle {...panelProps} />
               </ScrollArea>
             </CardContent>
           </Card>
