@@ -72,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<UsuarioPerfil | null>(null);
   const [perfilError, setPerfilError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const authChangeFired = useRef(false);
 
   const loadPerfil = async (userId: string) => {
     const result = await fetchPerfil(userId);
@@ -82,8 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Carga inicial: getSession es la fuente de verdad para el primer render
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) await loadPerfil(session.user.id);
+      setLoading(false);
+    });
+
+    // Cambios posteriores: login, logout, refresh de token
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      authChangeFired.current = true;
       setSession(session);
       if (session?.user) {
         await loadPerfil(session.user.id);
@@ -91,17 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPerfil(null);
         setPerfilError(null);
       }
-      setLoading(false);
-    });
-
-    // Seed initial state only if onAuthStateChange hasn't fired yet
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (authChangeFired.current) return;
-      setSession(session);
-      if (session?.user) {
-        await loadPerfil(session.user.id);
-      }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
