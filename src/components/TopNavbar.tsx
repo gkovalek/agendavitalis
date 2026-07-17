@@ -2,12 +2,15 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCentroConfig } from '@/hooks/use-centro-config';
-import { Heart, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { usePlan, type Feature } from '@/hooks/use-plan';
+import { useToast } from '@/hooks/use-toast';
+import { Heart, Settings, LogOut, ChevronDown, Lock } from 'lucide-react';
 
 interface NavItem {
   label: string;
   href?: string;
   disabled?: boolean;
+  requiere?: Feature;
 }
 
 interface NavGroup {
@@ -22,7 +25,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Base de pacientes', href: '/pacientes' },
       { label: 'Nuevo paciente', href: '/pacientes/nuevo' },
-      { label: 'Historias clínicas', href: '/historia-clinica' },
+      { label: 'Historias clínicas', href: '/historia-clinica', requiere: 'historia_clinica' },
     ],
   },
   {
@@ -31,21 +34,21 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       { label: 'Gestión de Agendas', href: '/agendas' },
       { label: 'Profesionales', href: '/profesionales' },
       { label: 'Servicios', href: '/servicios' },
-      { label: 'Tratamientos', href: '/tratamientos' },
+      { label: 'Tratamientos', href: '/tratamientos', requiere: 'tratamientos' },
     ],
   },
   {
     label: 'Caja',
     items: [
       { label: 'Caja del día', href: '/caja' },
-      { label: 'Dashboard financiero', href: '/reportes' },
+      { label: 'Dashboard financiero', href: '/reportes', requiere: 'reportes' },
     ],
   },
   {
     label: 'Obras sociales',
     items: [
-      { label: 'Gestión de obras sociales', href: '/obras-sociales' },
-      { label: 'Liquidación mensual', href: '/liquidacion-os' },
+      { label: 'Gestión de obras sociales', href: '/obras-sociales', requiere: 'obras_sociales' },
+      { label: 'Liquidación mensual', href: '/liquidacion-os', requiere: 'liquidacion_os' },
     ],
   },
   {
@@ -59,7 +62,15 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (href: string) => void }) {
+function DropdownMenu({
+  group, onNavigate, tieneFeature, planMinimoPara, onLocked,
+}: {
+  group: NavGroup;
+  onNavigate: (href: string) => void;
+  tieneFeature: (f: Feature) => boolean;
+  planMinimoPara: (f: Feature) => string;
+  onLocked: (planNombre: string) => void;
+}) {
   const location = useLocation();
   const isActive = group.items.some(i => i.href && location.pathname.startsWith(i.href));
 
@@ -86,24 +97,33 @@ function DropdownMenu({ group, onNavigate }: { group: NavGroup; onNavigate: (hre
         <div className="absolute top-full left-0 z-[100] pt-0 hidden group-hover:block">
           <div className="h-1 w-full" />
           <div className="bg-popover border border-border rounded-lg shadow-xl min-w-[210px] py-1 overflow-hidden">
-            {group.items.map((item, i) => (
-              <button
-                key={i}
-                disabled={item.disabled}
-                onClick={() => item.href && !item.disabled && onNavigate(item.href)}
-                className={`
-                  w-full text-left px-4 py-2.5 text-[13px] transition-colors
-                  ${item.disabled
-                    ? 'text-muted-foreground/40 cursor-default'
-                    : location.pathname === item.href
-                      ? 'bg-accent text-primary font-medium'
-                      : 'text-popover-foreground hover:bg-accent'
-                  }
-                `}
-              >
-                {item.label}
-              </button>
-            ))}
+            {group.items.map((item, i) => {
+              const bloqueado = item.requiere ? !tieneFeature(item.requiere) : false;
+              return (
+                <button
+                  key={i}
+                  disabled={item.disabled}
+                  onClick={() => {
+                    if (bloqueado) { onLocked(planMinimoPara(item.requiere!)); return; }
+                    if (item.href && !item.disabled) onNavigate(item.href);
+                  }}
+                  className={`
+                    w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center justify-between
+                    ${item.disabled
+                      ? 'text-muted-foreground/40 cursor-default'
+                      : bloqueado
+                        ? 'text-muted-foreground/50 cursor-pointer hover:bg-accent/50'
+                        : location.pathname === item.href
+                          ? 'bg-accent text-primary font-medium'
+                          : 'text-popover-foreground hover:bg-accent'
+                    }
+                  `}
+                >
+                  <span>{item.label}</span>
+                  {bloqueado && <Lock className="w-3 h-3 shrink-0 ml-2 opacity-60" />}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -115,6 +135,8 @@ export function TopNavbar() {
   const navigate = useNavigate();
   const { perfil, centroId, signOut } = useAuth();
   const { get } = useCentroConfig(centroId);
+  const { tiene, planMinimoPara } = usePlan();
+  const { toast } = useToast();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -188,7 +210,17 @@ export function TopNavbar() {
           Panel principal
         </button>
         {navGroups.map((group, i) => (
-          <DropdownMenu key={i} group={group} onNavigate={navigate} />
+          <DropdownMenu
+            key={i}
+            group={group}
+            onNavigate={navigate}
+            tieneFeature={tiene}
+            planMinimoPara={planMinimoPara}
+            onLocked={(planNombre) => toast({
+              title: `Disponible en plan ${planNombre}`,
+              description: 'Actualizá tu plan para acceder a este módulo.',
+            })}
+          />
         ))}
       </nav>
 
