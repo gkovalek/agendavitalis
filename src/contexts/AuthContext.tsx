@@ -81,18 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Carga inicial: getSession es la fuente de verdad para el primer render
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // getSession lee localStorage — no espera red, setLoading(false) es inmediato
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) await loadPerfil(session.user.id);
+      if (session?.user) loadPerfil(session.user.id); // no await — corre en paralelo
       setLoading(false);
     });
 
     // Cambios posteriores: login, logout, refresh de token
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-        await loadPerfil(session.user.id);
+        loadPerfil(session.user.id); // no await
       } else {
         setPerfil(null);
         setPerfilError(null);
