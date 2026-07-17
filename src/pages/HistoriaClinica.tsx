@@ -14,6 +14,7 @@ import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTempl
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PacienteAutocomplete, PacienteOption } from '@/components/PacienteAutocomplete';
+import { usePlan } from '@/hooks/use-plan';
 
 /* ─────────────────── Interfaces ─────────────────── */
 interface EntradaHistoria {
@@ -164,9 +165,15 @@ function PanelDetalle({
           </p>
           <div>
             <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileSelect} />
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-              {uploading ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</> : <><Plus className="w-3 h-3" /> Adjuntar</>}
-            </Button>
+            {tiene('adjuntos_hc') ? (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                {uploading ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</> : <><Plus className="w-3 h-3" /> Adjuntar</>}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1 opacity-50 cursor-not-allowed" disabled title="Disponible en plan Premium">
+                <Plus className="w-3 h-3" /> Adjuntar
+              </Button>
+            )}
           </div>
         </div>
         {loadingAdjuntos ? (
@@ -204,6 +211,7 @@ function PanelDetalle({
 /* ═══════════════════════════════════════════════════ */
 export default function HistoriaClinica() {
   const { centroId, perfil } = useAuth();
+  const { tiene } = usePlan();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);

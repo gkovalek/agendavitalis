@@ -12,6 +12,7 @@ interface UsuarioPerfil {
   mail: string;
   activo: boolean;
   rol_nombre: string | null;
+  plan: 'basico' | 'intermedio' | 'premium';
 }
 
 interface AuthContextType {
@@ -36,7 +37,7 @@ interface FetchPerfilResult {
 async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo, rol:roles(nombre)')
+    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo, rol:roles(nombre), centro:centros(plan)')
     .eq('auth_user_id', userId)
     .maybeSingle();
 
@@ -44,6 +45,7 @@ async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
   if (!data) return { perfil: null, error: 'Tu cuenta existe en autenticación, pero no tiene perfil asignado en Vitalis.' };
 
   const rolData = data.rol as any;
+  const centroData = data.centro as any;
   const perfil: UsuarioPerfil = {
     id: data.id,
     auth_user_id: data.auth_user_id,
@@ -54,6 +56,7 @@ async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
     mail: data.mail,
     activo: data.activo,
     rol_nombre: rolData?.nombre ?? null,
+    plan: centroData?.plan ?? 'basico',
   };
 
   if (!perfil.activo) {

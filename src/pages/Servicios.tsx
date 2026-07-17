@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { usePlan } from '@/hooks/use-plan';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 const DIAS = [
@@ -72,6 +73,7 @@ export default function Servicios() {
   const { centroId } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { tiene } = usePlan();
 
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
@@ -200,6 +202,10 @@ export default function Servicios() {
 
   const handleSave = async () => {
     if (!centroId) return;
+    if (!editId && !tiene('servicios_ilimit') && servicios.length >= 3) {
+      toast({ title: 'Límite del plan Básico', description: 'El plan Básico incluye hasta 3 servicios. Actualizá tu plan para agregar más.', variant: 'destructive' });
+      return;
+    }
     if (franjas.length === 0) {
       toast({ title: 'Falta horario', description: 'Agregá al menos un día y franja horaria.', variant: 'destructive' });
       return;
