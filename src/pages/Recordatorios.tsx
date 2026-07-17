@@ -170,7 +170,7 @@ export default function Recordatorios() {
       return;
     }
     if (disponibles <= 0) {
-      toast({ title: 'Límite del plan alcanzado', description: `Usaste ${usadosMes} de ${planMensual} recordatorios este mes.`, variant: 'destructive' });
+      toast({ title: 'Límite mensual alcanzado', description: `Usaste ${usadosMes} de ${planMensual} recordatorios este mes. Solicitá ampliar tu plan o adquirí un pack adicional.`, variant: 'destructive', duration: 6000 });
       return;
     }
     setEnviandoId(turno.id);
@@ -223,7 +223,7 @@ export default function Recordatorios() {
     }
     const aEnviar = turnosPendientes.slice(0, disponibles);
     if (aEnviar.length < turnosPendientes.length) {
-      toast({ title: `Límite del plan`, description: `Solo se enviarán ${aEnviar.length} de ${turnosPendientes.length} (límite mensual).`, variant: 'destructive' });
+      toast({ title: 'Límite mensual alcanzado', description: `Solo se enviarán ${aEnviar.length} de ${turnosPendientes.length}. Solicitá ampliar tu plan o adquirí un pack adicional.`, variant: 'destructive', duration: 6000 });
     }
     setEnviandoAll(true);
     try {
