@@ -59,7 +59,9 @@ function formatHora(h: string) {
 
 /* ═══════════════════════════════════════════════════ */
 export default function Recordatorios() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const LIMITE_POR_PLAN: Record<string, number> = { basico: 100, intermedio: 300, premium: 500 };
+  const limitePlan = LIMITE_POR_PLAN[perfil?.plan ?? 'basico'] ?? 100;
   const { toast } = useToast();
   const { get } = useCentroConfig(centroId);
 
@@ -71,7 +73,7 @@ export default function Recordatorios() {
   const [logs, setLogs] = useState<RecordatorioLog[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
-  const [planMensual, setPlanMensual] = useState<number>(200);
+  const planMensual = limitePlan;
 
   /* ─── Filtros ─── */
   const manana = getManana();
@@ -92,9 +94,6 @@ export default function Recordatorios() {
       .then(({ data }) => setProfesionales((data ?? []) as Profesional[]));
     supabase.from('servicios').select('id, nombre').eq('centro_id', centroId).order('nombre')
       .then(({ data }) => setServicios((data ?? []) as Servicio[]));
-    // Cargar config del plan desde centros
-    supabase.from('centros').select('recordatorios_plan_mensual').eq('id', centroId).single()
-      .then(({ data }) => { if ((data as any)?.recordatorios_plan_mensual) setPlanMensual((data as any).recordatorios_plan_mensual); });
   }, [centroId]);
 
   /* ─── Fetch logs del mes actual ─── */
