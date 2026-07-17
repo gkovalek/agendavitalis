@@ -219,13 +219,28 @@ export default function PortalPublico() {
       return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
     })();
 
-    const { data: turno } = await supabase
-      .from('turnos')
-      .insert({ centro_id: centroId, paciente_id: pacienteId, profesional_id: selectedProfId, servicio_id: selectedServicioId, fecha: dateStr, hora_inicio: selectedHora, hora_fin: horaFin, estado: 'reservado', created_by: 'paciente' })
-      .select('id').single();
+    const capacidad = slots.find(s => s.hora === selectedHora)?.capacidad ?? 1;
+
+    const { data: turnoId, error: turnoError } = await supabase.rpc('reservar_turno', {
+      p_centro_id:      centroId,
+      p_profesional_id: selectedProfId,
+      p_servicio_id:    selectedServicioId,
+      p_paciente_id:    pacienteId,
+      p_fecha:          dateStr,
+      p_hora_inicio:    selectedHora,
+      p_hora_fin:       horaFin,
+      p_capacidad:      capacidad,
+    });
 
     setSaving(false);
-    if (turno?.id) setStep('confirmado');
+    if (turnoError) {
+      const msg = turnoError.message?.includes('slot_lleno')
+        ? 'El turno ya no está disponible. Por favor elegí otro horario.'
+        : 'No se pudo confirmar el turno. Intentá de nuevo.';
+      setFormErrors({ _general: msg });
+      return;
+    }
+    if (turnoId) setStep('confirmado');
   };
 
   const prof     = profesionales.find(p => p.id === selectedProfId);
@@ -507,6 +522,11 @@ export default function PortalPublico() {
                   </div>
                 </div>
 
+                {formErrors._general && (
+                  <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#B91C1C', marginTop: 8 }}>
+                    {formErrors._general}
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 }}>
                   <button onClick={() => setStep('fecha_hora')} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#5A7080', padding: '12px 16px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>Volver
