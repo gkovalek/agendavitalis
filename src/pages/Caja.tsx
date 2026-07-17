@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { TURNO_ESTADOS, TurnoEstado } from '@/lib/constants';
@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Profesional {
@@ -28,14 +29,28 @@ interface Movimiento {
   turno?: { id: string; estado: TurnoEstado; servicio?: { nombre: string } | null } | null;
 }
 
+interface TurnoPendiente {
+  id: string;
+  hora_inicio: string;
+  estado: TurnoEstado;
+  paciente_id: string;
+  profesional_id: string;
+  paciente?: { nombre: string; apellido: string } | null;
+  profesional?: { nombre: string; apellido: string } | null;
+  servicio?: { nombre: string } | null;
+}
+
 export default function Caja() {
   const { centroId } = useAuth();
   const { toast } = useToast();
 
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [turnosPendientes, setTurnosPendientes] = useState<TurnoPendiente[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [montosPendientes, setMontosPendientes] = useState<Record<string, { ef: string; tr: string; os: string }>>({});
+  const [registrandoId, setRegistrandoId] = useState<string | null>(null);
 
   const [fecha, setFecha] = useState(() => {
     const d = new Date();
@@ -49,22 +64,37 @@ export default function Caja() {
       .then(({ data }) => setProfesionales((data as Profesional[]) ?? []));
   }, [centroId]);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!centroId) return;
     setLoading(true);
-    let q = supabase.from('caja_movimientos')
+
+    let movQ = supabase.from('caja_movimientos')
       .select('id, fecha, turno_id, monto_efectivo, monto_transferencia, monto_prepaga, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), turno:turnos(id, estado, servicio:servicios(nombre))')
       .eq('fecha', fecha)
       .eq('centro_id', centroId)
       .order('created_at', { ascending: true });
+    if (profFiltro !== 'todos') movQ = movQ.eq('profesional_id', profFiltro);
 
-    if (profFiltro !== 'todos') q = q.eq('profesional_id', profFiltro);
+    let pendQ = supabase.from('turnos')
+      .select('id, hora_inicio, estado, paciente_id, profesional_id, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
+      .eq('fecha', fecha)
+      .eq('centro_id', centroId)
+      .in('estado', ['en_sala', 'siendo_atendidos'])
+      .order('hora_inicio', { ascending: true });
+    if (profFiltro !== 'todos') pendQ = pendQ.eq('profesional_id', profFiltro);
 
-    q.then(({ data }) => {
-      setMovimientos((data as any[]) ?? []);
-      setLoading(false);
-    });
+    const [{ data: movData }, { data: turnosData }] = await Promise.all([movQ, pendQ]);
+
+    const movs = (movData as any[]) ?? [];
+    const turnoIdsConCobro = new Set(movs.map((m: Movimiento) => m.turno_id).filter(Boolean));
+    const pendientes = ((turnosData as any[]) ?? []).filter((t: TurnoPendiente) => !turnoIdsConCobro.has(t.id));
+
+    setMovimientos(movs);
+    setTurnosPendientes(pendientes);
+    setLoading(false);
   }, [fecha, centroId, profFiltro]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleEstadoChange = async (mov: Movimiento, nuevoEstado: TurnoEstado) => {
     if (!mov.turno_id) return;
@@ -78,6 +108,43 @@ export default function Caja() {
       ));
     }
     setUpdatingId(null);
+  };
+
+  const handleRegistrarCobro = async (turno: TurnoPendiente) => {
+    const montos = montosPendientes[turno.id] ?? { ef: '', tr: '', os: '' };
+    const ef = parseFloat(montos.ef) || 0;
+    const tr = parseFloat(montos.tr) || 0;
+    const os = parseFloat(montos.os) || 0;
+    if (ef + tr + os === 0) {
+      toast({ title: 'Ingresá al menos un monto', variant: 'destructive' });
+      return;
+    }
+    setRegistrandoId(turno.id);
+    const { error } = await supabase.from('caja_movimientos').insert({
+      turno_id: turno.id,
+      fecha,
+      centro_id: centroId,
+      paciente_id: turno.paciente_id,
+      profesional_id: turno.profesional_id,
+      monto_efectivo: ef,
+      monto_transferencia: tr,
+      monto_prepaga: os,
+    });
+    setRegistrandoId(null);
+    if (error) {
+      toast({ title: 'Error al registrar', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Cobro registrado' });
+      setMontosPendientes(prev => { const n = { ...prev }; delete n[turno.id]; return n; });
+      fetchData();
+    }
+  };
+
+  const setMonto = (turnoId: string, campo: 'ef' | 'tr' | 'os', valor: string) => {
+    setMontosPendientes(prev => ({
+      ...prev,
+      [turnoId]: { ...(prev[turnoId] ?? { ef: '', tr: '', os: '' }), [campo]: valor },
+    }));
   };
 
   const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`;
@@ -140,7 +207,97 @@ export default function Caja() {
         ))}
       </div>
 
-      {/* Tabla */}
+      {/* Pacientes en curso — sin cobro registrado */}
+      {!loading && turnosPendientes.length > 0 && (
+        <Card className="border-amber-200 shadow-sm">
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-4 py-3 bg-amber-50/80 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/30 rounded-t-lg">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-400">
+                Pacientes en curso sin cobro registrado ({turnosPendientes.length})
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-amber-50/40 dark:bg-amber-950/10">
+                    <TableHead className="text-[11px] uppercase tracking-wide">Paciente</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide">Profesional</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide">Servicio / Hora</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide">Estado</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-right">Efectivo</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-right">Transferencia</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-right">Obra social</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {turnosPendientes.map(t => {
+                    const estadoCfg = TURNO_ESTADOS[t.estado] ?? TURNO_ESTADOS.reservado;
+                    const montos = montosPendientes[t.id] ?? { ef: '', tr: '', os: '' };
+                    const registrando = registrandoId === t.id;
+                    return (
+                      <TableRow key={t.id} className="bg-amber-50/20 dark:bg-amber-950/5">
+                        <TableCell className="font-medium text-[13px]">
+                          {t.paciente ? `${t.paciente.apellido}, ${t.paciente.nombre}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-[13px]">
+                          {t.profesional ? `${t.profesional.apellido}, ${t.profesional.nombre}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-[13px] text-muted-foreground">
+                          <span>{(t.servicio as any)?.nombre ?? '—'}</span>
+                          <span className="block text-[11px]">{t.hora_inicio}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-1.5 text-[12px]">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: estadoCfg.color }} />
+                            {estadoCfg.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number" min="0" placeholder="0"
+                            value={montos.ef} onChange={e => setMonto(t.id, 'ef', e.target.value)}
+                            className="h-8 w-24 text-right text-[13px] ml-auto"
+                            disabled={registrando}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number" min="0" placeholder="0"
+                            value={montos.tr} onChange={e => setMonto(t.id, 'tr', e.target.value)}
+                            className="h-8 w-24 text-right text-[13px] ml-auto"
+                            disabled={registrando}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number" min="0" placeholder="0"
+                            value={montos.os} onChange={e => setMonto(t.id, 'os', e.target.value)}
+                            className="h-8 w-24 text-right text-[13px] ml-auto"
+                            disabled={registrando}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm" className="h-8 text-[12px] whitespace-nowrap"
+                            onClick={() => handleRegistrarCobro(t)}
+                            disabled={registrando}
+                          >
+                            {registrando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Registrar'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabla de cobros del día — sin modificar */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
           {loading ? (
