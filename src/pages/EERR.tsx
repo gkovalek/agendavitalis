@@ -103,26 +103,28 @@ function SeccionCostos({
         )}
 
         {/* Formulario inline */}
-        <div className="flex gap-2 pt-1">
+        <div className="space-y-2 pt-1">
           <Input
             placeholder="Concepto"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            className="h-8 text-[12px] flex-1 min-w-0"
+            className="h-9 text-[13px] w-full"
             disabled={saving}
           />
-          <Input
-            type="number" min="0" placeholder="$"
-            value={monto}
-            onChange={e => setMonto(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            className="h-8 text-[12px] w-24 text-right"
-            disabled={saving}
-          />
-          <Button size="sm" className="h-8 px-2 shrink-0" onClick={handleAdd} disabled={saving || !nombre.trim() || !monto}>
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          </Button>
+          <div className="flex gap-2">
+            <Input
+              type="number" min="0" placeholder="$"
+              value={monto}
+              onChange={e => setMonto(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              className="h-8 text-[13px] flex-1 text-right"
+              disabled={saving}
+            />
+            <Button size="sm" className="h-8 px-2 shrink-0" onClick={handleAdd} disabled={saving || !nombre.trim() || !monto}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
