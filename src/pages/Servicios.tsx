@@ -245,10 +245,8 @@ export default function Servicios() {
       .eq('servicio_id', servicioId!)
       .eq('centro_id', centroId);
 
-    // profsProtegidos: profesionales que conservan su PCS porque tienen turnos activos
-    let profsProtegidos = new Set<string>();
-
     if (oldPcs && oldPcs.length > 0) {
+      // Profesionales que tienen turnos activos (no cancelados/finalizados) para este servicio
       const { data: turnosActivos } = await supabase
         .from('turnos')
         .select('profesional_id')
@@ -256,10 +254,10 @@ export default function Servicios() {
         .eq('servicio_id', servicioId!)
         .not('estado', 'in', '(cancelado,finalizado)');
 
-      profsProtegidos = new Set((turnosActivos ?? []).map((t: any) => t.profesional_id));
+      const profsConTurnos = new Set((turnosActivos ?? []).map((t: any) => t.profesional_id));
 
       const idsParaEliminar = oldPcs
-        .filter(p => !profsProtegidos.has(p.profesional_id))
+        .filter(p => !profsConTurnos.has(p.profesional_id))
         .map(p => p.id);
 
       if (idsParaEliminar.length > 0) {
@@ -268,8 +266,8 @@ export default function Servicios() {
       }
     }
 
-    // Crear nuevo PCS solo para profesionales sin PCS activo existente
-    for (const profId of (profSeleccionados as string[]).filter(id => !profsProtegidos.has(id))) {
+    // Crear nuevo PCS por profesional seleccionado y sus franjas
+    for (const profId of profSeleccionados) {
       // Crear PCS
       const { data: pcsData, error: pcsErr } = await supabase
         .from('profesional_centro_servicio')
