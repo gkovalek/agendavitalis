@@ -244,7 +244,10 @@ export default function Reportes() {
         fetchComp(rangoSem), fetchComp(rangoMes), fetchComp(rangoAño),
       ]);
 
-      setTurnos((turnosRes.data as TurnoItem[]) ?? []);
+      setTurnos(((turnosRes.data as any[]) ?? []).map((t: any) => ({
+        ...t,
+        servicio: Array.isArray(t.servicio) ? (t.servicio[0] ?? null) : t.servicio,
+      })) as TurnoItem[]);
       setMovimientos((movRes.data as any[]) ?? []);
       setCompSemana(cSem);
       setCompMes(cMes);
