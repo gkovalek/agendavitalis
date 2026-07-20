@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail, ShieldCheck, CalendarOff, Trash2, Plus } from 'lucide-react';
+import { Loader2, Save, Settings, Clock, AlertTriangle, Copy, Check, MapPin, Globe, Mail, ShieldCheck, CalendarOff, Trash2, Plus, CreditCard, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SQL_SCRIPT = `-- Ejecutar en Supabase SQL Editor para habilitar configuración por centro
@@ -97,12 +97,98 @@ interface DiaNolaboral {
 
 interface ProfSimple { id: string; nombre: string; apellido: string; }
 
+const MP_APP_ID  = import.meta.env.VITE_MP_APP_ID as string | undefined;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
 export default function Configuracion() {
   const { centroId } = useAuth();
   const { get, getNumber, set, loading, tableExists } = useCentroConfig(centroId);
   const { toast } = useToast();
   const [saving, setSaving] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // ── Mercado Pago ─────────────────────────────────────────────────────────
+  const [mpUserId, setMpUserId]       = useState<string | null>(null);
+  const [mpFeePct, setMpFeePct]       = useState('3');
+  const [mpLoading, setMpLoading]     = useState(true);
+  const [mpConnecting, setMpConnecting] = useState(false);
+  const [mpDisconnecting, setMpDisconnecting] = useState(false);
+
+  // Cargar estado MP del centro
+  useEffect(() => {
+    if (!centroId) return;
+    supabase.from('centros').select('mp_user_id, mp_fee_pct').eq('id', centroId).single()
+      .then(({ data }) => {
+        setMpUserId(data?.mp_user_id ?? null);
+        setMpFeePct(String(data?.mp_fee_pct ?? 3));
+        setMpLoading(false);
+      });
+  }, [centroId]);
+
+  // Detectar redirect de MP con ?code=
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (!code) return;
+
+    // Limpiar la URL inmediatamente para evitar re-procesar si recarga
+    window.history.replaceState({}, '', window.location.pathname);
+
+    const exchangeCode = async () => {
+      setMpConnecting(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/mp-oauth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      const json = await res.json();
+      setMpConnecting(false);
+      if (json.ok) {
+        setMpUserId(json.mp_user_id);
+        toast({ title: '¡Mercado Pago conectado!', description: `Cuenta ${json.mp_user_id} vinculada correctamente.` });
+      } else {
+        toast({ title: 'Error al conectar MP', description: json.error ?? 'Intentá de nuevo.', variant: 'destructive' });
+      }
+    };
+
+    exchangeCode();
+  }, []);
+
+  const handleMpConnect = () => {
+    if (!MP_APP_ID) {
+      toast({ title: 'MP_APP_ID no configurado', variant: 'destructive' });
+      return;
+    }
+    const redirectUri = encodeURIComponent(window.location.origin + '/configuracion');
+    const url = `https://auth.mercadopago.com/authorization?client_id=${MP_APP_ID}&response_type=code&platform_id=mp&redirect_uri=${redirectUri}`;
+    window.location.href = url;
+  };
+
+  const handleMpDisconnect = async () => {
+    if (!centroId) return;
+    setMpDisconnecting(true);
+    await supabase.from('centros').update({ mp_access_token: null, mp_public_key: null, mp_user_id: null }).eq('id', centroId);
+    setMpUserId(null);
+    setMpDisconnecting(false);
+    toast({ title: 'Mercado Pago desconectado' });
+  };
+
+  const handleSaveMpFee = async () => {
+    if (!centroId) return;
+    const pct = parseFloat(mpFeePct);
+    if (isNaN(pct) || pct < 0 || pct > 30) {
+      toast({ title: 'Porcentaje inválido (0–30%)', variant: 'destructive' });
+      return;
+    }
+    setSaving('mp_fee');
+    await supabase.from('centros').update({ mp_fee_pct: pct }).eq('id', centroId);
+    setSaving(null);
+    toast({ title: 'Comisión guardada' });
+  };
 
   // Local state para edición
   const [vals, setVals] = useState<Record<string, string>>({});
@@ -440,6 +526,92 @@ export default function Configuracion() {
             <Copy className="h-4 w-4" />
           </Button>
         </div>
+      </Section>
+
+      {/* Mercado Pago */}
+      <Section
+        title="Mercado Pago"
+        description="Aceptá pagos online en el portal de reservas. La comisión de Vitalis se descuenta automáticamente."
+        icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+      >
+        {mpLoading || mpConnecting ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {mpConnecting ? 'Conectando con Mercado Pago…' : 'Cargando…'}
+          </div>
+        ) : mpUserId ? (
+          <div className="space-y-4">
+            {/* Estado conectado */}
+            <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900/40 px-4 py-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Cuenta conectada</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-500 truncate">ID de cuenta MP: {mpUserId}</p>
+              </div>
+            </div>
+
+            {/* Comisión Vitalis */}
+            <div className="space-y-2">
+              <Label className="text-sm">Comisión Vitalis por cobro (%)</Label>
+              <p className="text-xs text-muted-foreground">
+                Este porcentaje se descuenta automáticamente de cada pago y va a la cuenta de Vitalis.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="0.5"
+                  value={mpFeePct}
+                  onChange={e => setMpFeePct(e.target.value)}
+                  className="w-28"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+                <Button
+                  size="sm"
+                  disabled={saving === 'mp_fee'}
+                  onClick={handleSaveMpFee}
+                >
+                  {saving === 'mp_fee' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  <Save className="w-4 h-4 mr-2" /> Guardar
+                </Button>
+              </div>
+            </div>
+
+            {/* Desconectar */}
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                disabled={mpDisconnecting}
+                onClick={handleMpDisconnect}
+              >
+                {mpDisconnecting
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : <XCircle className="w-4 h-4 mr-2" />
+                }
+                Desconectar Mercado Pago
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-lg border border-muted bg-muted/30 px-4 py-3">
+              <XCircle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Sin cuenta conectada</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Conectá tu cuenta de Mercado Pago para recibir pagos online de tus pacientes.
+                </p>
+              </div>
+            </div>
+            <Button onClick={handleMpConnect} className="gap-2">
+              <CreditCard className="w-4 h-4" />
+              Conectar Mercado Pago
+            </Button>
+          </div>
+        )}
       </Section>
     </div>
   );
