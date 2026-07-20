@@ -97,7 +97,7 @@ export default function Caja() {
     if (pendientesBase.length > 0) {
       const pairs = pendientesBase
         .filter((t: any) => t.profesional_id && t.servicio_id)
-        .map((t: any) => `profesional_id.eq.${t.profesional_id},servicio_id.eq.${t.servicio_id}`);
+        .map((t: any) => `and(profesional_id.eq.${t.profesional_id},servicio_id.eq.${t.servicio_id})`);
 
       const { data: pcsData } = await supabase
         .from('profesional_centro_servicio')

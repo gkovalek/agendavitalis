@@ -42,14 +42,14 @@ CREATE POLICY "admin modifica config de su centro" ON centros_config
     AND EXISTS (
       SELECT 1 FROM usuarios u
       JOIN roles r ON r.id = u.rol_id
-      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre IN ('admin', 'administrador')
     )
   ) WITH CHECK (
     centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
     AND EXISTS (
       SELECT 1 FROM usuarios u
       JOIN roles r ON r.id = u.rol_id
-      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre IN ('admin', 'administrador')
     )
   );
 
