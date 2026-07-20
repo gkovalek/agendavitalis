@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlan } from '@/hooks/use-plan';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type Categoria = 'fijo' | 'variable' | 'gasto' | 'ingreso';
@@ -103,28 +104,26 @@ function SeccionCostos({
         )}
 
         {/* Formulario inline */}
-        <div className="space-y-2 pt-1">
+        <div className="flex gap-2 pt-1">
           <Input
             placeholder="Concepto"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            className="h-9 text-[13px] w-full"
+            className="h-8 text-[12px] flex-1 min-w-0"
             disabled={saving}
           />
-          <div className="flex gap-2">
-            <Input
-              type="number" min="0" placeholder="$"
-              value={monto}
-              onChange={e => setMonto(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              className="h-8 text-[13px] flex-1 text-right"
-              disabled={saving}
-            />
-            <Button size="sm" className="h-8 px-2 shrink-0" onClick={handleAdd} disabled={saving || !nombre.trim() || !monto}>
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-            </Button>
-          </div>
+          <Input
+            type="number" min="0" placeholder="$"
+            value={monto}
+            onChange={e => setMonto(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            className="h-8 text-[12px] w-24 text-right"
+            disabled={saving}
+          />
+          <Button size="sm" className="h-8 px-2 shrink-0" onClick={handleAdd} disabled={saving || !nombre.trim() || !monto}>
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -134,6 +133,7 @@ function SeccionCostos({
 export default function EERR() {
   const { centroId } = useAuth();
   const { toast } = useToast();
+  const { tiene } = usePlan();
 
   const hoy = new Date();
   const [year, setYear] = useState(hoy.getFullYear());
@@ -145,6 +145,15 @@ export default function EERR() {
   const [ingresos, setIngresos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  if (!tiene('eerr')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+        <Lock className="w-8 h-8 opacity-40" />
+        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
+      </div>
+    );
+  }
 
   const fetchData = useCallback(async () => {
     if (!centroId) return;

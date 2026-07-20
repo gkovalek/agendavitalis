@@ -18,7 +18,7 @@ const reservaSchema = z.object({
 // ── Interfaces ───────────────────────────────────────────────────────────────
 interface Centro      { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
-interface Servicio    { id: string; nombre: string; duracion_minutos: number; costo_base?: number; }
+interface Servicio    { id: string; nombre: string; duracion_minutos: number; costo_base?: number | null; }
 interface PCS         { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; agenda_id: string | null; }
 interface SlotInfo    { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
@@ -94,9 +94,16 @@ export default function PortalPublico() {
   // ── Resolver centroId desde slug o param directo ─────────────────────────
   useEffect(() => {
     if (centroIdParam) { setResolvedCentroId(centroIdParam); return; }
-    if (!slug) return;
-    supabase.from('centros').select('id').eq('slug', slug).single()
-      .then(({ data }) => setResolvedCentroId(data?.id ?? null));
+    if (!slug) { setLoadingInit(false); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from('centros').select('id').eq('slug', slug).single();
+        if (!data?.id) setLoadingInit(false);
+        else setResolvedCentroId(data.id);
+      } catch {
+        setLoadingInit(false);
+      }
+    })();
   }, [centroIdParam, slug]);
 
   // ── Carga inicial ────────────────────────────────────────────────────────
