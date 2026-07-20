@@ -18,6 +18,7 @@ const FEATURE_MIN_PLAN = {
   liquidacion_os:   'intermedio',
   reportes:         'intermedio',
   servicios_ilimit: 'intermedio',
+  eerr:             'premium',
 } as const satisfies Record<string, Plan>;
 
 export type Feature = keyof typeof FEATURE_MIN_PLAN;
