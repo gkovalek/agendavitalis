@@ -23,6 +23,7 @@ import Reportes from "@/pages/Reportes";
 import EERR from "@/pages/EERR";
 import Configuracion from "@/pages/Configuracion";
 import PortalPublico from "@/pages/PortalPublico";
+import PagoResultado from "@/pages/PagoResultado";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import { Loader2 } from "lucide-react";
@@ -79,6 +80,9 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/reservar/:centroId" element={<PortalPublico />} />
       <Route path="/reservas/:slug" element={<PortalPublico />} />
+      <Route path="/pago/success" element={<PagoResultado tipo="success" />} />
+      <Route path="/pago/failure" element={<PagoResultado tipo="failure" />} />
+      <Route path="/pago/pending" element={<PagoResultado tipo="pending" />} />
 
       {/* Rutas protegidas */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

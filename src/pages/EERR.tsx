@@ -135,15 +135,6 @@ export default function EERR() {
   const { toast } = useToast();
   const { tiene } = usePlan();
 
-  if (!tiene('eerr')) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
-        <Lock className="w-8 h-8 opacity-40" />
-        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
-      </div>
-    );
-  }
-
   const hoy = new Date();
   const [year, setYear] = useState(hoy.getFullYear());
   const [month, setMonth] = useState(hoy.getMonth() + 1);
@@ -154,6 +145,15 @@ export default function EERR() {
   const [ingresos, setIngresos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  if (!tiene('eerr')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+        <Lock className="w-8 h-8 opacity-40" />
+        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
+      </div>
+    );
+  }
 
   const fetchData = useCallback(async () => {
     if (!centroId) return;
