@@ -86,9 +86,17 @@ function shiftDias(rango: RangoFechas, dias: number): RangoFechas {
 }
 
 function shiftMes(rango: RangoFechas): RangoFechas {
-  const d = new Date(rango.desde + 'T00:00:00'); d.setMonth(d.getMonth() - 1);
-  const h = new Date(rango.hasta + 'T00:00:00'); h.setMonth(h.getMonth() - 1);
-  return { desde: toDateStr(d), hasta: toDateStr(h) };
+  const shiftOneMonth = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const targetMonth = d.getMonth() - 1;
+    d.setDate(1); // evitar overflow antes de cambiar mes
+    d.setMonth(targetMonth);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const origDay = parseInt(dateStr.slice(8), 10);
+    d.setDate(Math.min(origDay, lastDay));
+    return toDateStr(d);
+  };
+  return { desde: shiftOneMonth(rango.desde), hasta: shiftOneMonth(rango.hasta) };
 }
 
 function shiftAño(rango: RangoFechas): RangoFechas {
@@ -236,28 +244,8 @@ export default function Reportes() {
         fetchComp(rangoSem), fetchComp(rangoMes), fetchComp(rangoAño),
       ]);
 
-      setTurnos(((turnosRes.data as any[]) ?? []).map((t: any) => ({
-        id: t.id,
-        fecha: t.fecha,
-        estado: t.estado,
-        profesional_id: t.profesional_id,
-        servicio_id: t.servicio_id,
-        servicio: Array.isArray(t.servicio) ? t.servicio[0] : t.servicio,
-      })) as TurnoItem[]);
-      setMovimientos(((movRes.data as any[]) ?? []).map((m: any) => ({
-        ...m,
-        profesional: Array.isArray(m.profesional) ? m.profesional[0] : m.profesional,
-        turno: m.turno ? {
-          ...m.turno,
-          servicio: Array.isArray(m.turno.servicio) ? m.turno.servicio[0] : m.turno.servicio,
-          paciente: m.turno.paciente ? {
-            ...m.turno.paciente,
-            obra_social: Array.isArray(m.turno.paciente.obra_social)
-              ? m.turno.paciente.obra_social[0]
-              : m.turno.paciente.obra_social,
-          } : null,
-        } : null,
-      })) as Movimiento[]);
+      setTurnos((turnosRes.data as TurnoItem[]) ?? []);
+      setMovimientos((movRes.data as any[]) ?? []);
       setCompSemana(cSem);
       setCompMes(cMes);
       setCompAño(cAño);
