@@ -236,8 +236,28 @@ export default function Reportes() {
         fetchComp(rangoSem), fetchComp(rangoMes), fetchComp(rangoAño),
       ]);
 
-      setTurnos((turnosRes.data as TurnoItem[]) ?? []);
-      setMovimientos((movRes.data as any[]) ?? []);
+      setTurnos(((turnosRes.data as any[]) ?? []).map((t: any) => ({
+        id: t.id,
+        fecha: t.fecha,
+        estado: t.estado,
+        profesional_id: t.profesional_id,
+        servicio_id: t.servicio_id,
+        servicio: Array.isArray(t.servicio) ? t.servicio[0] : t.servicio,
+      })) as TurnoItem[]);
+      setMovimientos(((movRes.data as any[]) ?? []).map((m: any) => ({
+        ...m,
+        profesional: Array.isArray(m.profesional) ? m.profesional[0] : m.profesional,
+        turno: m.turno ? {
+          ...m.turno,
+          servicio: Array.isArray(m.turno.servicio) ? m.turno.servicio[0] : m.turno.servicio,
+          paciente: m.turno.paciente ? {
+            ...m.turno.paciente,
+            obra_social: Array.isArray(m.turno.paciente.obra_social)
+              ? m.turno.paciente.obra_social[0]
+              : m.turno.paciente.obra_social,
+          } : null,
+        } : null,
+      })) as Movimiento[]);
       setCompSemana(cSem);
       setCompMes(cMes);
       setCompAño(cAño);
