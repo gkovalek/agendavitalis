@@ -42,14 +42,14 @@ CREATE POLICY "admin modifica config de su centro" ON centros_config
     AND EXISTS (
       SELECT 1 FROM usuarios u
       JOIN roles r ON r.id = u.rol_id
-      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre IN ('admin', 'administrador')
     )
   ) WITH CHECK (
     centro_id = (SELECT centro_id FROM usuarios WHERE auth_user_id = auth.uid() AND activo = true)
     AND EXISTS (
       SELECT 1 FROM usuarios u
       JOIN roles r ON r.id = u.rol_id
-      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre = 'admin'
+      WHERE u.auth_user_id = auth.uid() AND u.activo = true AND r.nombre IN ('admin', 'administrador')
     )
   );
 
@@ -78,7 +78,7 @@ function Section({ title, description, icon, children }: SectionProps) {
   );
 }
 
-function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>

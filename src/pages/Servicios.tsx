@@ -238,19 +238,32 @@ export default function Servicios() {
       servicioId = data.id;
     }
 
-    // Eliminar PCS existentes para este servicio
+    // Eliminar PCS existentes para este servicio (solo los que no tienen turnos activos)
     const { data: oldPcs } = await supabase
       .from('profesional_centro_servicio')
-      .select('id')
+      .select('id, profesional_id')
       .eq('servicio_id', servicioId!)
       .eq('centro_id', centroId);
 
     if (oldPcs && oldPcs.length > 0) {
-      const oldIds = oldPcs.map(p => p.id);
-      // Eliminar franjas primero (FK)
-      await supabase.from('pcs_horario_dia').delete().in('pcs_id', oldIds);
-      // Eliminar PCS (solo los que no tienen turnos)
-      await supabase.from('profesional_centro_servicio').delete().in('id', oldIds);
+      // Profesionales que tienen turnos activos (no cancelados/finalizados) para este servicio
+      const { data: turnosActivos } = await supabase
+        .from('turnos')
+        .select('profesional_id')
+        .eq('centro_id', centroId!)
+        .eq('servicio_id', servicioId!)
+        .not('estado', 'in', '(cancelado,finalizado)');
+
+      const profsConTurnos = new Set((turnosActivos ?? []).map((t: any) => t.profesional_id));
+
+      const idsParaEliminar = oldPcs
+        .filter(p => !profsConTurnos.has(p.profesional_id))
+        .map(p => p.id);
+
+      if (idsParaEliminar.length > 0) {
+        await supabase.from('pcs_horario_dia').delete().in('pcs_id', idsParaEliminar);
+        await supabase.from('profesional_centro_servicio').delete().in('id', idsParaEliminar);
+      }
     }
 
     // Crear nuevo PCS por profesional seleccionado y sus franjas
