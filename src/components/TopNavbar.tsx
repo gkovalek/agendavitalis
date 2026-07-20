@@ -142,7 +142,7 @@ export function TopNavbar() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const rol = perfil?.rol_nombre ?? 'admin';
-  const esAdmin = rol === 'admin' || !perfil?.rol_nombre;
+  const esAdmin = rol === 'admin' || rol === 'administrador' || !perfil?.rol_nombre;
   const esSecretario = rol === 'secretario';
   const esProfesional = rol === 'profesional';
 
