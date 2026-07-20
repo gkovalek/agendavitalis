@@ -35,9 +35,11 @@ interface TurnoPendiente {
   estado: TurnoEstado;
   paciente_id: string;
   profesional_id: string;
+  servicio_id: string | null;
   paciente?: { nombre: string; apellido: string } | null;
   profesional?: { nombre: string; apellido: string } | null;
   servicio?: { nombre: string } | null;
+  precio_particular?: number | null;
 }
 
 export default function Caja() {
@@ -76,7 +78,7 @@ export default function Caja() {
     if (profFiltro !== 'todos') movQ = movQ.eq('profesional_id', profFiltro);
 
     let pendQ = supabase.from('turnos')
-      .select('id, hora_inicio, estado, paciente_id, profesional_id, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
+      .select('id, hora_inicio, estado, paciente_id, profesional_id, servicio_id, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
       .eq('fecha', fecha)
       .eq('centro_id', centroId)
       .in('estado', ['en_sala', 'siendo_atendido'])
@@ -86,8 +88,49 @@ export default function Caja() {
     const [{ data: movData }, { data: turnosData }] = await Promise.all([movQ, pendQ]);
 
     const movs = (movData as any[]) ?? [];
+    const turnosRaw = (turnosData as any[]) ?? [];
     const turnoIdsConCobro = new Set(movs.map((m: Movimiento) => m.turno_id).filter(Boolean));
-    const pendientes = ((turnosData as any[]) ?? []).filter((t: TurnoPendiente) => !turnoIdsConCobro.has(t.id));
+    const pendientesBase = turnosRaw.filter((t: any) => !turnoIdsConCobro.has(t.id));
+
+    // Enriquecer con precio_particular desde pcs_horario_dia
+    let pendientes: TurnoPendiente[] = pendientesBase;
+    if (pendientesBase.length > 0) {
+      const pairs = pendientesBase
+        .filter((t: any) => t.profesional_id && t.servicio_id)
+        .map((t: any) => `profesional_id.eq.${t.profesional_id},servicio_id.eq.${t.servicio_id}`);
+
+      const { data: pcsData } = await supabase
+        .from('profesional_centro_servicio')
+        .select('id, profesional_id, servicio_id')
+        .eq('centro_id', centroId)
+        .or(pairs.join(','));
+
+      if (pcsData && pcsData.length > 0) {
+        const pcsIds = pcsData.map((p: any) => p.id);
+        const { data: horarioData } = await supabase
+          .from('pcs_horario_dia')
+          .select('pcs_id, precio_particular')
+          .in('pcs_id', pcsIds)
+          .eq('activo', true);
+
+        // Mapa pcs_id → primer precio_particular no nulo
+        const precioByPcs: Record<string, number | null> = {};
+        for (const h of (horarioData ?? [])) {
+          if (!(h.pcs_id in precioByPcs)) precioByPcs[h.pcs_id] = h.precio_particular ?? null;
+        }
+        // Mapa "profesional_id:servicio_id" → precio
+        const precioMap: Record<string, number | null> = {};
+        for (const p of pcsData) {
+          const key = `${p.profesional_id}:${p.servicio_id}`;
+          if (!(key in precioMap)) precioMap[key] = precioByPcs[p.id] ?? null;
+        }
+
+        pendientes = pendientesBase.map((t: any) => ({
+          ...t,
+          precio_particular: precioMap[`${t.profesional_id}:${t.servicio_id}`] ?? null,
+        }));
+      }
+    }
 
     setMovimientos(movs);
     setTurnosPendientes(pendientes);
@@ -115,7 +158,18 @@ export default function Caja() {
     const ef = parseFloat(montos.ef) || 0;
     const tr = parseFloat(montos.tr) || 0;
     const os = parseFloat(montos.os) || 0;
-    if (ef + tr + os === 0) {
+    const tieneArancel = turno.precio_particular != null && turno.precio_particular > 0;
+    if (tieneArancel && ef + tr + os < turno.precio_particular!) {
+      toast({
+        title: 'Monto inferior al arancel',
+        description: `El arancel para este servicio es $${turno.precio_particular!.toLocaleString('es-AR')}. El cobro registrado es menor.`,
+        variant: 'destructive',
+        duration: 5000,
+      });
+      // Continúa igual — solo es advertencia
+    } else if (!tieneArancel && ef + tr + os === 0) {
+      // Sin arancel y sin monto: registrar igual (valor 0 es válido para servicios OS)
+    } else if (tieneArancel && ef + tr + os === 0) {
       toast({ title: 'Ingresá al menos un monto', variant: 'destructive' });
       return;
     }
@@ -247,6 +301,10 @@ export default function Caja() {
                         <TableCell className="text-[13px] text-muted-foreground">
                           <span>{(t.servicio as any)?.nombre ?? '—'}</span>
                           <span className="block text-[11px]">{t.hora_inicio}</span>
+                          {t.precio_particular != null && t.precio_particular > 0
+                            ? <span className="text-[10px] font-medium text-emerald-700">Arancel: {fmt(t.precio_particular)}</span>
+                            : <span className="text-[10px] text-muted-foreground/60">Sin arancel</span>
+                          }
                         </TableCell>
                         <TableCell>
                           <span className="flex items-center gap-1.5 text-[12px]">
