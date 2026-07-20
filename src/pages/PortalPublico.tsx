@@ -18,7 +18,7 @@ const reservaSchema = z.object({
 // ── Interfaces ───────────────────────────────────────────────────────────────
 interface Centro      { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
-interface Servicio    { id: string; nombre: string; duracion_minutos: number; costo_base?: number; }
+interface Servicio    { id: string; nombre: string; duracion_minutos: number; }
 interface PCS         { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; agenda_id: string | null; }
 interface SlotInfo    { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
@@ -61,7 +61,8 @@ function isDayWorking(date: Date, pcsRecords: PCS[], profId: string, servicioId:
 
 // ── Componente ───────────────────────────────────────────────────────────────
 export default function PortalPublico() {
-  const { centroId } = useParams<{ centroId: string }>();
+  const { centroId: centroIdParam, slug } = useParams<{ centroId?: string; slug?: string }>();
+  const [resolvedCentroId, setResolvedCentroId] = useState<string | null>(null);
 
   const [centro, setCentro]             = useState<Centro | null>(null);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -90,13 +91,21 @@ export default function PortalPublico() {
     return dates;
   }, []);
 
+  // ── Resolver centroId desde slug o param directo ─────────────────────────
+  useEffect(() => {
+    if (centroIdParam) { setResolvedCentroId(centroIdParam); return; }
+    if (!slug) return;
+    supabase.from('centros').select('id').eq('slug', slug).single()
+      .then(({ data }) => setResolvedCentroId(data?.id ?? null));
+  }, [centroIdParam, slug]);
+
   // ── Carga inicial ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!centroId) return;
+    if (!resolvedCentroId) return;
     Promise.all([
-      supabase.from('centros').select('id, nombre, direccion, telefono').eq('id', centroId).single(),
-      supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda_id').eq('centro_id', centroId).eq('activo', true),
+      supabase.from('centros').select('id, nombre, direccion, telefono').eq('id', resolvedCentroId).single(),
+      supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', resolvedCentroId).eq('activo', true).order('apellido'),
+      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda_id').eq('centro_id', resolvedCentroId).eq('activo', true),
     ]).then(([cRes, pRes, pcsRes]) => {
       setCentro(cRes.data);
       setProfesionales(pRes.data ?? []);
@@ -105,7 +114,7 @@ export default function PortalPublico() {
     }).catch(() => {
       setLoadingInit(false);
     });
-  }, [centroId]);
+  }, [resolvedCentroId]);
 
   // ── Servicios del profesional ────────────────────────────────────────────
   const serviciosDelProf = useMemo(() => {
@@ -122,7 +131,7 @@ export default function PortalPublico() {
 
   // ── Slots disponibles ────────────────────────────────────────────────────
   const fetchSlots = async () => {
-    if (!selectedProfId || !selectedServicioId || !centroId) return;
+    if (!selectedProfId || !selectedServicioId || !resolvedCentroId) return;
     setLoadingSlots(true);
 
     const dateStr = formatDate(selectedDate);
@@ -155,7 +164,7 @@ export default function PortalPublico() {
     // Filtrar por servicio_id para no contar turnos de otros servicios del mismo profesional
     const { data: turnosExistentes } = await supabase
       .from('turnos').select('hora_inicio')
-      .eq('centro_id', centroId)
+      .eq('centro_id', resolvedCentroId)
       .eq('profesional_id', selectedProfId)
       .eq('servicio_id', selectedServicioId)
       .eq('fecha', dateStr)
@@ -188,7 +197,7 @@ export default function PortalPublico() {
 
   // ── Confirmar reserva ────────────────────────────────────────────────────
   const handleConfirmarReserva = async () => {
-    if (!centroId) return;
+    if (!resolvedCentroId) return;
     const parsed = reservaSchema.safeParse(form);
     if (!parsed.success) {
       const errs: Record<string, string> = {};
@@ -203,7 +212,7 @@ export default function PortalPublico() {
     const servicio = servicios.find(s => s.id === selectedServicioId);
 
     const { data: pacienteIdResult, error: rpcError } = await supabase.rpc('buscar_o_crear_paciente', {
-      p_centro_id: centroId,
+      p_centro_id: resolvedCentroId,
       p_nombre:    data.nombre,
       p_apellido:  data.apellido,
       p_dni:       data.dni    || null,
@@ -222,7 +231,7 @@ export default function PortalPublico() {
     const capacidad = slots.find(s => s.hora === selectedHora)?.capacidad ?? 1;
 
     const { data: turnoId, error: turnoError } = await supabase.rpc('reservar_turno', {
-      p_centro_id:      centroId,
+      p_centro_id:      resolvedCentroId,
       p_profesional_id: selectedProfId,
       p_servicio_id:    selectedServicioId,
       p_paciente_id:    pacienteId,
