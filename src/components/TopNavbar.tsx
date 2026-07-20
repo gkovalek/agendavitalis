@@ -42,6 +42,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Caja del día', href: '/caja' },
       { label: 'Dashboard financiero', href: '/reportes', requiere: 'reportes' },
+      { label: 'Estado de Resultados', href: '/eerr', requiere: 'eerr' },
     ],
   },
   {
