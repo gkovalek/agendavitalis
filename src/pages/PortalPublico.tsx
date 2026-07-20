@@ -18,7 +18,7 @@ const reservaSchema = z.object({
 // ── Interfaces ───────────────────────────────────────────────────────────────
 interface Centro      { id: string; nombre: string; direccion: string | null; telefono: string | null; }
 interface Profesional { id: string; nombre: string; apellido: string; }
-interface Servicio    { id: string; nombre: string; duracion_minutos: number; }
+interface Servicio    { id: string; nombre: string; duracion_minutos: number; costo_base?: number; }
 interface PCS         { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; agenda_id: string | null; }
 interface SlotInfo    { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
