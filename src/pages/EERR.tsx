@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-type Categoria = 'fijo' | 'variable' | 'gasto';
+type Categoria = 'fijo' | 'variable' | 'gasto' | 'ingreso';
 
 interface Costo {
   id: string;
@@ -70,6 +70,7 @@ function SeccionCostos({
     fijo: 'text-blue-700 dark:text-blue-400',
     variable: 'text-amber-700 dark:text-amber-400',
     gasto: 'text-red-600 dark:text-red-400',
+    ingreso: 'text-emerald-700 dark:text-emerald-400',
   };
 
   return (
@@ -191,8 +192,10 @@ export default function EERR() {
   const totalFijos = useMemo(() => costos.filter(c => c.categoria === 'fijo').reduce((s, c) => s + c.monto, 0), [costos]);
   const totalVariables = useMemo(() => costos.filter(c => c.categoria === 'variable').reduce((s, c) => s + c.monto, 0), [costos]);
   const totalGastos = useMemo(() => costos.filter(c => c.categoria === 'gasto').reduce((s, c) => s + c.monto, 0), [costos]);
+  const totalOtrosIngresos = useMemo(() => costos.filter(c => c.categoria === 'ingreso').reduce((s, c) => s + c.monto, 0), [costos]);
   const totalEgresos = totalFijos + totalVariables + totalGastos;
-  const resultado = ingresos - totalEgresos;
+  const ingresosTotales = ingresos + totalOtrosIngresos;
+  const resultado = ingresosTotales - totalEgresos;
 
   const years = Array.from({ length: 3 }, (_, i) => hoy.getFullYear() - i);
 
@@ -232,6 +235,7 @@ export default function EERR() {
             <SeccionCostos titulo="Costos Fijos" categoria="fijo" costos={costos} onAdd={handleAdd} onDelete={handleDelete} saving={saving} />
             <SeccionCostos titulo="Costos Variables" categoria="variable" costos={costos} onAdd={handleAdd} onDelete={handleDelete} saving={saving} />
             <SeccionCostos titulo="Gastos" categoria="gasto" costos={costos} onAdd={handleAdd} onDelete={handleDelete} saving={saving} />
+            <SeccionCostos titulo="Otros Ingresos" categoria="ingreso" costos={costos} onAdd={handleAdd} onDelete={handleDelete} saving={saving} />
           </div>
 
           {/* EERR */}
@@ -242,8 +246,10 @@ export default function EERR() {
               </h2>
               <table className="w-full max-w-sm">
                 <tbody>
-                  <FilaResultado label="Ingresos" valor={ingresos} bold color="#0F6E56" />
-                  <FilaResultado label="(-) Costos fijos" valor={totalFijos} separador />
+                  <FilaResultado label="Ingresos facturados" valor={ingresos} bold color="#0F6E56" />
+                  {totalOtrosIngresos > 0 && <FilaResultado label="(+) Otros ingresos" valor={totalOtrosIngresos} color="#0F6E56" />}
+                  {totalOtrosIngresos > 0 && <FilaResultado label="Total ingresos" valor={ingresosTotales} bold color="#0F6E56" separador />}
+                  <FilaResultado label="(-) Costos fijos" valor={totalFijos} separador={totalOtrosIngresos === 0} />
                   <FilaResultado label="(-) Costos variables" valor={totalVariables} />
                   <FilaResultado label="(-) Gastos" valor={totalGastos} />
                   <FilaResultado label="Total egresos" valor={totalEgresos} bold separador />
@@ -271,21 +277,21 @@ export default function EERR() {
               </table>
 
               {/* Barra visual */}
-              {ingresos > 0 && (
+              {ingresosTotales > 0 && (
                 <div className="mt-4 space-y-1.5 max-w-sm">
                   <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wide">
                     <span>Composición de egresos</span>
-                    <span>{ingresos > 0 ? `${Math.round((totalEgresos / ingresos) * 100)}% de ingresos` : ''}</span>
+                    <span>{`${Math.round((totalEgresos / ingresosTotales) * 100)}% de ingresos`}</span>
                   </div>
                   <div className="h-3 rounded-full bg-muted overflow-hidden flex">
                     {totalFijos > 0 && (
-                      <div className="h-full bg-blue-500" style={{ width: `${(totalFijos / ingresos) * 100}%` }} title={`Fijos: ${fmt(totalFijos)}`} />
+                      <div className="h-full bg-blue-500" style={{ width: `${(totalFijos / ingresosTotales) * 100}%` }} title={`Fijos: ${fmt(totalFijos)}`} />
                     )}
                     {totalVariables > 0 && (
-                      <div className="h-full bg-amber-400" style={{ width: `${(totalVariables / ingresos) * 100}%` }} title={`Variables: ${fmt(totalVariables)}`} />
+                      <div className="h-full bg-amber-400" style={{ width: `${(totalVariables / ingresosTotales) * 100}%` }} title={`Variables: ${fmt(totalVariables)}`} />
                     )}
                     {totalGastos > 0 && (
-                      <div className="h-full bg-red-400" style={{ width: `${(totalGastos / ingresos) * 100}%` }} title={`Gastos: ${fmt(totalGastos)}`} />
+                      <div className="h-full bg-red-400" style={{ width: `${(totalGastos / ingresosTotales) * 100}%` }} title={`Gastos: ${fmt(totalGastos)}`} />
                     )}
                   </div>
                   <div className="flex gap-4 text-[10px] text-muted-foreground">
