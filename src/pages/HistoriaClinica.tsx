@@ -86,6 +86,7 @@ function PanelDetalle({
   selectedEntrada, adjuntos, loadingAdjuntos, uploading,
   isMobile, fileInputRef, handleFileSelect, handleAbrirAdjunto, handleEliminarAdjunto, onBack,
 }: PanelDetalleProps) {
+  const { tiene } = usePlan();
   if (!selectedEntrada) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground gap-3">

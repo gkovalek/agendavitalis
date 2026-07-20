@@ -79,7 +79,7 @@ export default function Caja() {
       .select('id, hora_inicio, estado, paciente_id, profesional_id, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
       .eq('fecha', fecha)
       .eq('centro_id', centroId)
-      .in('estado', ['en_sala', 'siendo_atendidos'])
+      .in('estado', ['en_sala', 'siendo_atendido'])
       .order('hora_inicio', { ascending: true });
     if (profFiltro !== 'todos') pendQ = pendQ.eq('profesional_id', profFiltro);
 
