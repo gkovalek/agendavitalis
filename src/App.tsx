@@ -78,6 +78,7 @@ function AppRoutes() {
       <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/reservar/:centroId" element={<PortalPublico />} />
+      <Route path="/reservas/:slug" element={<PortalPublico />} />
 
       {/* Rutas protegidas */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
