@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlan } from '@/hooks/use-plan';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type Categoria = 'fijo' | 'variable' | 'gasto' | 'ingreso';
@@ -132,6 +133,16 @@ function SeccionCostos({
 export default function EERR() {
   const { centroId } = useAuth();
   const { toast } = useToast();
+  const { tiene } = usePlan();
+
+  if (!tiene('eerr')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+        <Lock className="w-8 h-8 opacity-40" />
+        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
+      </div>
+    );
+  }
 
   const hoy = new Date();
   const [year, setYear] = useState(hoy.getFullYear());

@@ -86,9 +86,17 @@ function shiftDias(rango: RangoFechas, dias: number): RangoFechas {
 }
 
 function shiftMes(rango: RangoFechas): RangoFechas {
-  const d = new Date(rango.desde + 'T00:00:00'); d.setMonth(d.getMonth() - 1);
-  const h = new Date(rango.hasta + 'T00:00:00'); h.setMonth(h.getMonth() - 1);
-  return { desde: toDateStr(d), hasta: toDateStr(h) };
+  const shiftOneMonth = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const targetMonth = d.getMonth() - 1;
+    d.setDate(1); // evitar overflow antes de cambiar mes
+    d.setMonth(targetMonth);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const origDay = parseInt(dateStr.slice(8), 10);
+    d.setDate(Math.min(origDay, lastDay));
+    return toDateStr(d);
+  };
+  return { desde: shiftOneMonth(rango.desde), hasta: shiftOneMonth(rango.hasta) };
 }
 
 function shiftAño(rango: RangoFechas): RangoFechas {

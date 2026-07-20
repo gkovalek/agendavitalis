@@ -94,9 +94,13 @@ export default function PortalPublico() {
   // ── Resolver centroId desde slug o param directo ─────────────────────────
   useEffect(() => {
     if (centroIdParam) { setResolvedCentroId(centroIdParam); return; }
-    if (!slug) return;
+    if (!slug) { setLoadingInit(false); return; }
     supabase.from('centros').select('id').eq('slug', slug).single()
-      .then(({ data }) => setResolvedCentroId(data?.id ?? null));
+      .then(({ data }) => {
+        if (!data?.id) setLoadingInit(false);
+        else setResolvedCentroId(data.id);
+      })
+      .catch(() => setLoadingInit(false));
   }, [centroIdParam, slug]);
 
   // ── Carga inicial ────────────────────────────────────────────────────────

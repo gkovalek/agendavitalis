@@ -95,9 +95,18 @@ export default function Caja() {
     // Enriquecer con precio_particular desde pcs_horario_dia
     let pendientes: TurnoPendiente[] = pendientesBase;
     if (pendientesBase.length > 0) {
-      const pairs = pendientesBase
-        .filter((t: any) => t.profesional_id && t.servicio_id)
-        .map((t: any) => `and(profesional_id.eq.${t.profesional_id},servicio_id.eq.${t.servicio_id})`);
+      const pairs = [...new Map(
+        pendientesBase
+          .filter((t: any) => t.profesional_id && t.servicio_id)
+          .map((t: any) => [`${t.profesional_id}:${t.servicio_id}`, `and(profesional_id.eq.${t.profesional_id},servicio_id.eq.${t.servicio_id})`])
+      ).values()];
+
+      if (pairs.length === 0) {
+        setMovimientos(movs);
+        setTurnosPendientes(pendientesBase);
+        setLoading(false);
+        return;
+      }
 
       const { data: pcsData } = await supabase
         .from('profesional_centro_servicio')
@@ -159,19 +168,19 @@ export default function Caja() {
     const tr = parseFloat(montos.tr) || 0;
     const os = parseFloat(montos.os) || 0;
     const tieneArancel = turno.precio_particular != null && turno.precio_particular > 0;
-    if (tieneArancel && ef + tr + os < turno.precio_particular!) {
+    const total = ef + tr + os;
+    if (tieneArancel && total === 0) {
+      toast({ title: 'Ingresá al menos un monto', variant: 'destructive' });
+      return;
+    }
+    if (tieneArancel && total < turno.precio_particular!) {
       toast({
         title: 'Monto inferior al arancel',
-        description: `El arancel para este servicio es $${turno.precio_particular!.toLocaleString('es-AR')}. El cobro registrado es menor.`,
+        description: `El arancel es $${turno.precio_particular!.toLocaleString('es-AR')}. El cobro registrado es menor.`,
         variant: 'destructive',
         duration: 5000,
       });
-      // Continúa igual — solo es advertencia
-    } else if (!tieneArancel && ef + tr + os === 0) {
-      // Sin arancel y sin monto: registrar igual (valor 0 es válido para servicios OS)
-    } else if (tieneArancel && ef + tr + os === 0) {
-      toast({ title: 'Ingresá al menos un monto', variant: 'destructive' });
-      return;
+      // Solo advertencia — continúa el registro
     }
     setRegistrandoId(turno.id);
     const { error } = await supabase.from('caja_movimientos').insert({
