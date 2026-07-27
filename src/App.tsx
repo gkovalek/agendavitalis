@@ -26,6 +26,7 @@ import PortalPublico from "@/pages/PortalPublico";
 import PagoResultado from "@/pages/PagoResultado";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
+import SecretariaWhatsApp from "@/pages/SecretariaWhatsApp";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -83,6 +84,7 @@ function AppRoutes() {
       <Route path="/pago/success" element={<PagoResultado tipo="success" />} />
       <Route path="/pago/failure" element={<PagoResultado tipo="failure" />} />
       <Route path="/pago/pending" element={<PagoResultado tipo="pending" />} />
+      <Route path="/secretaria" element={<SecretariaWhatsApp />} />
 
       {/* Rutas protegidas */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
