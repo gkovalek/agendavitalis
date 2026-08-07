@@ -1,73 +1,58 @@
-# Welcome to your Lovable project
+# Vitalis - Gestion Inteligente de Centros de Salud
 
-## Project info
+SaaS multi-tenant para clinicas y centros kinesiologicos en Argentina. Agenda online, historia clinica, obras sociales, cobros con MercadoPago, recordatorios por WhatsApp y asistente de IA 24/7.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Demo en produccion: https://agendavitalis.app
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Que es Vitalis
 
-**Use Lovable**
+Vitalis es una plataforma SaaS completa para la gestion de centros de salud (kinesiologia, fisioterapia, clinicas). Permite a cada centro administrar su agenda, pacientes, profesionales, cobros, obras sociales e historia clinica desde un unico sistema.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Caracteristicas principales: sistema multi-tenant con aislamiento de datos por Row Level Security (RLS) en Supabase; portal de reservas online donde los pacientes reservan turnos sin necesidad de registrarse; cobros integrados con MercadoPago (cobro anticipado, modelo Marketplace); recordatorios automaticos por WhatsApp que avisan a los pacientes 24 horas antes de su turno y procesan respuestas (confirmar, cancelar, reagendar); asistente de IA por WhatsApp que atiende consultas, agenda turnos y envia links de pago de forma autonoma (plan Premium); historia clinica digital con exportacion a PDF; estado de resultados financiero con graficos y exportacion a Excel; y un panel SuperAdmin con metricas y gestion de billing para todos los centros.
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## Stack tecnologico
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Frontend: React 18, TypeScript, Vite (SWC), React Router DOM, TanStack React Query, React Hook Form + Zod, Tailwind CSS + shadcn/ui, Radix UI, Recharts, jsPDF, date-fns, Sentry para monitoreo de errores.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Backend e infraestructura: Supabase (Auth, PostgreSQL, Edge Functions en Deno, RLS, Realtime), n8n self-hosted para automatizacion de workflows (recordatorios, emails, WhatsApp), MercadoPago (Checkout Pro + OAuth Marketplace), Evolution API para WhatsApp Business, Anthropic Claude como asistente conversacional, OpenAI Whisper para transcripcion de audios, y Docker + Traefik + nginx para el despliegue.
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Arquitectura
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+El frontend (React/TypeScript) se despliega como SPA y se comunica con Supabase via su cliente JS (REST + Realtime). Supabase centraliza autenticacion, base de datos PostgreSQL con RLS multi-tenant, y Edge Functions en Deno para la logica de pagos, el asistente de WhatsApp y el registro de nuevos centros. Las Edge Functions integran con MercadoPago para cobros, con n8n para workflows de automatizacion (recordatorios y emails), y con Evolution API para la mensajeria de WhatsApp, que a su vez usa Claude para las respuestas del asistente y Whisper para transcribir audios.
 
-# Step 3: Install the necessary dependencies.
-npm i
+Modelo multi-tenant: todos los datos usan `centro_id` como clave de aislamiento, garantizado por politicas RLS de PostgreSQL. Cada usuario solo accede a los datos de su propio centro.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+## Planes y feature gating
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Feature | Basico | Intermedio | Premium |
+|---|:---:|:---:|:---:|
+| Agenda, turnos y portal de reservas online | Si | Si | Si |
+| Cobro anticipado con MercadoPago | Si | Si | Si |
+| Recordatorios WhatsApp | Si | Si | Si |
+| Historia clinica, tratamientos, obras sociales | No | Si | Si |
+| Reportes estadisticos | No | Si | Si |
+| Estado de Resultados (EERR) | No | No | Si |
+| Asistente IA WhatsApp 24/7 | No | No | Si |
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Estado
 
-## What technologies are used for this project?
+Producto propietario en produccion activa. Este repositorio se comparte como referencia de arquitectura y stack; el codigo fuente completo y la configuracion de infraestructura son privados.
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Licencia
 
-## How can I deploy this project?
+Propietario. Todos los derechos reservados. Vitalis, 2026.
+## Licencia
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Propietario. Todos los derechos reservados. Vitalis, 2026.
