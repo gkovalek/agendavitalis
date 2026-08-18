@@ -12,11 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePlan } from '@/hooks/use-plan';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { FaqManagerTab } from '@/components/FaqManagerTab';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -89,6 +90,7 @@ export default function Servicios() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [faqServicio, setFaqServicio] = useState<{ id: string; nombre: string } | null>(null);
 
   const fetchData = async () => {
     if (!centroId) return;
@@ -370,6 +372,7 @@ export default function Servicios() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" title="FAQ del asistente IA" onClick={() => setFaqServicio({ id: s.id, nombre: s.nombre })}><MessageSquare className="w-4 h-4 text-muted-foreground" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteId(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                       </div>
@@ -535,6 +538,25 @@ export default function Servicios() {
               </div>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog FAQ por servicio */}
+      <Dialog open={!!faqServicio} onOpenChange={(o) => !o && setFaqServicio(null)}>
+        <DialogContent className="max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle>FAQ IA — {faqServicio?.nombre}</DialogTitle>
+          </DialogHeader>
+          {faqServicio && (
+            <ScrollArea className="max-h-[70vh] pr-2">
+              <FaqManagerTab
+                table="faq_servicio"
+                field="servicio_id"
+                entityId={faqServicio.id}
+                entityNombre={faqServicio.nombre}
+              />
+            </ScrollArea>
+          )}
         </DialogContent>
       </Dialog>
 

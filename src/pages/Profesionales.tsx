@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { ServiciosHorariosTab } from '@/components/ServiciosHorariosTab';
-import { ArancelesTab } from '@/components/ArancelesTab';
+import { FaqManagerTab } from '@/components/FaqManagerTab';
 import { InlineAgendasHorarios, type InlineAgendaAsignada } from '@/components/InlineAgendasHorarios';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,6 +24,7 @@ import { normalizeDiasTrabajo } from '@/lib/constants';
 
 interface Profesional {
   id: string;
+  titulo: string | null;
   nombre: string;
   apellido: string;
   dni: string;
@@ -40,7 +41,7 @@ interface Profesion {
   tipo: 'generador' | 'receptor';
 }
 
-const emptyForm = { nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true, profesion_id: '', matricula: '' };
+const emptyForm = { titulo: '', nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true, profesion_id: '', matricula: '' };
 
 function ProfesionField({
   profesiones,
@@ -124,6 +125,7 @@ export default function Profesionales() {
     if (!centroId) return;
     setEditId(p.id);
     setForm({
+      titulo: p.titulo || '',
       nombre: p.nombre,
       apellido: p.apellido,
       dni: p.dni || '',
@@ -162,7 +164,7 @@ export default function Profesionales() {
     setSaving(true);
     let profesionalId = editId;
 
-    const payload = { ...form, profesion_id: form.profesion_id || null, matricula: form.matricula || null };
+    const payload = { ...form, titulo: form.titulo || null, profesion_id: form.profesion_id || null, matricula: form.matricula || null };
 
     if (editId) {
       const { error } = await supabase.from('profesionales').update(payload).eq('id', editId);
@@ -227,6 +229,10 @@ export default function Profesionales() {
 
   const FormFields = (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <Label>Título / Prefijo</Label>
+        <Input value={form.titulo} onChange={e => setForm({...form, titulo: e.target.value})} placeholder="Ej: Dr., Dra., Lic., Téc. en Kinesiología..." />
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1"><Label>Nombre *</Label><Input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} /></div>
         <div className="space-y-1"><Label>Apellido *</Label><Input value={form.apellido} onChange={e => setForm({...form, apellido: e.target.value})} /></div>
@@ -267,11 +273,13 @@ export default function Profesionales() {
           </Button>
         </div>
         <Tabs defaultValue="info">
-          <TabsList className="w-full grid grid-cols-2">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="info">Información</TabsTrigger>
             <TabsTrigger value="servicios">Servicios</TabsTrigger>
+            <TabsTrigger value="faq">FAQ IA</TabsTrigger>
           </TabsList>
           <TabsContent value="info" className="space-y-3 pt-4">
+            {selectedProfesional.titulo && <p><strong>Título:</strong> {selectedProfesional.titulo}</p>}
             <p><strong>Nombre:</strong> {selectedProfesional.nombre} {selectedProfesional.apellido}</p>
             <p><strong>DNI:</strong> {selectedProfesional.dni || '—'}</p>
             <p><strong>Mail:</strong> {selectedProfesional.mail || '—'}</p>
@@ -280,6 +288,14 @@ export default function Profesionales() {
           </TabsContent>
           <TabsContent value="servicios">
             <ServiciosHorariosTab entityType="profesional" entityId={selectedProfesional.id} />
+          </TabsContent>
+          <TabsContent value="faq">
+            <FaqManagerTab
+              table="faq_profesional"
+              field="profesional_id"
+              entityId={selectedProfesional.id}
+              entityNombre={`${selectedProfesional.titulo ?? ''} ${selectedProfesional.nombre} ${selectedProfesional.apellido}`.trim()}
+            />
           </TabsContent>
         </Tabs>
 
@@ -374,9 +390,9 @@ export default function Profesionales() {
                   <TabsList>
                     <TabsTrigger value="info">Información</TabsTrigger>
                     <TabsTrigger value="servicios">Servicios y Horarios</TabsTrigger>
-                    <TabsTrigger value="aranceles">Aranceles</TabsTrigger>
                   </TabsList>
                   <TabsContent value="info" className="space-y-3 pt-4">
+                    {selectedProfesional.titulo && <p><strong>Título:</strong> {selectedProfesional.titulo}</p>}
                     <p><strong>Nombre:</strong> {selectedProfesional.nombre} {selectedProfesional.apellido}</p>
                     <p><strong>DNI:</strong> {selectedProfesional.dni || '—'}</p>
                     <p><strong>Mail:</strong> {selectedProfesional.mail || '—'}</p>
@@ -392,9 +408,6 @@ export default function Profesionales() {
                   </TabsContent>
                   <TabsContent value="servicios">
                     <ServiciosHorariosTab entityType="profesional" entityId={selectedProfesional.id} />
-                  </TabsContent>
-                  <TabsContent value="aranceles">
-                    <ArancelesTab profesionalId={selectedProfesional.id} />
                   </TabsContent>
                 </Tabs>
               ) : (
