@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,148 +6,133 @@
 
 @layer base {
   :root {
-    /* ── Light ─────────────────────────────────────────── */
-    /* Landing palette: bg #F8FAFC · surface #fff · text #0F172A · subtle #64748B · border #E2E8F0 */
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Vital Aqua #21C8C0 */
-    --primary: 177 70% 45%;
+    /* Vitalis brand */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 214 32% 93%;
+    --secondary: 214 32% 94%;
     --secondary-foreground: 222 47% 20%;
-
-    --muted: 214 32% 95%;
+    --muted: 214 32% 96%;
     --muted-foreground: 215 16% 47%;
-
-    --accent: 177 40% 90%;
-    --accent-foreground: 177 65% 22%;
-
+    --accent: 225 100% 96%;
+    --accent-foreground: 221 83% 40%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 214 32% 88%;
+    --border: 214 32% 90%;
     --input: 214 32% 88%;
-    --ring: 177 70% 45%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
 
-    --radius: 0.625rem;
-
-    /* Vital Navy sidebar */
-    --sidebar-background: 222 53% 7%;
-    --sidebar-foreground: 215 15% 75%;
-    --sidebar-primary: 177 70% 45%;
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 215 20% 80%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 35% 14%;
-    --sidebar-accent-foreground: 210 15% 92%;
-    --sidebar-border: 222 35% 12%;
-    --sidebar-ring: 177 70% 45%;
+    --sidebar-accent: 222 35% 15%;
+    --sidebar-accent-foreground: 214 32% 96%;
+    --sidebar-border: 222 35% 14%;
+    --sidebar-ring: 217 91% 60%;
 
     --success: 152 60% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 210 80% 52%;
+    --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
   }
 
   .dark {
-    /* ── Dark ──────────────────────────────────────────── */
-    /* Landing palette: bg #080E1A · surface #0F172A · text #F1F5F9 · subtle #94A3B8 · border #1E293B */
-    --background: 222 53% 7%;
+    --background: 222 47% 7%;
     --foreground: 214 32% 96%;
-
-    --card: 222 47% 12%;
+    --card: 222 47% 10%;
     --card-foreground: 214 32% 96%;
-
     --popover: 222 47% 10%;
     --popover-foreground: 214 32% 96%;
-
-    /* Primary = Vital Aqua #21C8C0 */
-    --primary: 177 70% 45%;
-    --primary-foreground: 0 0% 100%;
-
+    --primary: 217 91% 65%;
+    --primary-foreground: 222 47% 8%;
     --secondary: 222 30% 17%;
-    --secondary-foreground: 215 15% 82%;
-
-    --muted: 222 30% 15%;
+    --secondary-foreground: 215 20% 86%;
+    --muted: 222 30% 14%;
     --muted-foreground: 215 20% 65%;
-
-    --accent: 177 50% 18%;
-    --accent-foreground: 177 70% 75%;
-
+    --accent: 222 50% 18%;
+    --accent-foreground: 217 91% 78%;
     --destructive: 0 62% 38%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 215 32% 18%;
     --input: 215 32% 18%;
-    --ring: 177 70% 45%;
-
-    /* Sidebar = Vital Navy profundo #080E1A */
+    --ring: 217 91% 65%;
     --sidebar-background: 222 53% 5%;
-    --sidebar-foreground: 215 15% 72%;
-    --sidebar-primary: 177 70% 45%;
+    --sidebar-foreground: 215 20% 76%;
+    --sidebar-primary: 217 91% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 35% 11%;
-    --sidebar-accent-foreground: 210 15% 90%;
+    --sidebar-accent-foreground: 210 15% 92%;
     --sidebar-border: 222 35% 10%;
-    --sidebar-ring: 177 70% 45%;
+    --sidebar-ring: 217 91% 65%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Poppins', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02','cv03','cv04','cv11';
   }
-
-  /* Typography scale */
-  h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.02em;
-    font-weight: 700;
-  }
-
-  /* Refined scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; font-weight: 700; }
+  button,input,textarea,select { font-family: inherit; }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
-
-  /* Focus ring */
-  :focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-  }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 }
 
 @layer components {
-  /* Card elevation levels */
-  .card-sm   { box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04); }
-  .card-md   { box-shadow: 0 4px 16px rgba(0,0,0,.07), 0 2px 6px rgba(0,0,0,.04); }
-  .card-lg   { box-shadow: 0 16px 48px rgba(0,0,0,.10), 0 4px 16px rgba(0,0,0,.06); }
+  .card-sm { box-shadow: 0 1px 3px rgba(15,23,42,.05), 0 1px 2px rgba(15,23,42,.03); }
+  .card-md { box-shadow: 0 8px 24px rgba(15,23,42,.06), 0 2px 8px rgba(15,23,42,.03); }
+  .card-lg { box-shadow: 0 24px 60px rgba(15,23,42,.10), 0 8px 24px rgba(15,23,42,.05); }
 
-  /* Premium button glow */
   .btn-primary-glow {
-    box-shadow: 0 4px 20px rgba(33,200,192,.35);
-    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 6px 20px rgba(37,99,235,.22);
+    transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
   }
-  .btn-primary-glow:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 28px rgba(33,200,192,.45);
-  }
+  .btn-primary-glow:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(37,99,235,.30); filter: brightness(1.02); }
+  .btn-primary-glow:active { transform: translateY(0); }
 
-  /* Stat number formatting */
-  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .vitalis-surface { @apply rounded-2xl border bg-card; box-shadow: 0 8px 24px rgba(15,23,42,.05); }
+  .vitalis-page { @apply min-h-full bg-background; }
+  .vitalis-page-title { @apply text-2xl font-bold tracking-tight text-foreground; }
+  .vitalis-page-subtitle { @apply mt-1 text-sm text-muted-foreground; }
+  .vitalis-gradient-text { background: linear-gradient(135deg,#2563EB,#60A5FA); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+  /* Landing motion */
+  .vitalis-fade-up { animation: vitalisFadeUp .7s cubic-bezier(.2,.8,.2,1) both; }
+  .vitalis-delay-1 { animation-delay: .08s; }
+  .vitalis-delay-2 { animation-delay: .16s; }
+  .vitalis-delay-3 { animation-delay: .24s; }
+  .vitalis-float { animation: vitalisFloat 6s ease-in-out infinite; }
+  .vitalis-pulse-dot { animation: vitalisPulse 2s ease-in-out infinite; }
+  .vitalis-demo-row { animation: vitalisDemoRow 5s ease-in-out infinite; }
+  .vitalis-demo-row:nth-child(2) { animation-delay: .8s; }
+  .vitalis-demo-row:nth-child(3) { animation-delay: 1.6s; }
+
+  @keyframes vitalisFadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes vitalisFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+  @keyframes vitalisPulse { 0%,100% { box-shadow:0 0 0 0 rgba(37,99,235,.2); } 50% { box-shadow:0 0 0 8px rgba(37,99,235,0); } }
+  @keyframes vitalisDemoRow { 0%,100% { opacity:.62; transform:translateX(0); } 50% { opacity:1; transform:translateX(6px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
+  }
 }
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
