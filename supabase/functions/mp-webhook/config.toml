@@ -1,0 +1,2 @@
+[functions.mp-webhook]
+verify_jwt = false

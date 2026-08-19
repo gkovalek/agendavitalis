@@ -1,0 +1,100 @@
+{
+  "name": "Vitalis - Email Aviso Vencimiento Suscripcion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "node-cron",
+      "name": "Cron 10:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gsmrccofuegcmujycydd.supabase.co/rest/v1/centros",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "id,nombre,plan,trial_hasta,suscripcion_estado,suscripcion_vence,billing_email" },
+            { "name": "activo", "value": "=eq.true" }
+          ]
+        }
+      },
+      "id": "node-fetch-centros",
+      "name": "Buscar Centros",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const centros = $input.all();\nconst hoy = new Date();\nconst emails = [];\n\nfor (const item of centros) {\n  const c = item.json;\n  const email = c.billing_email;\n  if (!email) continue;\n\n  let diasRestantes = null;\n  let tipo = null;\n\n  // Trial por vencer (3 días antes)\n  if (c.suscripcion_estado === 'trial' && c.trial_hasta) {\n    const vence = new Date(c.trial_hasta);\n    const diff = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));\n    if (diff === 3 || diff === 1) {\n      diasRestantes = diff;\n      tipo = 'trial';\n    }\n  }\n\n  // Suscripción activa por vencer (5 días antes)\n  if (c.suscripcion_estado === 'activo' && c.suscripcion_vence) {\n    const vence = new Date(c.suscripcion_vence);\n    const diff = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));\n    if (diff === 5 || diff === 2 || diff === 0) {\n      diasRestantes = diff;\n      tipo = 'suscripcion';\n    }\n  }\n\n  if (!tipo) continue;\n\n  const planLabel = { basico: 'Básico', intermedio: 'Intermedio', premium: 'Premium' }[c.plan] ?? c.plan;\n  const precios = { basico: 35, intermedio: 45, premium: 60 };\n  const precio = precios[c.plan] ?? 35;\n\n  const diasText = diasRestantes === 0 ? 'hoy' : diasRestantes === 1 ? 'mañana' : `en ${diasRestantes} días`;\n  const subject = tipo === 'trial'\n    ? `Tu prueba gratuita de Vitalis vence ${diasText}`\n    : `Tu suscripción de Vitalis vence ${diasText}`;\n\n  const html = `<!DOCTYPE html>\n<html lang=\"es\">\n<head><meta charset=\"UTF-8\"><title>${subject}</title></head>\n<body style=\"margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f6f9;padding:32px 0;\">\n  <tr><td align=\"center\">\n    <table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n      <tr>\n        <td style=\"background:#080E1A;padding:28px;text-align:center;\">\n          <svg width=\"38\" height=\"38\" viewBox=\"0 0 80 80\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <path d=\"M14 66 Q28 44 40 32 Q53 18 68 16\" stroke=\"#234A73\" stroke-width=\"9\" stroke-linecap=\"round\" fill=\"none\"/>\n            <path d=\"M14 50 Q30 32 44 22 Q56 13 70 11\" stroke=\"#21C8C0\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\" opacity=\"0.9\"/>\n          </svg>\n          <p style=\"color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.12em;margin:10px 0 0;\">VITALIS</p>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding:40px 36px;\">\n          <div style=\"text-align:center;margin-bottom:24px;font-size:40px;\">⏰</div>\n          <h1 style=\"color:#080E1A;font-size:22px;text-align:center;margin:0 0 12px;\">${subject}</h1>\n          <p style=\"color:#666;font-size:15px;text-align:center;margin:0 0 28px;\">\n            ${tipo === 'trial'\n              ? `Tu período de prueba gratuita de <strong>${c.nombre}</strong> vence ${diasText}.`\n              : `La suscripción de <strong>${c.nombre}</strong> vence ${diasText}.`\n            }\n          </p>\n\n          <div style=\"background:#f8f9fb;border-radius:10px;padding:20px;margin-bottom:28px;text-align:center;\">\n            <p style=\"color:#999;font-size:13px;margin:0 0 6px;\">Plan actual</p>\n            <p style=\"color:#080E1A;font-size:20px;font-weight:700;margin:0;\">${planLabel} — $${precio} USD/mes</p>\n          </div>\n\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n            <tr><td align=\"center\">\n              <a href=\"https://wa.me/543624075957?text=${encodeURIComponent('Hola, quiero renovar mi suscripción de Vitalis. Centro: ' + c.nombre)}\" style=\"display:inline-block;background:#21C8C0;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;\">Activar suscripción por WhatsApp →</a>\n            </td></tr>\n          </table>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"background:#f4f6f9;padding:20px 36px;text-align:center;border-top:1px solid #e8ecf0;\">\n          <p style=\"color:#999;font-size:12px;margin:0;\">Vitalis · agendavitalis.app</p>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>`;\n\n  emails.push({ json: { to: email, subject, html, centro: c.nombre } });\n}\n\nreturn emails.length > 0 ? emails : [{ json: { skip: true } }];"
+      },
+      "id": "node-armar-emails",
+      "name": "Filtrar y Armar Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "leftValue": "={{ $json.skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notEqual" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "node-check",
+      "name": "Hay emails?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@agendavitalis.app",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}"
+      },
+      "id": "node-smtp",
+      "name": "Enviar Email SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1040, 200],
+      "credentials": {
+        "smtp": {
+          "name": "Zoho SMTP Vitalis"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 10:00": { "main": [[{ "node": "Buscar Centros", "type": "main", "index": 0 }]] },
+    "Buscar Centros": { "main": [[{ "node": "Filtrar y Armar Emails", "type": "main", "index": 0 }]] },
+    "Filtrar y Armar Emails": { "main": [[{ "node": "Hay emails?", "type": "main", "index": 0 }]] },
+    "Hay emails?": { "main": [[{ "node": "Enviar Email SMTP", "type": "main", "index": 0 }], []] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,11 +1,13 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { TutorialProvider, useTutorialContext } from "@/contexts/TutorialContext";
 import { AppLayout } from "@/components/AppLayout";
+import { Tutorial } from "@/components/Tutorial";
 import { Loader2 } from "lucide-react";
 
 const Login = lazy(() => import("@/pages/Login"));
@@ -36,6 +38,7 @@ const Landing = lazy(() => import("@/pages/Landing"));
 const Registro = lazy(() => import("@/pages/Registro"));
 const SuscripcionVencida = lazy(() => import("@/pages/SuscripcionVencida"));
 const SuperAdmin = lazy(() => import("@/pages/admin/SuperAdmin"));
+const Ayuda = lazy(() => import("@/pages/Ayuda"));
 
 const queryClient = new QueryClient();
 
@@ -73,6 +76,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <AppLayout>{children}</AppLayout>;
+}
+
+function AppRoutesWithTutorial() {
+  const { session } = useAuth();
+  const { startTutorial, tutorialActive, stopTutorial } = useTutorialContext();
+
+  useEffect(() => {
+    if (session && localStorage.getItem('vitalis_tutorial_done') !== '1') {
+      const timer = setTimeout(() => startTutorial(), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [session, startTutorial]);
+
+  return (
+    <>
+      <Tutorial active={tutorialActive} onClose={stopTutorial} />
+      <AppRoutes />
+    </>
+  );
 }
 
 function AppRoutes() {
@@ -129,6 +151,7 @@ function AppRoutes() {
         <Route path="/faq" element={<ProtectedRoute><FaqManager /></ProtectedRoute>} />
         <Route path="/mi-perfil" element={<ProtectedRoute><MiPerfil /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
+        <Route path="/ayuda" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
@@ -142,7 +165,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <TutorialProvider>
+            <AppRoutesWithTutorial />
+          </TutorialProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

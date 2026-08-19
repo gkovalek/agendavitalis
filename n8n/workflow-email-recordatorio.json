@@ -1,0 +1,97 @@
+{
+  "name": "Vitalis - Email Recordatorio 24hs",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "node-cron",
+      "name": "Cron 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tomorrow = new Date();\ntomorrow.setDate(tomorrow.getDate() + 1);\nconst yyyy = tomorrow.getFullYear();\nconst mm = String(tomorrow.getMonth() + 1).padStart(2, '0');\nconst dd = String(tomorrow.getDate()).padStart(2, '0');\nreturn [{ json: { fecha_manana: `${yyyy}-${mm}-${dd}` } }];"
+      },
+      "id": "node-fecha",
+      "name": "Calcular Mañana",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gsmrccofuegcmujycydd.supabase.co/rest/v1/turnos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "id,fecha,hora_inicio,estado,paciente:pacientes(nombre,apellido,email),profesional:profesionales(nombre,apellido),centro:centros(nombre)" },
+            { "name": "fecha", "value": "=eq.{{ $json.fecha_manana }}" },
+            { "name": "estado", "value": "=in.(reservado,confirmado)" }
+          ]
+        }
+      },
+      "id": "node-fetch-turnos",
+      "name": "Buscar Turnos Mañana",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const turnos = $input.all();\nconst resultado = [];\n\nfor (const item of turnos) {\n  const t = item.json;\n  const email = t.paciente?.email;\n  if (!email) continue;\n\n  const nombre     = `${t.paciente?.nombre ?? ''} ${t.paciente?.apellido ?? ''}`.trim();\n  const profesional = `${t.profesional?.nombre ?? ''} ${t.profesional?.apellido ?? ''}`.trim();\n  const centro      = t.centro?.nombre ?? '';\n  const fecha       = t.fecha ?? '';\n  const hora        = t.hora_inicio ? t.hora_inicio.slice(0,5) : '';\n\n  let fechaDisplay = fecha;\n  try {\n    const d = new Date(fecha + 'T12:00:00');\n    fechaDisplay = d.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n    fechaDisplay = fechaDisplay.charAt(0).toUpperCase() + fechaDisplay.slice(1);\n  } catch(e) {}\n\n  const html = `<!DOCTYPE html>\n<html lang=\"es\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Recordatorio de turno</title></head>\n<body style=\"margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f6f9;padding:32px 0;\">\n  <tr><td align=\"center\">\n    <table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n      <tr>\n        <td style=\"background:#080E1A;padding:28px;text-align:center;\">\n          <svg width=\"38\" height=\"38\" viewBox=\"0 0 80 80\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <path d=\"M14 66 Q28 44 40 32 Q53 18 68 16\" stroke=\"#234A73\" stroke-width=\"9\" stroke-linecap=\"round\" fill=\"none\"/>\n            <path d=\"M14 50 Q30 32 44 22 Q56 13 70 11\" stroke=\"#21C8C0\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\" opacity=\"0.9\"/>\n          </svg>\n          <p style=\"color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.12em;margin:10px 0 0;\">VITALIS</p>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding:40px 36px;\">\n          <div style=\"text-align:center;margin-bottom:24px;\">\n            <div style=\"display:inline-block;background:#eff6ff;border-radius:50%;width:64px;height:64px;line-height:64px;font-size:32px;\">🔔</div>\n          </div>\n          <h1 style=\"color:#080E1A;font-size:22px;text-align:center;margin:0 0 6px;\">Recordatorio de turno</h1>\n          <p style=\"color:#666;font-size:15px;text-align:center;margin:0 0 32px;\">Hola <strong>${nombre}</strong>, te recordamos que mañana tenés turno en <strong>${centro}</strong>.</p>\n\n          <div style=\"background:#f8f9fb;border-radius:10px;padding:24px;margin-bottom:28px;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n              <tr><td style=\"padding:8px 0;border-bottom:1px solid #eee;\"><span style=\"color:#999;font-size:13px;\">📅 Fecha</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #eee;\">${fechaDisplay}</td></tr>\n              ${hora ? `<tr><td style=\"padding:8px 0;border-bottom:1px solid #eee;\"><span style=\"color:#999;font-size:13px;\">🕐 Hora</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #eee;\">${hora} hs</td></tr>` : ''}\n              ${profesional ? `<tr><td style=\"padding:8px 0;\"><span style=\"color:#999;font-size:13px;\">👨‍⚕️ Profesional</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;\">${profesional}</td></tr>` : ''}\n            </table>\n          </div>\n\n          <div style=\"background:#e6faf9;border-radius:8px;padding:14px 18px;text-align:center;\">\n            <p style=\"color:#0d7377;font-size:13px;margin:0;\">Por favor llegá 5 minutos antes de tu turno.</p>\n          </div>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"background:#f4f6f9;padding:20px 36px;text-align:center;border-top:1px solid #e8ecf0;\">\n          <p style=\"color:#999;font-size:12px;margin:0;\">Vitalis · agendavitalis.app · Este es un email automático, no respondas a este mensaje.</p>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>`;\n\n  resultado.push({ json: {\n    to: email,\n    subject: `Recordatorio: turno mañana ${hora ? 'a las ' + hora + ' hs' : ''} en ${centro}`,\n    html\n  }});\n}\n\nreturn resultado;"
+      },
+      "id": "node-armar-emails",
+      "name": "Armar Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@agendavitalis.app",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}"
+      },
+      "id": "node-smtp",
+      "name": "Enviar Email SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1040, 300],
+      "credentials": {
+        "smtp": {
+          "name": "Zoho SMTP Vitalis"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 9:00": { "main": [[{ "node": "Calcular Mañana", "type": "main", "index": 0 }]] },
+    "Calcular Mañana": { "main": [[{ "node": "Buscar Turnos Mañana", "type": "main", "index": 0 }]] },
+    "Buscar Turnos Mañana": { "main": [[{ "node": "Armar Emails", "type": "main", "index": 0 }]] },
+    "Armar Emails": { "main": [[{ "node": "Enviar Email SMTP", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

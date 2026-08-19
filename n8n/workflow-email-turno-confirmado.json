@@ -1,0 +1,69 @@
+{
+  "name": "Vitalis - Email Turno Confirmado",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-turno-confirmado",
+        "responseMode": "immediately",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook Turno Confirmado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "vitalis-email-turno-confirmado"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? $input.first().json;\nconst email       = body.paciente_email;\nconst nombre      = body.paciente_nombre ?? 'Paciente';\nconst centro      = body.centro_nombre ?? 'el centro';\nconst profesional = body.profesional_nombre ?? '';\nconst fecha       = body.fecha ?? '';\nconst hora        = body.hora ?? '';\nconst servicio    = body.servicio ?? '';\n\n// Si no hay email, no enviamos\nif (!email) return [];\n\n// Formatear fecha legible\nlet fechaDisplay = fecha;\ntry {\n  const d = new Date(fecha + 'T12:00:00');\n  fechaDisplay = d.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n  fechaDisplay = fechaDisplay.charAt(0).toUpperCase() + fechaDisplay.slice(1);\n} catch(e) {}\n\nconst html = `<!DOCTYPE html>\n<html lang=\"es\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Turno Confirmado</title></head>\n<body style=\"margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f6f9;padding:32px 0;\">\n  <tr><td align=\"center\">\n    <table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n      <tr>\n        <td style=\"background:#080E1A;padding:28px;text-align:center;\">\n          <svg width=\"38\" height=\"38\" viewBox=\"0 0 80 80\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <path d=\"M14 66 Q28 44 40 32 Q53 18 68 16\" stroke=\"#234A73\" stroke-width=\"9\" stroke-linecap=\"round\" fill=\"none\"/>\n            <path d=\"M14 50 Q30 32 44 22 Q56 13 70 11\" stroke=\"#21C8C0\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\" opacity=\"0.9\"/>\n          </svg>\n          <p style=\"color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.12em;margin:10px 0 0;\">VITALIS</p>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding:40px 36px;\">\n          <!-- Check icon -->\n          <div style=\"text-align:center;margin-bottom:24px;\">\n            <div style=\"display:inline-block;background:#e6faf9;border-radius:50%;width:64px;height:64px;line-height:64px;font-size:32px;\">✅</div>\n          </div>\n          <h1 style=\"color:#080E1A;font-size:22px;text-align:center;margin:0 0 6px;\">Turno confirmado</h1>\n          <p style=\"color:#666;font-size:15px;text-align:center;margin:0 0 32px;\">Hola <strong>${nombre}</strong>, tu turno en <strong>${centro}</strong> está confirmado.</p>\n\n          <!-- Detalle del turno -->\n          <div style=\"background:#f8f9fb;border-radius:10px;padding:24px;margin-bottom:28px;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n              ${fecha ? `<tr><td style=\"padding:8px 0;border-bottom:1px solid #eee;\"><span style=\"color:#999;font-size:13px;\">📅 Fecha</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #eee;\">${fechaDisplay}</span></td></tr>` : ''}\n              ${hora ? `<tr><td style=\"padding:8px 0;border-bottom:1px solid #eee;\"><span style=\"color:#999;font-size:13px;\">🕐 Hora</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #eee;\">${hora} hs</td></tr>` : ''}\n              ${profesional ? `<tr><td style=\"padding:8px 0;border-bottom:1px solid #eee;\"><span style=\"color:#999;font-size:13px;\">👨‍⚕️ Profesional</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #eee;\">${profesional}</td></tr>` : ''}\n              ${servicio ? `<tr><td style=\"padding:8px 0;\"><span style=\"color:#999;font-size:13px;\">🏥 Servicio</span></td><td style=\"text-align:right;color:#080E1A;font-size:14px;font-weight:600;padding:8px 0;\">${servicio}</td></tr>` : ''}\n            </table>\n          </div>\n\n          <div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;\">\n            <p style=\"color:#92400e;font-size:13px;margin:0;\">⚠️ Si necesitás cancelar o reprogramar, contactá al centro con anticipación.</p>\n          </div>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"background:#f4f6f9;padding:20px 36px;text-align:center;border-top:1px solid #e8ecf0;\">\n          <p style=\"color:#999;font-size:12px;margin:0;\">Vitalis · agendavitalis.app · Este es un email automático, no respondas a este mensaje.</p>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>`;\n\nreturn [{ json: { to: email, subject: `Turno confirmado — ${fechaDisplay || fecha} ${hora ? 'a las ' + hora + ' hs' : ''}`, html } }];"
+      },
+      "id": "node-armar-email",
+      "name": "Armar Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "leftValue": "={{ $json.to }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "node-check-email",
+      "name": "Tiene Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@agendavitalis.app",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}"
+      },
+      "id": "node-smtp",
+      "name": "Enviar Email SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [820, 200],
+      "credentials": {
+        "smtp": {
+          "name": "Zoho SMTP Vitalis"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Turno Confirmado": { "main": [[{ "node": "Armar Email", "type": "main", "index": 0 }]] },
+    "Armar Email": { "main": [[{ "node": "Tiene Email?", "type": "main", "index": 0 }]] },
+    "Tiene Email?": { "main": [[{ "node": "Enviar Email SMTP", "type": "main", "index": 0 }], []] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,2 @@
+[functions.wa-send]
+verify_jwt = false

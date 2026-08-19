@@ -43,7 +43,8 @@ interface TurnoPendiente {
 }
 
 export default function Caja() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const esProfesional = perfil?.rol_nombre === 'profesional';
   const { toast } = useToast();
 
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
@@ -58,7 +59,9 @@ export default function Caja() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
-  const [profFiltro, setProfFiltro] = useState<string>('todos');
+  const [profFiltro, setProfFiltro] = useState<string>(
+    perfil?.rol_nombre === 'profesional' && perfil?.profesional_id ? perfil.profesional_id : 'todos'
+  );
 
   useEffect(() => {
     if (!centroId) return;
@@ -236,6 +239,7 @@ export default function Caja() {
             <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Fecha</Label>
             <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="w-44 h-9" />
           </div>
+          {!esProfesional && (
           <div className="space-y-1">
             <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Profesional</Label>
             <Select value={profFiltro} onValueChange={setProfFiltro}>
@@ -250,6 +254,7 @@ export default function Caja() {
               </SelectContent>
             </Select>
           </div>
+          )}
         </div>
       </div>
 

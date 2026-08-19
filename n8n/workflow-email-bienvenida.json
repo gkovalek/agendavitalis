@@ -1,0 +1,54 @@
+{
+  "name": "Vitalis - Email Bienvenida Nuevo Centro",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-bienvenida",
+        "responseMode": "immediately",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook",
+      "name": "Webhook Bienvenida",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "vitalis-email-bienvenida"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? $input.first().json;\nconst nombre = body.nombre_admin ?? 'equipo';\nconst centro = body.nombre_centro ?? 'tu centro';\nconst email  = body.email;\nconst plan   = body.plan ?? 'básico';\n\nif (!email) throw new Error('Email requerido');\n\nconst planLabel = { basico: 'Básico', intermedio: 'Intermedio', premium: 'Premium' }[plan] ?? plan;\n\nconst html = `<!DOCTYPE html>\n<html lang=\"es\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Bienvenido a Vitalis</title></head>\n<body style=\"margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f6f9;padding:32px 0;\">\n  <tr><td align=\"center\">\n    <table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n      <!-- Header -->\n      <tr>\n        <td style=\"background:#080E1A;padding:32px;text-align:center;\">\n          <svg width=\"44\" height=\"44\" viewBox=\"0 0 80 80\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <path d=\"M14 66 Q28 44 40 32 Q53 18 68 16\" stroke=\"#234A73\" stroke-width=\"9\" stroke-linecap=\"round\" fill=\"none\"/>\n            <path d=\"M14 50 Q30 32 44 22 Q56 13 70 11\" stroke=\"#21C8C0\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\" opacity=\"0.9\"/>\n          </svg>\n          <p style=\"color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.12em;margin:12px 0 0;\">VITALIS</p>\n          <p style=\"color:#21C8C0;font-size:12px;margin:4px 0 0;\">Gestión inteligente de centros de salud</p>\n        </td>\n      </tr>\n      <!-- Body -->\n      <tr>\n        <td style=\"padding:40px 36px;\">\n          <h1 style=\"color:#080E1A;font-size:24px;margin:0 0 8px;\">¡Bienvenido, ${nombre}!</h1>\n          <p style=\"color:#555;font-size:15px;line-height:1.6;margin:0 0 24px;\">Tu centro <strong>${centro}</strong> ya está activo en Vitalis con el plan <strong>${planLabel}</strong>. Tenés <strong>7 días de prueba gratuita</strong> para explorar todo el sistema.</p>\n          \n          <div style=\"background:#f0fafa;border-left:4px solid #21C8C0;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 28px;\">\n            <p style=\"color:#234A73;font-size:14px;font-weight:600;margin:0 0 12px;\">Primeros pasos recomendados:</p>\n            <ol style=\"color:#555;font-size:14px;line-height:2;margin:0;padding-left:20px;\">\n              <li>Configurá tu agenda y horarios</li>\n              <li>Agregá tus profesionales</li>\n              <li>Cargá tus servicios y precios</li>\n              <li>Compartí el link de reservas con tus pacientes</li>\n            </ol>\n          </div>\n\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n            <tr>\n              <td align=\"center\">\n                <a href=\"https://agendavitalis.app/dashboard\" style=\"display:inline-block;background:#21C8C0;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;\">Ir al dashboard →</a>\n              </td>\n            </tr>\n          </table>\n        </td>\n      </tr>\n      <!-- Footer -->\n      <tr>\n        <td style=\"background:#f4f6f9;padding:20px 36px;text-align:center;border-top:1px solid #e8ecf0;\">\n          <p style=\"color:#999;font-size:12px;margin:0;\">Vitalis · agendavitalis.app · Este es un email automático, no respondas a este mensaje.</p>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>`;\n\nreturn [{ json: { to: email, subject: `¡Bienvenido a Vitalis, ${nombre}!`, html, nombre, centro, plan } }];"
+      },
+      "id": "node-armar-email",
+      "name": "Armar Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@agendavitalis.app",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}"
+      },
+      "id": "node-smtp",
+      "name": "Enviar Email SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, 300],
+      "credentials": {
+        "smtp": {
+          "name": "Zoho SMTP Vitalis"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Bienvenida": { "main": [[{ "node": "Armar Email", "type": "main", "index": 0 }]] },
+    "Armar Email": { "main": [[{ "node": "Enviar Email SMTP", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

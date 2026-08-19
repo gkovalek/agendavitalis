@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, LogOut, ChevronDown, Lock, UserCircle } from 'lucide-react';
+import { useTutorialContext } from '@/contexts/TutorialContext';
+import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle } from 'lucide-react';
 
 function VitalisIsotipo({ size = 20 }: { size?: number }) {
   return (
@@ -73,13 +74,14 @@ const BASE_NAV_GROUPS: NavGroup[] = [
 ];
 
 function DropdownMenu({
-  group, onNavigate, tieneFeature, planMinimoPara, onLocked,
+  group, onNavigate, tieneFeature, planMinimoPara, onLocked, tutorialId,
 }: {
   group: NavGroup;
   onNavigate: (href: string) => void;
   tieneFeature: (f: Feature) => boolean;
   planMinimoPara: (f: Feature) => string;
   onLocked: (planNombre: string) => void;
+  tutorialId?: string;
 }) {
   const location = useLocation();
   const isActive = group.items.some(i => i.href && location.pathname.startsWith(i.href));
@@ -88,6 +90,7 @@ function DropdownMenu({
     <div className="relative group h-full flex items-center">
       <button
         disabled={group.disabled}
+        {...(tutorialId ? { 'data-tutorial': tutorialId } : {})}
         className={`
           flex items-center gap-0.5 px-3 h-full text-[13px] font-medium
           transition-colors whitespace-nowrap border-none bg-transparent
@@ -147,6 +150,7 @@ export function TopNavbar() {
   const { get } = useCentroConfig(centroId);
   const { tiene, planMinimoPara } = usePlan();
   const { toast } = useToast();
+  const { startTutorial } = useTutorialContext();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -162,7 +166,7 @@ export function TopNavbar() {
         let items = group.items;
 
         if (esProfesional) {
-          items = items.filter(i => i.href !== '/profesionales' && i.href !== '/servicios');
+          items = items.filter(i => i.href !== '/profesionales');
         }
 
         if (esSecretario) {
@@ -207,6 +211,7 @@ export function TopNavbar() {
       {/* Nav */}
       <nav className="flex items-stretch flex-1 min-w-0">
         <button
+          data-tutorial="dashboard"
           onClick={() => navigate('/dashboard')}
           className={`
             flex items-center px-4 h-full text-[13px] font-semibold
@@ -219,19 +224,27 @@ export function TopNavbar() {
         >
           Panel principal
         </button>
-        {navGroups.map((group, i) => (
-          <DropdownMenu
-            key={i}
-            group={group}
-            onNavigate={navigate}
-            tieneFeature={tiene}
-            planMinimoPara={planMinimoPara}
-            onLocked={(planNombre) => toast({
-              title: `Disponible en plan ${planNombre}`,
-              description: 'Actualizá tu plan para acceder a este módulo.',
-            })}
-          />
-        ))}
+        {navGroups.map((group, i) => {
+          const tutorialMap: Record<string, string> = {
+            Pacientes: 'nav-pacientes',
+            Agendas: 'nav-agendas',
+            Caja: 'nav-caja',
+          };
+          return (
+            <DropdownMenu
+              key={i}
+              group={group}
+              onNavigate={navigate}
+              tieneFeature={tiene}
+              planMinimoPara={planMinimoPara}
+              tutorialId={tutorialMap[group.label]}
+              onLocked={(planNombre) => toast({
+                title: `Disponible en plan ${planNombre}`,
+                description: 'Actualizá tu plan para acceder a este módulo.',
+              })}
+            />
+          );
+        })}
       </nav>
 
       {/* Right */}
@@ -248,6 +261,7 @@ export function TopNavbar() {
 
         <div className="relative" ref={userMenuRef}>
           <button
+            data-tutorial="user-menu"
             onClick={() => setUserMenuOpen(v => !v)}
             className="flex items-center gap-2 px-2 py-1.5 rounded text-white/80 hover:text-white hover:bg-white/10 transition-colors"
           >
@@ -279,6 +293,12 @@ export function TopNavbar() {
                   <Settings className="w-4 h-4 opacity-60" /> Configuración
                 </button>
               )}
+              <button
+                onClick={() => { setUserMenuOpen(false); startTutorial(); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+              >
+                <HelpCircle className="h-4 w-4 opacity-60" /> Ver tutorial
+              </button>
               <button
                 onClick={() => { setUserMenuOpen(false); signOut(); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-destructive hover:bg-destructive/10 text-left transition-colors"
