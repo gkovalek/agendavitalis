@@ -13,6 +13,7 @@ interface UsuarioPerfil {
   activo: boolean;
   rol_nombre: string | null;
   plan: 'basico' | 'intermedio' | 'premium';
+  suscripcion_estado: 'trial' | 'activo' | 'vencido' | 'suspendido';
 }
 
 interface AuthContextType {
@@ -37,7 +38,7 @@ interface FetchPerfilResult {
 async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo, rol:roles(nombre), centro:centros(plan)')
+    .select('id, auth_user_id, centro_id, rol_id, profesional_id, nombre, mail, activo, rol:roles(nombre), centro:centros(plan, suscripcion_estado, trial_hasta)')
     .eq('auth_user_id', userId)
     .maybeSingle();
 
@@ -46,6 +47,15 @@ async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
 
   const rolData = data.rol as any;
   const centroData = data.centro as any;
+
+  // Calcular suscripcion_estado: si trial_hasta existe y no vencio, es trial
+  let suscripcion_estado: UsuarioPerfil['suscripcion_estado'] = centroData?.suscripcion_estado ?? 'trial';
+  if (suscripcion_estado === 'trial' && centroData?.trial_hasta) {
+    if (new Date(centroData.trial_hasta) < new Date()) {
+      suscripcion_estado = 'vencido';
+    }
+  }
+
   const perfil: UsuarioPerfil = {
     id: data.id,
     auth_user_id: data.auth_user_id,
@@ -57,6 +67,7 @@ async function fetchPerfil(userId: string): Promise<FetchPerfilResult> {
     activo: data.activo,
     rol_nombre: rolData?.nombre ?? null,
     plan: centroData?.plan ?? 'basico',
+    suscripcion_estado,
   };
 
   if (!perfil.activo) {
@@ -84,10 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // getSession lee localStorage — no espera red, setLoading(false) es inmediato
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
-      if (session?.user) loadPerfil(session.user.id); // no await — corre en paralelo
+      if (session?.user) await loadPerfil(session.user.id);
       setLoading(false);
     });
 

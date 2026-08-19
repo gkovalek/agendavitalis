@@ -25,6 +25,12 @@ interface Props {
   onCancel: () => void;
 }
 
+interface ProfesionalOpcion {
+  id: string;
+  nombre: string;
+  apellido: string;
+}
+
 interface Paciente {
   id: string;
   nombre: string;
@@ -62,9 +68,25 @@ interface TurnoHistorial {
 
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
-export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, preselectedAgendaId, onSuccess, onCancel }: Props) {
+export function NuevoTurnoForm({ fecha, hora, profesionalId: profesionalIdProp, profesionalNombre: profesionalNombreProp, preselectedAgendaId, onSuccess, onCancel }: Props) {
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
+
+  // Cuando llega vacío (filtro "Todos"), el usuario elige el profesional aquí
+  const [profesionalId, setProfesionalId] = useState(profesionalIdProp);
+  const [profesionalNombre, setProfesionalNombre] = useState(profesionalNombreProp);
+  const [profesionalesList, setProfesionalesList] = useState<ProfesionalOpcion[]>([]);
+
+  useEffect(() => {
+    if (profesionalIdProp || !centroId) return;
+    supabase
+      .from('profesionales')
+      .select('id, nombre, apellido')
+      .eq('centro_id', centroId)
+      .eq('activo', true)
+      .order('apellido')
+      .then(({ data }) => setProfesionalesList((data as ProfesionalOpcion[]) ?? []));
+  }, [profesionalIdProp, centroId]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paciente[]>([]);
@@ -352,10 +374,34 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId, profesionalNombre, 
     <div className="space-y-4">
       <div className="border-b pb-3">
         <p className="text-sm text-muted-foreground">{fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
-        <p className="text-sm font-medium text-foreground">{profesionalNombre}</p>
+        {profesionalNombre && <p className="text-sm font-medium text-foreground">{profesionalNombre}</p>}
       </div>
 
-      {!selectedPaciente ? (
+      {/* Selector de profesional cuando se abre desde "Todos" */}
+      {!profesionalIdProp && (
+        <div className="space-y-1">
+          <Label>Profesional *</Label>
+          <Select
+            value={profesionalId}
+            onValueChange={(v) => {
+              const p = profesionalesList.find(x => x.id === v);
+              setProfesionalId(v);
+              setProfesionalNombre(p ? `${p.nombre} ${p.apellido}` : '');
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar profesional" />
+            </SelectTrigger>
+            <SelectContent>
+              {profesionalesList.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.apellido}, {p.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {!profesionalId ? null : !selectedPaciente ? (
         <div className="space-y-3">
           <div className="relative" ref={searchRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

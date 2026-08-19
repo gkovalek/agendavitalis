@@ -6,15 +6,38 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle2, XCircle, User, CreditCard, Lock, MessageSquare } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, User, CreditCard, Lock, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 import { FaqManagerTab } from '@/components/FaqManagerTab';
 
 const MP_APP_ID   = import.meta.env.VITE_MP_APP_ID as string | undefined;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
+interface Servicio { id: string; nombre: string; }
+
 export default function MiPerfil() {
   const { perfil } = useAuth();
   const { toast } = useToast();
+
+  // ── Servicios del profesional ─────────────────────────────────────────────
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [openProfFaq, setOpenProfFaq] = useState(true);
+  const [openServFaq, setOpenServFaq] = useState(false);
+
+  useEffect(() => {
+    if (!perfil?.profesional_id) return;
+    supabase
+      .from('profesional_centro_servicio')
+      .select('servicio_id, servicios(id, nombre)')
+      .eq('profesional_id', perfil.profesional_id)
+      .eq('activo', true)
+      .then(({ data }) => {
+        const items: Servicio[] = (data ?? [])
+          .map((r: any) => r.servicios)
+          .filter(Boolean)
+          .filter((s: Servicio, i: number, arr: Servicio[]) => arr.findIndex(x => x.id === s.id) === i);
+        setServicios(items);
+      });
+  }, [perfil?.profesional_id]);
 
   // ── Mercado Pago ─────────────────────────────────────────────────────────────
   const [mpUserId, setMpUserId]           = useState<string | null>(null);
@@ -218,16 +241,68 @@ export default function MiPerfil() {
               Preguntas frecuentes — Asistente IA
             </CardTitle>
             <CardDescription>
-              El bot de WhatsApp usará estas respuestas cuando los pacientes te consulten a vos específicamente.
+              El bot de WhatsApp usará estas respuestas para contestar consultas de tus pacientes.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <FaqManagerTab
-              table="faq_profesional"
-              field="profesional_id"
-              entityId={perfil.profesional_id}
-              entityNombre={perfil.nombre}
-            />
+          <CardContent className="space-y-3">
+
+            {/* Desplegable: Preguntas sobre el profesional */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <button
+                onClick={() => setOpenProfFaq(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Preguntas sobre el profesional
+                </span>
+                {openProfFaq ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {openProfFaq && (
+                <div className="px-4 pb-4 pt-2 border-t border-border">
+                  <FaqManagerTab
+                    table="faq_profesional"
+                    field="profesional_id"
+                    entityId={perfil.profesional_id}
+                    entityNombre={perfil.nombre}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Desplegable: Preguntas sobre los servicios */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <button
+                onClick={() => setOpenServFaq(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  Preguntas sobre los servicios
+                </span>
+                {openServFaq ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {openServFaq && (
+                <div className="px-4 pb-4 pt-2 border-t border-border space-y-4">
+                  {servicios.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No tenés servicios asignados todavía.</p>
+                  ) : (
+                    servicios.map(s => (
+                      <div key={s.id}>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{s.nombre}</p>
+                        <FaqManagerTab
+                          table="faq_servicio"
+                          field="servicio_id"
+                          entityId={s.id}
+                          entityNombre={s.nombre}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
           </CardContent>
         </Card>
       )}

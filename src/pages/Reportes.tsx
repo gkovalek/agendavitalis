@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, TrendingUp, TrendingDown, Minus, Users, Calendar, Banknote, Building2, Activity } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Minus, Users, Calendar, Banknote, Building2, Activity, Lock } from 'lucide-react';
+import { usePlan } from '@/hooks/use-plan';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, AreaChart, Area,
@@ -28,7 +29,7 @@ interface Movimiento {
   monto_efectivo: number;
   monto_transferencia: number;
   monto_prepaga: number;
-  monto_total: number;
+  monto_total: number; // computado en cliente: sum(efectivo + transferencia + prepaga)
   profesional_id: string | null;
   profesional?: { nombre: string; apellido: string } | null;
   turno?: {
@@ -159,6 +160,7 @@ function EmptyChart() {
 
 export default function Reportes() {
   const { centroId } = useAuth();
+  const { tiene, planMinimoPara } = usePlan();
   const hoyStr = toDateStr(new Date());
 
   const [periodo, setPeriodo] = useState<Periodo>('mes');
@@ -205,7 +207,7 @@ export default function Reportes() {
 
     const fetchComp = async (r: RangoFechas): Promise<CompData> => {
       let mQ = supabase.from('caja_movimientos')
-        .select('monto_total, monto_prepaga')
+        .select('monto_efectivo, monto_transferencia, monto_prepaga')
         .eq('centro_id', centroId).gte('fecha', r.desde).lte('fecha', r.hasta);
       let tQ = supabase.from('turnos')
         .select('id', { count: 'exact', head: true })
@@ -217,7 +219,7 @@ export default function Reportes() {
       const [mRes, tRes] = await Promise.all([mQ, tQ]);
       const movs = (mRes.data as any[]) ?? [];
       return {
-        ingresos: movs.reduce((s, m) => s + (m.monto_total || 0), 0),
+        ingresos: movs.reduce((s, m) => s + (m.monto_efectivo || 0) + (m.monto_transferencia || 0) + (m.monto_prepaga || 0), 0),
         ingresosOS: movs.reduce((s, m) => s + (m.monto_prepaga || 0), 0),
         turnosFinalizados: tRes.count ?? 0,
       };
@@ -230,7 +232,7 @@ export default function Reportes() {
         .select('id, fecha, estado, profesional_id, servicio_id, servicio:servicios(nombre)')
         .eq('centro_id', centroId).gte('fecha', rango.desde).lte('fecha', rango.hasta);
       let movQ = supabase.from('caja_movimientos')
-        .select(`id, fecha, monto_efectivo, monto_transferencia, monto_prepaga, monto_total, profesional_id,
+        .select(`id, fecha, monto_efectivo, monto_transferencia, monto_prepaga, profesional_id,
           profesional:profesionales(nombre, apellido),
           turno:turnos(servicio_id, servicio:servicios(nombre), paciente:pacientes(obra_social:obras_sociales(id, nombre)))`)
         .eq('centro_id', centroId).gte('fecha', rango.desde).lte('fecha', rango.hasta).order('fecha', { ascending: true });
@@ -245,7 +247,12 @@ export default function Reportes() {
       ]);
 
       setTurnos((turnosRes.data as TurnoItem[]) ?? []);
-      setMovimientos((movRes.data as any[]) ?? []);
+      // Computar monto_total en cliente (columna no existe en la DB)
+      const movData = ((movRes.data as any[]) ?? []).map(m => ({
+        ...m,
+        monto_total: (m.monto_efectivo || 0) + (m.monto_transferencia || 0) + (m.monto_prepaga || 0),
+      }));
+      setMovimientos(movData);
       setCompSemana(cSem);
       setCompMes(cMes);
       setCompAño(cAño);
@@ -455,6 +462,13 @@ export default function Reportes() {
           </SelectContent>
         </Select>
       </div>
+    </div>
+  );
+
+  if (!tiene('reportes')) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+      <Lock className="w-8 h-8 opacity-40" />
+      <p className="text-sm font-medium">Reportes requiere plan {planMinimoPara('reportes')}</p>
     </div>
   );
 

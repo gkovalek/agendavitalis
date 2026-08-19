@@ -4,7 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Settings, LogOut, ChevronDown, Lock, User } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Lock, UserCircle } from 'lucide-react';
+
+function VitalisIsotipo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 66 Q28 44 40 32 Q53 18 68 16" stroke="#234A73" strokeWidth="9" strokeLinecap="round" fill="none"/>
+      <path d="M14 50 Q30 32 44 22 Q56 13 70 11" stroke="#21C8C0" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.9"/>
+    </svg>
+  );
+}
 
 interface NavItem {
   label: string;
@@ -188,11 +197,11 @@ export function TopNavbar() {
     : 'U';
 
   return (
-    <header className="h-12 flex items-stretch bg-primary shrink-0 z-40 relative select-none">
+    <header className="h-12 flex items-stretch bg-[#080E1A] shrink-0 z-40 relative select-none border-b border-white/8">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-4 border-r border-white/20 shrink-0">
-        <Heart className="w-4 h-4 text-white" />
-        <span className="text-white font-semibold text-[14px] tracking-tight">Vitalis</span>
+      <div className="flex items-center gap-2.5 px-4 border-r border-white/10 shrink-0">
+        <VitalisIsotipo size={20} />
+        <span className="text-white font-extrabold text-[13px] tracking-[0.1em] uppercase">VITALIS</span>
       </div>
 
       {/* Nav */}
@@ -203,8 +212,8 @@ export function TopNavbar() {
             flex items-center px-4 h-full text-[13px] font-semibold
             transition-colors whitespace-nowrap border-none shrink-0 cursor-pointer
             ${location.pathname === '/dashboard'
-              ? 'bg-white text-primary'
-              : 'bg-white/90 text-primary hover:bg-white'
+              ? 'bg-white/15 text-white'
+              : 'text-white/70 hover:text-white hover:bg-white/10'
             }
           `}
         >
@@ -254,12 +263,14 @@ export function TopNavbar() {
                 <p className="text-[13px] font-semibold text-foreground">{perfil?.nombre}</p>
                 <p className="text-xs text-muted-foreground truncate mt-0.5">{perfil?.mail}</p>
               </div>
-              <button
-                onClick={() => { setUserMenuOpen(false); navigate('/mi-perfil'); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
-              >
-                <User className="w-4 h-4 opacity-60" /> Mi perfil
-              </button>
+              {!esSecretario && (
+                <button
+                  onClick={() => { setUserMenuOpen(false); navigate('/mi-perfil'); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                >
+                  <UserCircle className="w-4 h-4 opacity-60" /> Mi perfil
+                </button>
+              )}
               {mostrarConfig && (
                 <button
                   onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}

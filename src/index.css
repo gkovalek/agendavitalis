@@ -1,49 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 210 40% 11%;
+    /* ── Light ─────────────────────────────────────────── */
+    /* Landing palette: bg #F8FAFC · surface #fff · text #0F172A · subtle #64748B · border #E2E8F0 */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 210 40% 11%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 210 40% 11%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 187 65% 32%;
+    /* Vital Aqua #21C8C0 */
+    --primary: 177 70% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 187 30% 94%;
-    --secondary-foreground: 187 65% 22%;
+    --secondary: 214 32% 93%;
+    --secondary-foreground: 222 47% 20%;
 
-    --muted: 210 20% 95%;
-    --muted-foreground: 210 15% 46%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 187 40% 90%;
-    --accent-foreground: 187 65% 22%;
+    --accent: 177 40% 90%;
+    --accent-foreground: 177 65% 22%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 90%;
-    --input: 210 20% 90%;
-    --ring: 187 65% 32%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 177 70% 45%;
 
     --radius: 0.625rem;
 
-    --sidebar-background: 187 65% 22%;
-    --sidebar-foreground: 187 10% 92%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 187 65% 22%;
-    --sidebar-accent: 187 50% 28%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 187 50% 28%;
-    --sidebar-ring: 187 65% 42%;
+    /* Vital Navy sidebar */
+    --sidebar-background: 222 53% 7%;
+    --sidebar-foreground: 215 15% 75%;
+    --sidebar-primary: 177 70% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 35% 14%;
+    --sidebar-accent-foreground: 210 15% 92%;
+    --sidebar-border: 222 35% 12%;
+    --sidebar-ring: 177 70% 45%;
 
     --success: 152 60% 40%;
     --success-foreground: 0 0% 100%;
@@ -54,33 +58,46 @@
   }
 
   .dark {
-    --background: 210 40% 7%;
-    --foreground: 210 20% 95%;
-    --card: 210 35% 10%;
-    --card-foreground: 210 20% 95%;
-    --popover: 210 35% 10%;
-    --popover-foreground: 210 20% 95%;
-    --primary: 187 65% 42%;
+    /* ── Dark ──────────────────────────────────────────── */
+    /* Landing palette: bg #080E1A · surface #0F172A · text #F1F5F9 · subtle #94A3B8 · border #1E293B */
+    --background: 222 53% 7%;
+    --foreground: 214 32% 96%;
+
+    --card: 222 47% 12%;
+    --card-foreground: 214 32% 96%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 214 32% 96%;
+
+    /* Primary = Vital Aqua #21C8C0 */
+    --primary: 177 70% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 187 30% 15%;
-    --secondary-foreground: 187 30% 85%;
-    --muted: 210 25% 15%;
-    --muted-foreground: 210 15% 60%;
-    --accent: 187 40% 18%;
-    --accent-foreground: 187 30% 85%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 210 25% 18%;
-    --input: 210 25% 18%;
-    --ring: 187 65% 42%;
-    --sidebar-background: 210 40% 6%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 187 65% 42%;
+
+    --secondary: 222 30% 17%;
+    --secondary-foreground: 215 15% 82%;
+
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 177 50% 18%;
+    --accent-foreground: 177 70% 75%;
+
+    --destructive: 0 62% 38%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 32% 18%;
+    --input: 215 32% 18%;
+    --ring: 177 70% 45%;
+
+    /* Sidebar = Vital Navy profundo #080E1A */
+    --sidebar-background: 222 53% 5%;
+    --sidebar-foreground: 215 15% 72%;
+    --sidebar-primary: 177 70% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 30% 12%;
-    --sidebar-accent-foreground: 210 20% 85%;
-    --sidebar-border: 210 25% 15%;
-    --sidebar-ring: 187 65% 42%;
+    --sidebar-accent: 222 35% 11%;
+    --sidebar-accent-foreground: 210 15% 90%;
+    --sidebar-border: 222 35% 10%;
+    --sidebar-ring: 177 70% 45%;
   }
 }
 
@@ -91,5 +108,46 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
   }
+
+  /* Typography scale */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+
+  /* Refined scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+  /* Focus ring */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Card elevation levels */
+  .card-sm   { box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04); }
+  .card-md   { box-shadow: 0 4px 16px rgba(0,0,0,.07), 0 2px 6px rgba(0,0,0,.04); }
+  .card-lg   { box-shadow: 0 16px 48px rgba(0,0,0,.10), 0 4px 16px rgba(0,0,0,.06); }
+
+  /* Premium button glow */
+  .btn-primary-glow {
+    box-shadow: 0 4px 20px rgba(33,200,192,.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn-primary-glow:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(33,200,192,.45);
+  }
+
+  /* Stat number formatting */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
 }

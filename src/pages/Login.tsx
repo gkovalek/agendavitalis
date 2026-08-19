@@ -6,7 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Heart, Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+
+function VitalisIsotipo({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 66 Q28 44 40 32 Q53 18 68 16" stroke="#234A73" strokeWidth="9" strokeLinecap="round" fill="none"/>
+      <path d="M14 50 Q30 32 44 22 Q56 13 70 11" stroke="#21C8C0" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.9"/>
+    </svg>
+  );
+}
 import { useToast } from '@/hooks/use-toast';
 
 export default function Login() {
@@ -24,7 +33,7 @@ export default function Login() {
     e.preventDefault();
     setResetLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://agendavitalis.lovable.app/reset-password',
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     setResetLoading(false);
     if (error) {
@@ -52,11 +61,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
-            <Heart className="w-8 h-8 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#080E1A] border border-white/10 mb-4">
+            <VitalisIsotipo size={38} />
           </div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Vitalis</h1>
-          <p className="text-muted-foreground mt-1">Sistema de Gestión de Turnos Médicos</p>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-[0.08em] uppercase">VITALIS</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Gestión inteligente de centros de salud</p>
         </div>
 
         <Card className="shadow-lg border-border/50">

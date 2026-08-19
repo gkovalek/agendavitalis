@@ -6,6 +6,7 @@ export const TURNO_ESTADOS = {
   atendiendo: { label: 'Siendo atendido', color: '#60A5FA', bg: 'bg-blue-400/20', text: 'text-blue-600' },
   finalizado: { label: 'Finalizado', color: '#7DD3FC', bg: 'bg-sky-300/20', text: 'text-sky-600' },
   cancelado: { label: 'Cancelado', color: '#F87171', bg: 'bg-red-400/20', text: 'text-red-600' },
+  pendiente_pago: { label: 'Pendiente de pago', color: '#FB923C', bg: 'bg-orange-400/20', text: 'text-orange-600' },
 } as const;
 
 export type TurnoEstado = keyof typeof TURNO_ESTADOS;

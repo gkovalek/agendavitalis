@@ -80,6 +80,7 @@ const ESTADO_COUNTS_LABELS: { key: TurnoEstado; label: string; color: string }[]
   { key: 'siendo_atendido', label: 'Siendo atendidos', color: '#60A5FA' },
   { key: 'cancelado', label: 'Cancelados / Ausentes', color: '#E24B4A' },
   { key: 'reservado', label: 'Reservados', color: '#7F77DD' },
+  { key: 'pendiente_pago', label: 'Pendiente de pago', color: '#FB923C' },
 ];
 
 export default function Dashboard() {
@@ -217,6 +218,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     if (!centroId) return;
     setLoading(true);
+    try {
     const [profRes, turnosRes, pcsRes, nlRes] = await Promise.all([
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select(`
@@ -286,6 +288,10 @@ export default function Dashboard() {
     setPcsRecords(pcsListRaw);
     setDiasNL((nlRes.data as DiaNolaboral[]) ?? []);
     setLoading(false);
+    } catch (err) {
+      console.error('Dashboard fetchData error:', err);
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
@@ -547,7 +553,7 @@ export default function Dashboard() {
             </div>
             <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1"
               onClick={() => {
-                const profId = selectedProfId !== 'todos' ? selectedProfId : (profesionales[0]?.id ?? '');
+                const profId = selectedProfId !== 'todos' ? selectedProfId : '';
                 const prof = profesionales.find(p => p.id === profId);
                 setNewTurnoSlot({ fecha: dateStr, hora: '09:00', profesional_id: profId, profesional_nombre: prof ? `${prof.nombre} ${prof.apellido}` : '', agenda_id: agendasDelProf[0]?.id });
               }}

@@ -107,12 +107,33 @@ export default function Configuracion() {
   const [saving, setSaving] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // ── Mercado Pago ─────────────────────────────────────────────────────────
+  // ── Mercado Pago — centro (fallback) ─────────────────────────────────────
   const [mpUserId, setMpUserId]       = useState<string | null>(null);
   const [mpFeePct, setMpFeePct]       = useState('3');
   const [mpLoading, setMpLoading]     = useState(true);
   const [mpConnecting, setMpConnecting] = useState(false);
   const [mpDisconnecting, setMpDisconnecting] = useState(false);
+
+  // ── Mercado Pago — por profesional ────────────────────────────────────────
+  // mapa profesional_id → mp_user_id (null = no conectado)
+  const [profMpStatus, setProfMpStatus] = useState<Record<string, string | null>>({});
+  const [profMpLoading, setProfMpLoading] = useState(false);
+  const [profMpConnecting, setProfMpConnecting] = useState<string | null>(null); // prof id en curso
+  const [profMpDisconnecting, setProfMpDisconnecting] = useState<string | null>(null);
+
+  const fetchProfMpStatus = async () => {
+    if (!centroId) return;
+    setProfMpLoading(true);
+    const { data } = await supabase
+      .from('profesionales')
+      .select('id, mp_user_id')
+      .eq('centro_id', centroId)
+      .eq('activo', true);
+    const status: Record<string, string | null> = {};
+    (data ?? []).forEach((p: any) => { status[p.id] = p.mp_user_id ?? null; });
+    setProfMpStatus(status);
+    setProfMpLoading(false);
+  };
 
   // Cargar estado MP del centro
   useEffect(() => {
@@ -123,19 +144,24 @@ export default function Configuracion() {
         setMpFeePct(String(data?.mp_fee_pct ?? 3));
         setMpLoading(false);
       });
+    fetchProfMpStatus();
   }, [centroId]);
 
-  // Detectar redirect de MP con ?code=
+  // Detectar redirect de MP con ?code= y ?state=profesional_id opcional
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (!code) return;
+    const profesionalId = params.get('state') ?? undefined;
 
-    // Limpiar la URL inmediatamente para evitar re-procesar si recarga
     window.history.replaceState({}, '', window.location.pathname);
 
     const exchangeCode = async () => {
-      setMpConnecting(true);
+      if (profesionalId) {
+        setProfMpConnecting(profesionalId);
+      } else {
+        setMpConnecting(true);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/mp-oauth`, {
         method: 'POST',
@@ -143,13 +169,19 @@ export default function Configuracion() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, profesional_id: profesionalId }),
       });
       const json = await res.json();
+      setProfMpConnecting(null);
       setMpConnecting(false);
       if (json.ok) {
-        setMpUserId(json.mp_user_id);
-        toast({ title: '¡Mercado Pago conectado!', description: `Cuenta ${json.mp_user_id} vinculada correctamente.` });
+        if (profesionalId) {
+          setProfMpStatus(prev => ({ ...prev, [profesionalId]: json.mp_user_id }));
+          toast({ title: '¡Mercado Pago conectado!', description: `Cuenta ${json.mp_user_id} vinculada al profesional.` });
+        } else {
+          setMpUserId(json.mp_user_id);
+          toast({ title: '¡Mercado Pago conectado!', description: `Cuenta ${json.mp_user_id} vinculada correctamente.` });
+        }
       } else {
         toast({ title: 'Error al conectar MP', description: json.error ?? 'Intentá de nuevo.', variant: 'destructive' });
       }
@@ -158,13 +190,15 @@ export default function Configuracion() {
     exchangeCode();
   }, []);
 
-  const handleMpConnect = () => {
+  const handleMpConnect = (profesionalId?: string) => {
     if (!MP_APP_ID) {
       toast({ title: 'MP_APP_ID no configurado', variant: 'destructive' });
       return;
     }
     const redirectUri = encodeURIComponent(window.location.origin + '/configuracion');
-    const url = `https://auth.mercadopago.com/authorization?client_id=${MP_APP_ID}&response_type=code&platform_id=mp&redirect_uri=${redirectUri}`;
+    // state = profesional_id para identificar al profesional en el redirect
+    const state = profesionalId ? `&state=${encodeURIComponent(profesionalId)}` : '';
+    const url = `https://auth.mercadopago.com/authorization?client_id=${MP_APP_ID}&response_type=code&platform_id=mp&redirect_uri=${redirectUri}${state}`;
     window.location.href = url;
   };
 
@@ -177,18 +211,14 @@ export default function Configuracion() {
     toast({ title: 'Mercado Pago desconectado' });
   };
 
-  const handleSaveMpFee = async () => {
-    if (!centroId) return;
-    const pct = parseFloat(mpFeePct);
-    if (isNaN(pct) || pct < 0 || pct > 30) {
-      toast({ title: 'Porcentaje inválido (0–30%)', variant: 'destructive' });
-      return;
-    }
-    setSaving('mp_fee');
-    await supabase.from('centros').update({ mp_fee_pct: pct }).eq('id', centroId);
-    setSaving(null);
-    toast({ title: 'Comisión guardada' });
+  const handleProfMpDisconnect = async (profId: string) => {
+    setProfMpDisconnecting(profId);
+    await supabase.from('profesionales').update({ mp_access_token: null, mp_public_key: null, mp_user_id: null, mp_refresh_token: null }).eq('id', profId);
+    setProfMpStatus(prev => ({ ...prev, [profId]: null }));
+    setProfMpDisconnecting(null);
+    toast({ title: 'Mercado Pago desconectado del profesional' });
   };
+
 
   // Local state para edición
   const [vals, setVals] = useState<Record<string, string>>({});
@@ -550,32 +580,13 @@ export default function Configuracion() {
               </div>
             </div>
 
-            {/* Comisión Vitalis */}
-            <div className="space-y-2">
-              <Label className="text-sm">Comisión Vitalis por cobro (%)</Label>
+            {/* Comisión Vitalis — solo lectura, se configura desde el panel Superadmin */}
+            <div className="space-y-1">
+              <Label className="text-sm">Comisión Vitalis por cobro</Label>
               <p className="text-xs text-muted-foreground">
-                Este porcentaje se descuenta automáticamente de cada pago y va a la cuenta de Vitalis.
+                Porcentaje que Vitalis descuenta automáticamente de cada pago. Configurado por Vitalis.
               </p>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min="0"
-                  max="30"
-                  step="0.5"
-                  value={mpFeePct}
-                  onChange={e => setMpFeePct(e.target.value)}
-                  className="w-28"
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-                <Button
-                  size="sm"
-                  disabled={saving === 'mp_fee'}
-                  onClick={handleSaveMpFee}
-                >
-                  {saving === 'mp_fee' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  <Save className="w-4 h-4 mr-2" /> Guardar
-                </Button>
-              </div>
+              <p className="text-sm font-semibold">{mpFeePct}%</p>
             </div>
 
             {/* Desconectar */}
@@ -606,10 +617,70 @@ export default function Configuracion() {
                 </p>
               </div>
             </div>
-            <Button onClick={handleMpConnect} className="gap-2">
+            <Button onClick={() => handleMpConnect()} className="gap-2">
               <CreditCard className="w-4 h-4" />
-              Conectar Mercado Pago
+              Conectar Mercado Pago (cuenta del centro)
             </Button>
+          </div>
+        )}
+      </Section>
+
+      {/* Mercado Pago por profesional */}
+      <Section
+        title="Mercado Pago por profesional"
+        description="Cada profesional puede conectar su propia cuenta de Mercado Pago para recibir los pagos directamente."
+        icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+      >
+        {profMpLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Cargando…
+          </div>
+        ) : profesionales.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No hay profesionales activos.</p>
+        ) : (
+          <div className="space-y-3">
+            {profesionales.map(prof => {
+              const mpId = profMpStatus[prof.id];
+              const isConnecting = profMpConnecting === prof.id;
+              const isDisconnecting = profMpDisconnecting === prof.id;
+              return (
+                <div key={prof.id} className="flex items-center gap-3 rounded-lg border px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{prof.apellido}, {prof.nombre}</p>
+                    {mpId ? (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">ID MP: {mpId}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Sin cuenta conectada</p>
+                    )}
+                  </div>
+                  {mpId ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:bg-destructive/10 border-destructive/30 text-xs"
+                        disabled={isDisconnecting}
+                        onClick={() => handleProfMpDisconnect(prof.id)}
+                      >
+                        {isDisconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                        <span className="ml-1">Desconectar</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isConnecting}
+                      onClick={() => handleMpConnect(prof.id)}
+                    >
+                      {isConnecting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CreditCard className="w-3 h-3 mr-1" />}
+                      Conectar
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Section>

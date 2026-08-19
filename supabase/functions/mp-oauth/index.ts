@@ -20,6 +20,7 @@ const MP_APP_SECRET    = Deno.env.get('MP_APP_SECRET')!;   // nunca va al fronte
 const APP_URL          = Deno.env.get('APP_URL')!;          // ej: https://vitalis.app
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   // ── 1. Autenticar usuario ────────────────────────────────────────────────
@@ -36,17 +37,19 @@ Deno.serve(async (req: Request) => {
 
   // ── 2. Obtener centro_id ─────────────────────────────────────────────────
   const { data: perfil } = await supabaseAdmin
-    .from('perfiles')
+    .from('usuarios')
     .select('centro_id')
-    .eq('id', user.id)
+    .eq('auth_user_id', user.id)
     .single();
 
   if (!perfil?.centro_id) return json({ error: 'no_centro' }, 400);
 
   // ── 3. Parsear body ──────────────────────────────────────────────────────
-  let body: { code?: string };
+  let body: { code?: string; profesional_id?: string; redirect_uri?: string };
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
   if (!body.code) return json({ error: 'missing_code' }, 400);
+
+  const redirectUri = body.redirect_uri ?? `${APP_URL}/configuracion`;
 
   // ── 4. Intercambiar código por tokens con MP ─────────────────────────────
   const tokenRes = await fetch('https://api.mercadopago.com/oauth/token', {
@@ -57,7 +60,7 @@ Deno.serve(async (req: Request) => {
       client_secret: MP_APP_SECRET,
       code:          body.code,
       grant_type:    'authorization_code',
-      redirect_uri:  `${APP_URL}/configuracion`,
+      redirect_uri:  redirectUri,
     }),
   });
 
@@ -76,19 +79,41 @@ Deno.serve(async (req: Request) => {
   const accessToken = tokens.access_token as string;
   const publicKey   = tokens.public_key   as string | undefined;
 
-  // ── 6. Guardar en centros ────────────────────────────────────────────────
-  const { error: updateErr } = await supabaseAdmin
-    .from('centros')
-    .update({
-      mp_access_token: accessToken,
-      mp_public_key:   publicKey ?? null,
-      mp_user_id:      mpUserId,
-    })
-    .eq('id', perfil.centro_id);
+  // ── 6. Guardar en profesional o en centro (fallback) ────────────────────
+  const refreshToken = tokens.refresh_token as string | undefined;
 
-  if (updateErr) {
-    console.error('DB update error:', updateErr);
-    return json({ error: 'db_error' }, 500);
+  if (body.profesional_id) {
+    // Modelo 1 cuenta por profesional
+    const { error: updateErr } = await supabaseAdmin
+      .from('profesionales')
+      .update({
+        mp_access_token:  accessToken,
+        mp_public_key:    publicKey ?? null,
+        mp_user_id:       mpUserId,
+        mp_refresh_token: refreshToken ?? null,
+      })
+      .eq('id', body.profesional_id)
+      .eq('centro_id', perfil.centro_id);
+
+    if (updateErr) {
+      console.error('DB update profesional error:', updateErr);
+      return json({ error: 'db_error' }, 500);
+    }
+  } else {
+    // Fallback: guardar en centro (1 cuenta por centro)
+    const { error: updateErr } = await supabaseAdmin
+      .from('centros')
+      .update({
+        mp_access_token: accessToken,
+        mp_public_key:   publicKey ?? null,
+        mp_user_id:      mpUserId,
+      })
+      .eq('id', perfil.centro_id);
+
+    if (updateErr) {
+      console.error('DB update centro error:', updateErr);
+      return json({ error: 'db_error' }, 500);
+    }
   }
 
   return json({ ok: true, mp_user_id: mpUserId });
@@ -97,6 +122,14 @@ Deno.serve(async (req: Request) => {
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...cors() },
   });
+}
+
+function cors() {
+  return {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Headers': 'content-type, apikey, authorization, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 }

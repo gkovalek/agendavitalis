@@ -1,4 +1,13 @@
-import { LayoutDashboard, Users, UserPlus, LogOut, Heart, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell, BarChart2, Settings, Lock } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, LogOut, Stethoscope, Building2, DollarSign, FileText, Wrench, UsersRound, Activity, Bell, BarChart2, Settings, Lock, BookOpen, UserCircle } from 'lucide-react';
+
+function VitalisIsotipo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 66 Q28 44 40 32 Q53 18 68 16" stroke="#234A73" strokeWidth="9" strokeLinecap="round" fill="none"/>
+      <path d="M14 50 Q30 32 44 22 Q56 13 70 11" stroke="#21C8C0" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.9"/>
+    </svg>
+  );
+}
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlan, type Feature } from '@/hooks/use-plan';
@@ -23,22 +32,25 @@ interface MenuItem {
   url: string;
   icon: React.ElementType;
   requiere?: Feature;
+  soloNoSecretario?: boolean;
 }
 
 const menuItems: MenuItem[] = [
   { title: 'Panel Principal',  url: '/dashboard',       icon: LayoutDashboard },
   { title: 'Pacientes',        url: '/pacientes',        icon: Users },
   { title: 'Nuevo Paciente',   url: '/pacientes/nuevo',  icon: UserPlus },
-  { title: 'Profesionales',    url: '/profesionales',    icon: Stethoscope },
-  { title: 'Equipos',          url: '/equipos',          icon: UsersRound },
-  { title: 'Servicios',        url: '/servicios',        icon: Wrench },
-  { title: 'Tratamientos',     url: '/tratamientos',     icon: Activity,   requiere: 'tratamientos' },
-  { title: 'Historia Clínica', url: '/historia-clinica', icon: FileText,   requiere: 'historia_clinica' },
+  { title: 'Profesionales',    url: '/profesionales',    icon: Stethoscope,  soloNoSecretario: true },
+  { title: 'Equipos',          url: '/equipos',          icon: UsersRound,   soloNoSecretario: true },
+  { title: 'Servicios',        url: '/servicios',        icon: Wrench,       soloNoSecretario: true },
+  { title: 'Tratamientos',     url: '/tratamientos',     icon: Activity,     requiere: 'tratamientos' },
+  { title: 'Historia Clínica', url: '/historia-clinica', icon: FileText,     requiere: 'historia_clinica' },
   { title: 'Recordatorios',    url: '/recordatorios',    icon: Bell },
-  { title: 'Obras Sociales',   url: '/obras-sociales',   icon: Building2,  requiere: 'obras_sociales' },
+  { title: 'Obras Sociales',   url: '/obras-sociales',   icon: Building2,    requiere: 'obras_sociales' },
   { title: 'Caja',             url: '/caja',             icon: DollarSign },
-  { title: 'Reportes',         url: '/reportes',         icon: BarChart2,  requiere: 'reportes' },
-  { title: 'Configuración',    url: '/configuracion',    icon: Settings },
+  { title: 'Reportes',         url: '/reportes',         icon: BarChart2,    requiere: 'reportes' },
+  { title: 'FAQ / Bot IA',     url: '/faq',              icon: BookOpen },
+  { title: 'Configuración',    url: '/configuracion',    icon: Settings,     soloNoSecretario: true },
+  { title: 'Mi perfil',        url: '/mi-perfil',        icon: UserCircle },
 ];
 
 export function AppSidebar() {
@@ -47,18 +59,19 @@ export function AppSidebar() {
   const { signOut, perfil } = useAuth();
   const { tiene, planMinimoPara } = usePlan();
   const { toast } = useToast();
+  const esSecretario = perfil?.rol_nombre === 'secretario';
 
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-sidebar-accent">
-            <Heart className="w-5 h-5 text-sidebar-accent-foreground" />
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#0B1220]">
+            <VitalisIsotipo size={22} />
           </div>
           {!collapsed && (
             <div>
-              <h2 className="text-base font-bold text-sidebar-foreground tracking-tight">Vitalis</h2>
-              <p className="text-xs text-sidebar-foreground/60">Gestión Médica</p>
+              <h2 className="text-sm font-extrabold text-sidebar-foreground tracking-[0.1em] uppercase">VITALIS</h2>
+              <p className="text-xs text-sidebar-foreground/50">Centro de salud</p>
             </div>
           )}
         </div>
@@ -69,7 +82,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-sidebar-foreground/50">Menú</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {menuItems.filter(item => !(item.soloNoSecretario && esSecretario)).map((item) => {
                 const bloqueado = item.requiere ? !tiene(item.requiere) : false;
 
                 if (bloqueado) {

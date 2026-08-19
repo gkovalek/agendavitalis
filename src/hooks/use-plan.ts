@@ -2,12 +2,18 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export type Plan = 'basico' | 'intermedio' | 'premium';
 
-const PLAN_RANK: Record<Plan, number> = { basico: 0, intermedio: 1, premium: 2 };
+export const PLAN_RANK: Record<Plan, number> = { basico: 0, intermedio: 1, premium: 2 };
 
-const PLAN_LABEL: Record<Plan, string> = {
-  basico: 'Básico',
+export const PLAN_LABEL: Record<Plan, string> = {
+  basico:     'Básico',
   intermedio: 'Intermedio',
-  premium: 'Premium',
+  premium:    'Premium',
+};
+
+export const PLAN_PRECIO_USD: Record<Plan, number> = {
+  basico:     40000,
+  intermedio: 55000,
+  premium:    70000,
 };
 
 const FEATURE_MIN_PLAN = {
@@ -17,8 +23,9 @@ const FEATURE_MIN_PLAN = {
   obras_sociales:   'intermedio',
   liquidacion_os:   'intermedio',
   reportes:         'intermedio',
-  servicios_ilimit: 'intermedio',
+  servicios_ilimit: 'basico',
   eerr:             'premium',
+  whatsapp_bot:     'premium',
 } as const satisfies Record<string, Plan>;
 
 export type Feature = keyof typeof FEATURE_MIN_PLAN;

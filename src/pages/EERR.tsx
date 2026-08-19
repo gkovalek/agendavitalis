@@ -146,15 +146,6 @@ export default function EERR() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  if (!tiene('eerr')) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
-        <Lock className="w-8 h-8 opacity-40" />
-        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
-      </div>
-    );
-  }
-
   const fetchData = useCallback(async () => {
     if (!centroId) return;
     setLoading(true);
@@ -166,17 +157,29 @@ export default function EERR() {
     const [costosRes, movRes] = await Promise.all([
       supabase.from('eerr_costos').select('id, categoria, nombre, monto')
         .eq('centro_id', centroId).eq('mes', mes).order('created_at'),
-      supabase.from('caja_movimientos').select('monto_total')
+      supabase.from('caja_movimientos').select('monto_efectivo, monto_transferencia, monto_prepaga')
         .eq('centro_id', centroId).gte('fecha', desde).lte('fecha', hasta),
     ]);
 
     setCostos((costosRes.data as Costo[]) ?? []);
-    const total = ((movRes.data as any[]) ?? []).reduce((s, m) => s + (m.monto_total || 0), 0);
+    const total = ((movRes.data as any[]) ?? []).reduce(
+      (s, m) => s + (m.monto_efectivo || 0) + (m.monto_transferencia || 0) + (m.monto_prepaga || 0), 0
+    );
     setIngresos(total);
     setLoading(false);
   }, [centroId, mes, year, month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Guard DESPUÉS de todos los hooks — evita violación de Rules of Hooks
+  if (!tiene('eerr')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+        <Lock className="w-8 h-8 opacity-40" />
+        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
+      </div>
+    );
+  }
 
   const handleAdd = async (categoria: Categoria, nombre: string, monto: number) => {
     setSaving(true);

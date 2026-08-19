@@ -3,7 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Clock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   entityType: 'profesional' | 'equipo';
@@ -18,6 +20,8 @@ interface HorarioDia {
   precio_particular: number | null;
 }
 
+type CobroAnticipado = 'ninguno' | '50%' | '100%';
+
 interface ServicioAsignado {
   pcs_id: string;
   servicio_id: string;
@@ -26,6 +30,7 @@ interface ServicioAsignado {
   es_tratamiento: boolean;
   sesiones_por_bloque: number | null;
   agenda_nombre: string | null;
+  cobro_anticipado: CobroAnticipado;
   horarios: HorarioDia[];
 }
 
@@ -35,8 +40,10 @@ const DIAS_LABEL: Record<number, string> = {
 
 export function ServiciosHorariosTab({ entityType, entityId }: Props) {
   const { centroId } = useAuth();
+  const { toast } = useToast();
   const [servicios, setServicios] = useState<ServicioAsignado[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingPcs, setSavingPcs] = useState<string | null>(null);
 
   useEffect(() => {
     if (!centroId || !entityId) return;
@@ -50,7 +57,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
     // Traer PCS del profesional
     const { data: pcsData } = await supabase
       .from('profesional_centro_servicio')
-      .select('id, servicio_id')
+      .select('id, servicio_id, cobro_anticipado')
       .eq(col, entityId)
       .eq('centro_id', centroId!)
       .eq('activo', true);
@@ -100,12 +107,27 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
         es_tratamiento: srv.es_tratamiento ?? false,
         sesiones_por_bloque: srv.sesiones_por_bloque ?? null,
         agenda_nombre: srv.agendas?.nombre ?? null,
+        cobro_anticipado: (pcs.cobro_anticipado as CobroAnticipado) ?? 'ninguno',
         horarios: horMap[pcs.id] ?? [],
       };
     });
 
     setServicios(result);
     setLoading(false);
+  };
+
+  const handleCobroAnticipado = async (pcsId: string, valor: CobroAnticipado) => {
+    setSavingPcs(pcsId);
+    const { error } = await supabase
+      .from('profesional_centro_servicio')
+      .update({ cobro_anticipado: valor })
+      .eq('id', pcsId);
+    setSavingPcs(null);
+    if (error) {
+      toast({ title: 'Error al guardar', description: error.message, variant: 'destructive' });
+    } else {
+      setServicios(prev => prev.map(s => s.pcs_id === pcsId ? { ...s, cobro_anticipado: valor } : s));
+    }
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
@@ -132,7 +154,7 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
               <span className="text-xs text-muted-foreground">{s.duracion_minutos} min</span>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {s.horarios.length === 0 ? (
               <p className="text-xs text-muted-foreground">Sin horarios configurados.</p>
             ) : (
@@ -153,6 +175,24 @@ export function ServiciosHorariosTab({ entityType, entityId }: Props) {
                 ))}
               </div>
             )}
+            <div className="flex items-center gap-2 pt-1 border-t">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Cobro anticipado (MP):</span>
+              <Select
+                value={s.cobro_anticipado}
+                onValueChange={v => handleCobroAnticipado(s.pcs_id, v as CobroAnticipado)}
+                disabled={savingPcs === s.pcs_id}
+              >
+                <SelectTrigger className="h-7 text-xs w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ninguno">Sin cobro anticipado</SelectItem>
+                  <SelectItem value="50%">50% del turno</SelectItem>
+                  <SelectItem value="100%">100% del turno</SelectItem>
+                </SelectContent>
+              </Select>
+              {savingPcs === s.pcs_id && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+            </div>
           </CardContent>
         </Card>
       ))}

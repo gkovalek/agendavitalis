@@ -57,10 +57,6 @@ Deno.serve(async (req: Request) => {
     .eq('id', centroId)
     .single();
 
-  if (!centro?.mp_access_token) {
-    return json({ error: 'mp_not_configured', message: 'El centro no tiene Mercado Pago configurado.' }, 400);
-  }
-
   // ── 4. Parsear body ──────────────────────────────────────────────────────
   let body: { turno_id?: string; monto?: number; descripcion?: string; back_url_base?: string };
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
@@ -68,7 +64,30 @@ Deno.serve(async (req: Request) => {
   const { turno_id, monto, descripcion, back_url_base } = body;
   if (!monto || monto <= 0) return json({ error: 'monto_invalido' }, 400);
 
-  const feePct       = centro.mp_fee_pct ?? 3.0;
+  // Resolver token: profesional del turno primero, fallback al centro
+  let accessToken = centro?.mp_access_token ?? null;
+
+  if (turno_id) {
+    const { data: turno } = await supabaseAdmin
+      .from('turnos')
+      .select('profesional_id')
+      .eq('id', turno_id)
+      .single();
+    if (turno?.profesional_id) {
+      const { data: prof } = await supabaseAdmin
+        .from('profesionales')
+        .select('mp_access_token')
+        .eq('id', turno.profesional_id)
+        .single();
+      if (prof?.mp_access_token) accessToken = prof.mp_access_token;
+    }
+  }
+
+  if (!accessToken) {
+    return json({ error: 'mp_not_configured', message: 'El profesional o centro no tiene Mercado Pago configurado.' }, 400);
+  }
+
+  const feePct       = centro?.mp_fee_pct ?? 3.0;
   const marketplaceFee = Math.round(monto * (feePct / 100) * 100) / 100;
 
   const backBase = back_url_base ?? 'https://vitalis.app';
@@ -104,8 +123,7 @@ Deno.serve(async (req: Request) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Token del CENTRO (para que el cobro vaya a su cuenta)
-      Authorization: `Bearer ${centro.mp_access_token}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(preferencePayload),
   });

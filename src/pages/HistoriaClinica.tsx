@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical, Paperclip, ImageIcon, FileIcon, ExternalLink, X } from 'lucide-react';
+import { Loader2, Search, Plus, ArrowLeft, FileText, Calendar, User, LayoutTemplate, Trash2, GripVertical, Paperclip, ImageIcon, FileIcon, ExternalLink, X, Pencil, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { exportarHistoriaPDF } from '@/components/ExportarHistoriaPDF';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PacienteAutocomplete, PacienteOption } from '@/components/PacienteAutocomplete';
@@ -242,11 +243,15 @@ export default function HistoriaClinica() {
   const [comentariosExtras, setComentariosExtras] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Dialog crear ficha modelo
+  // Dialog gestión fichas modelo
+  const [gestionFichasOpen, setGestionFichasOpen] = useState(false);
   const [fichaDialogOpen, setFichaDialogOpen] = useState(false);
   const [fichaForm, setFichaForm] = useState({ nombre: '' });
   const [fichaVarsForm, setFichaVarsForm] = useState<{ nombre: string }[]>([{ nombre: '' }]);
   const [savingFicha, setSavingFicha] = useState(false);
+  const [editFichaId, setEditFichaId] = useState<string | null>(null);
+  const [expandedFicha, setExpandedFicha] = useState<string | null>(null);
+  const [fichasConVars, setFichasConVars] = useState<(FichaModelo & { variables: FichaVariable[] })[]>([]);
 
   /* ─── Fetching ─── */
   const fetchEntradas = useCallback(async () => {
@@ -271,10 +276,16 @@ export default function HistoriaClinica() {
     if (!centroId) return;
     const { data } = await supabase
       .from('fichas_modelo')
-      .select('id, nombre')
+      .select('id, nombre, fichas_modelo_variables(id, nombre_variable, orden)')
       .eq('centro_id', centroId)
       .order('nombre');
-    setFichasDisponibles((data ?? []) as FichaModelo[]);
+    const rows = (data ?? []) as any[];
+    setFichasDisponibles(rows.map(r => ({ id: r.id, nombre: r.nombre })));
+    setFichasConVars(rows.map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      variables: (r.fichas_modelo_variables ?? []).sort((a: any, b: any) => a.orden - b.orden),
+    })));
   }, [centroId]);
 
   const fetchProfesionales = useCallback(async () => {
@@ -437,10 +448,28 @@ export default function HistoriaClinica() {
     setSaving(false);
   };
 
-  /* ─── Guardar ficha modelo ─── */
+  /* ─── Fichas modelo: gestión ─── */
   const resetFichaDialog = () => {
     setFichaForm({ nombre: '' });
     setFichaVarsForm([{ nombre: '' }]);
+    setEditFichaId(null);
+  };
+
+  const handleEditFicha = (ficha: FichaModelo & { variables: FichaVariable[] }) => {
+    setEditFichaId(ficha.id);
+    setFichaForm({ nombre: ficha.nombre });
+    setFichaVarsForm(ficha.variables.length > 0
+      ? ficha.variables.map(v => ({ nombre: v.nombre_variable }))
+      : [{ nombre: '' }]);
+    setFichaDialogOpen(true);
+  };
+
+  const handleDeleteFicha = async (fichaId: string, nombre: string) => {
+    if (!confirm(`¿Eliminar la ficha "${nombre}"? Las entradas que la usen no se verán afectadas.`)) return;
+    await supabase.from('fichas_modelo_variables').delete().eq('ficha_modelo_id', fichaId);
+    await supabase.from('fichas_modelo').delete().eq('id', fichaId);
+    toast({ title: 'Ficha eliminada' });
+    fetchFichas();
   };
 
   const handleGuardarFicha = async () => {
@@ -452,19 +481,28 @@ export default function HistoriaClinica() {
     }
     setSavingFicha(true);
 
-    const { data: fichaData, error: fichaErr } = await supabase
-      .from('fichas_modelo')
-      .insert({ centro_id: centroId, nombre: fichaForm.nombre.trim() })
-      .select('id').single();
+    let fichaId = editFichaId;
 
-    if (fichaErr || !fichaData) {
-      toast({ title: 'Error', description: fichaErr?.message, variant: 'destructive' });
-      setSavingFicha(false);
-      return;
+    if (editFichaId) {
+      // Editar existente
+      await supabase.from('fichas_modelo').update({ nombre: fichaForm.nombre.trim() }).eq('id', editFichaId);
+      await supabase.from('fichas_modelo_variables').delete().eq('ficha_modelo_id', editFichaId);
+    } else {
+      // Crear nueva
+      const { data: fichaData, error: fichaErr } = await supabase
+        .from('fichas_modelo')
+        .insert({ centro_id: centroId, nombre: fichaForm.nombre.trim() })
+        .select('id').single();
+      if (fichaErr || !fichaData) {
+        toast({ title: 'Error', description: fichaErr?.message, variant: 'destructive' });
+        setSavingFicha(false);
+        return;
+      }
+      fichaId = fichaData.id;
     }
 
     const varsPayload = validVars.map((v, i) => ({
-      ficha_modelo_id: fichaData.id,
+      ficha_modelo_id: fichaId!,
       nombre_variable: v.nombre.trim(),
       orden: i,
     }));
@@ -473,7 +511,7 @@ export default function HistoriaClinica() {
     if (varErr) {
       toast({ title: 'Error guardando variables', description: varErr.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Ficha modelo creada', description: `"${fichaForm.nombre}" disponible al crear entradas.` });
+      toast({ title: editFichaId ? 'Ficha actualizada' : 'Ficha creada', description: `"${fichaForm.nombre.trim()}" disponible al crear entradas.` });
       setFichaDialogOpen(false);
       resetFichaDialog();
       fetchFichas();
@@ -524,10 +562,25 @@ export default function HistoriaClinica() {
         <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
-            onClick={() => { resetFichaDialog(); setFichaDialogOpen(true); }}
+            onClick={() => setGestionFichasOpen(true)}
             className="gap-2"
           >
-            <LayoutTemplate className="w-4 h-4" /> Crear ficha modelo
+            <LayoutTemplate className="w-4 h-4" /> Fichas modelo
+            {fichasConVars.length > 0 && (
+              <span className="ml-1 text-xs bg-[#00ADBB]/15 text-[#00ADBB] rounded-full px-1.5 py-0.5 font-semibold">{fichasConVars.length}</span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => selectedEntrada && exportarHistoriaPDF(
+              selectedEntrada.paciente,
+              filtradas.filter(e => e.paciente?.id === selectedEntrada.paciente?.id)
+            )}
+            disabled={!selectedEntrada}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar PDF
           </Button>
           <Button
             onClick={() => { resetDialog(); setDialogOpen(true); }}
@@ -688,13 +741,78 @@ export default function HistoriaClinica() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══════════════ DIALOG CREAR FICHA MODELO ═══════════════ */}
+      {/* ═══════════════ DIALOG GESTIÓN FICHAS MODELO ═══════════════ */}
+      <Dialog open={gestionFichasOpen} onOpenChange={setGestionFichasOpen}>
+        <DialogContent className="max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutTemplate className="w-5 h-5 text-[#00ADBB]" />
+              Fichas modelo
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh] pr-1">
+            <div className="space-y-3 pb-2">
+              {fichasConVars.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No hay fichas modelo creadas todavía.
+                </p>
+              ) : (
+                fichasConVars.map(ficha => (
+                  <div key={ficha.id} className="border rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <button
+                        className="flex items-center gap-2 flex-1 text-left"
+                        onClick={() => setExpandedFicha(expandedFicha === ficha.id ? null : ficha.id)}
+                      >
+                        {expandedFicha === ficha.id
+                          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                        <span className="font-medium text-sm">{ficha.nombre}</span>
+                        <span className="text-xs text-muted-foreground">({ficha.variables.length} var.)</span>
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7"
+                          onClick={() => { setGestionFichasOpen(false); handleEditFicha(ficha); }}>
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7"
+                          onClick={() => handleDeleteFicha(ficha.id, ficha.nombre)}>
+                          <Trash2 className="w-3.5 h-3.5 text-destructive/70" />
+                        </Button>
+                      </div>
+                    </div>
+                    {expandedFicha === ficha.id && ficha.variables.length > 0 && (
+                      <div className="px-4 py-3 space-y-1.5 border-t bg-background">
+                        {ficha.variables.map((v, i) => (
+                          <div key={v.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="w-5 text-xs text-muted-foreground/50 font-mono">{i + 1}.</span>
+                            <span>{v.nombre_variable}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              <Button
+                className="w-full gap-2 mt-2"
+                style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}
+                onClick={() => { setGestionFichasOpen(false); resetFichaDialog(); setFichaDialogOpen(true); }}
+              >
+                <Plus className="w-4 h-4" /> Nueva ficha modelo
+              </Button>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════ DIALOG CREAR / EDITAR FICHA MODELO ═══════════════ */}
       <Dialog open={fichaDialogOpen} onOpenChange={open => { if (!open) resetFichaDialog(); setFichaDialogOpen(open); }}>
         <DialogContent className="max-w-lg w-full">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LayoutTemplate className="w-5 h-5 text-[#00ADBB]" />
-              Crear ficha modelo
+              {editFichaId ? 'Editar ficha modelo' : 'Nueva ficha modelo'}
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[78vh] pr-2">
@@ -771,7 +889,7 @@ export default function HistoriaClinica() {
                 <Button onClick={handleGuardarFicha}
                   disabled={savingFicha || !fichaForm.nombre.trim() || !fichaVarsForm.some(v => v.nombre.trim())}
                   className="flex-1" style={{ backgroundColor: '#00ADBB', borderColor: '#00ADBB' }}>
-                  {savingFicha && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Guardar ficha
+                  {savingFicha && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} {editFichaId ? 'Guardar cambios' : 'Crear ficha'}
                 </Button>
                 <Button variant="outline" onClick={() => { resetFichaDialog(); setFichaDialogOpen(false); }} className="flex-1">Cancelar</Button>
               </div>

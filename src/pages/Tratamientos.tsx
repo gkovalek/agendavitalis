@@ -13,8 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Plus, Search, ChevronRight, ArrowLeft, Calendar, Activity } from 'lucide-react';
+import { Loader2, Plus, Search, ChevronRight, ArrowLeft, Calendar, Activity, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePlan } from '@/hooks/use-plan';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Tratamiento {
@@ -53,6 +54,7 @@ export default function Tratamientos() {
   const { centroId } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { tiene, planMinimoPara } = usePlan();
 
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,6 +117,7 @@ export default function Tratamientos() {
   const handleSearchPaciente = async (q: string) => {
     setSearchPaciente(q);
     if (q.length < 2) { setPacientesFiltrados([]); return; }
+    if (!centroId) return;
     const { data } = await supabase
       .from('pacientes')
       .select('id, nombre, apellido, dni')
@@ -196,6 +199,13 @@ export default function Tratamientos() {
       </div>
     );
   }
+
+  if (!tiene('tratamientos')) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+      <Lock className="w-8 h-8 opacity-40" />
+      <p className="text-sm font-medium">Tratamientos requiere plan {planMinimoPara('tratamientos')}</p>
+    </div>
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in">

@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, AlertCircle } from 'lucide-react';
+import { Loader2, Download, AlertCircle, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePlan } from '@/hooks/use-plan';
 
 interface ObraSocial {
   id: string;
@@ -64,6 +65,7 @@ function fmt(n: number) {
 export default function LiquidacionOS() {
   const { centroId } = useAuth();
   const { toast } = useToast();
+  const { tiene, planMinimoPara } = usePlan();
 
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth()); // 0-indexed
@@ -98,6 +100,7 @@ export default function LiquidacionOS() {
   }, [centroId, mes, anio]);
 
   const fetchTurnos = async () => {
+    if (!centroId) return;
     setLoading(true);
     const desde = `${anio}-${String(mes + 1).padStart(2, '0')}-01`;
     const hasta = new Date(anio, mes + 1, 0);
@@ -296,6 +299,13 @@ export default function LiquidacionOS() {
     XLSX.writeFile(wb, filename);
     toast({ title: 'Excel descargado', description: filename });
   };
+
+  if (!tiene('liquidacion_os')) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+      <Lock className="w-8 h-8 opacity-40" />
+      <p className="text-sm font-medium">Liquidación OS requiere plan {planMinimoPara('liquidacion_os')}</p>
+    </div>
+  );
 
   const anios = [hoy.getFullYear() - 1, hoy.getFullYear()];
 

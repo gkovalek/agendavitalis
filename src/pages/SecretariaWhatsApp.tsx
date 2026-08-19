@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Send, MessageSquare, ChevronDown, ChevronUp, Check, X, Plus, LogOut, RefreshCw } from 'lucide-react';
+import { Loader2, Send, MessageSquare, ChevronDown, ChevronUp, Check, X, Plus, LogOut, RefreshCw, Lock } from 'lucide-react';
+import { usePlan } from '@/hooks/use-plan';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MsgItem {
@@ -29,9 +30,7 @@ interface FAQ {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EVOLUTION_URL  = 'http://72.61.58.46:8080';
-const EVOLUTION_INST = 'Secretaria_Vitalis';
-const EVOLUTION_KEY  = '8EAB7CB23201-4EEE-9D9B-A59CCF1AE923';
+const WA_SEND_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wa-send`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function relativeTime(iso: string) {
@@ -63,6 +62,7 @@ const ESTADO_COLOR: Record<string, string> = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SecretariaWhatsApp() {
   const { session, loading: authLoading, perfil } = useAuth();
+  const { tiene, planMinimoPara } = usePlan();
 
   const [convs, setConvs]           = useState<Conversacion[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -80,9 +80,6 @@ export default function SecretariaWhatsApp() {
 
   const centroId  = perfil?.centro_id as string | undefined;
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // ─── Auth redirect ──────────────────────────────────────────────────────────
-  if (!authLoading && !session) return <Navigate to="/login" replace />;
 
   // ─── Load conversations ─────────────────────────────────────────────────────
   const loadConvs = useCallback(async () => {
@@ -131,6 +128,16 @@ export default function SecretariaWhatsApp() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedId, convs]);
 
+  // ─── Auth redirect DESPUÉS de todos los hooks (evita violación de Rules of Hooks) ──
+  if (!authLoading && !session) return <Navigate to="/login" replace />;
+
+  if (!tiene('whatsapp_bot')) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+      <Lock className="w-8 h-8 opacity-40" />
+      <p className="text-sm font-medium">Secretaría WhatsApp requiere plan {planMinimoPara('whatsapp_bot')}</p>
+    </div>
+  );
+
   // ─── Derived data ───────────────────────────────────────────────────────────
   const filtered   = convs.filter(c => c.estado === activeTab);
   const selected   = convs.find(c => c.id === selectedId) ?? null;
@@ -143,14 +150,14 @@ export default function SecretariaWhatsApp() {
     const text = reply.trim();
     setReply('');
 
-    // 1. Enviar via Evolution API
+    // 1. Enviar via n8n (proxy HTTPS → Evolution API HTTP interno)
     try {
-      await fetch(`${EVOLUTION_URL}/message/sendText/${EVOLUTION_INST}`, {
+      await fetch(WA_SEND_URL, { // no auth needed: verify_jwt=false
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_KEY },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ number: selected.celular, text }),
       });
-    } catch (e) { console.error('Evolution API error', e); }
+    } catch (e) { console.error('Send error', e); }
 
     // 2. Actualizar historial en Supabase
     const ts = new Date().toISOString();

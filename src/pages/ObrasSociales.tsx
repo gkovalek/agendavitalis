@@ -10,8 +10,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePlan } from '@/hooks/use-plan';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
@@ -50,6 +51,7 @@ function getInitials(nombre: string, apellido: string): string {
 
 export default function ObrasSociales() {
   const { centroId } = useAuth();
+  const { tiene, planMinimoPara } = usePlan();
   const [items, setItems] = useState<ObraSocial[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +166,13 @@ export default function ObrasSociales() {
     const matchSearch = !q || os.nombre.toLowerCase().includes(q) || os.codigo.includes(q) || os.id_vitalis.toLowerCase().includes(q);
     return matchProf && matchSearch;
   });
+
+  if (!tiene('obras_sociales')) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+      <Lock className="w-8 h-8 opacity-40" />
+      <p className="text-sm font-medium">Obras Sociales requiere plan {planMinimoPara('obras_sociales')}</p>
+    </div>
+  );
 
   const selectedProfForForm = profesionales.find(p => p.id === form.profesional_id);
   const previewIdVitalis = selectedProfForForm

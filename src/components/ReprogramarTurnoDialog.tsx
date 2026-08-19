@@ -32,6 +32,7 @@ interface PCSRecord {
   hora_fin: string;
   dias_trabajo: string | string[];
   agenda_id: string | null;
+  capacidad_simultanea: number | null;
   agenda?: { duracion_minutos: number; sesiones_por_bloque: number } | null;
 }
 
@@ -69,7 +70,7 @@ export function ReprogramarTurnoDialog({ turno, onClose, onReprogramado }: Props
     const agendaId = turno.servicio?.agenda_id;
     supabase
       .from('profesional_centro_servicio')
-      .select('hora_inicio, hora_fin, dias_trabajo, agenda_id, agenda:agendas(duracion_minutos, sesiones_por_bloque)')
+      .select('hora_inicio, hora_fin, dias_trabajo, agenda_id, capacidad_simultanea, agenda:agendas(duracion_minutos, sesiones_por_bloque)')
       .eq('centro_id', centroId)
       .eq('profesional_id', turno.profesional_id)
       .then(({ data }) => {
@@ -82,7 +83,7 @@ export function ReprogramarTurnoDialog({ turno, onClose, onReprogramado }: Props
         } : null;
         setPcs(rec as PCSRecord | null);
       });
-  }, [turno?.id]);
+  }, [turno?.id, centroId]);
 
   // Cuando cambia la fecha, calcular slots disponibles
   useEffect(() => {
@@ -94,19 +95,36 @@ export function ReprogramarTurnoDialog({ turno, onClose, onReprogramado }: Props
     const duracion = pcs.agenda?.duracion_minutos ?? 30;
     const allSlots = generateSlots(pcs.hora_inicio, pcs.hora_fin, duracion);
 
-    supabase
+    // Capacidad efectiva: máximo entre capacidad_simultanea del PCS y sesiones_por_bloque de la agenda
+    const capacidad = Math.max(
+      pcs.capacidad_simultanea ?? 1,
+      pcs.agenda?.sesiones_por_bloque ?? 1,
+    );
+
+    // Filtrar por servicio_id para no bloquear slots de otros servicios del mismo profesional
+    const servicioId = (turno.servicio as any)?.id ?? null;
+
+    let query = supabase
       .from('turnos')
       .select('hora_inicio')
       .eq('profesional_id', turno.profesional_id)
       .eq('fecha', dateStr)
       .eq('centro_id', centroId!)
       .neq('id', turno.id)
-      .in('estado', ['reservado', 'confirmado', 'en_sala', 'siendo_atendido'])
-      .then(({ data }) => {
-        const ocupados = new Set((data ?? []).map((t: SlotOcupado) => t.hora_inicio.substring(0, 5)));
-        setSlotsDisponibles(allSlots.filter(s => !ocupados.has(s)));
-        setLoadingSlots(false);
+      .in('estado', ['reservado', 'confirmado', 'en_sala', 'siendo_atendido']);
+
+    if (servicioId) query = query.eq('servicio_id', servicioId);
+
+    query.then(({ data }) => {
+      // Conteo numérico por slot — slot disponible si ocupados < capacidad
+      const ocupadoMap: Record<string, number> = {};
+      (data ?? []).forEach((t: SlotOcupado) => {
+        const h = t.hora_inicio.substring(0, 5);
+        ocupadoMap[h] = (ocupadoMap[h] ?? 0) + 1;
       });
+      setSlotsDisponibles(allSlots.filter(s => (ocupadoMap[s] ?? 0) < capacidad));
+      setLoadingSlots(false);
+    });
   }, [newDate, pcs]);
 
   const handleConfirmar = async () => {
