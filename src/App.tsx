@@ -27,6 +27,7 @@ import PagoResultado from "@/pages/PagoResultado";
 import NotFound from "@/pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import SecretariaWhatsApp from "@/pages/SecretariaWhatsApp";
+import MiPerfil from "@/pages/MiPerfil";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -105,6 +106,7 @@ function AppRoutes() {
       <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
       <Route path="/eerr" element={<ProtectedRoute><EERR /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
+      <Route path="/mi-perfil" element={<ProtectedRoute><MiPerfil /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

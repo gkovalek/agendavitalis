@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Settings, LogOut, ChevronDown, Lock } from 'lucide-react';
+import { Heart, Settings, LogOut, ChevronDown, Lock, User } from 'lucide-react';
 
 interface NavItem {
   label: string;
@@ -254,6 +254,12 @@ export function TopNavbar() {
                 <p className="text-[13px] font-semibold text-foreground">{perfil?.nombre}</p>
                 <p className="text-xs text-muted-foreground truncate mt-0.5">{perfil?.mail}</p>
               </div>
+              <button
+                onClick={() => { setUserMenuOpen(false); navigate('/mi-perfil'); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+              >
+                <User className="w-4 h-4 opacity-60" /> Mi perfil
+              </button>
               {mostrarConfig && (
                 <button
                   onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
