@@ -50,7 +50,8 @@ function getInitials(nombre: string, apellido: string): string {
 }
 
 export default function ObrasSociales() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const esProfesional = perfil?.rol_nombre === 'profesional';
   const { tiene, planMinimoPara } = usePlan();
   const [items, setItems] = useState<ObraSocial[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -68,12 +69,16 @@ export default function ObrasSociales() {
 
   const fetchData = async () => {
     setLoading(true);
+    let osQuery = supabase
+      .from('obras_sociales')
+      .select('id, codigo, nombre, valor_sesion, activa, factura_con_token, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
+      .eq('centro_id', centroId!)
+      .order('nombre');
+    if (esProfesional && perfil?.profesional_id) {
+      osQuery = osQuery.eq('profesional_id', perfil.profesional_id);
+    }
     const [osRes, profRes] = await Promise.all([
-      supabase
-        .from('obras_sociales')
-        .select('id, codigo, nombre, valor_sesion, activa, factura_con_token, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
-        .eq('centro_id', centroId!)
-        .order('nombre'),
+      osQuery,
       supabase
         .from('profesionales')
         .select('id, nombre, apellido')
@@ -89,7 +94,7 @@ export default function ObrasSociales() {
     setLoading(false);
   };
 
-  useEffect(() => { if (centroId) fetchData(); }, [centroId]);
+  useEffect(() => { if (centroId) fetchData(); }, [centroId, esProfesional]);
 
   const openNew = () => {
     setEditId(null);

@@ -51,7 +51,8 @@ const ESTADO_CONFIG = {
 };
 
 export default function Tratamientos() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const esProfesional = perfil?.rol_nombre === 'profesional';
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { tiene, planMinimoPara } = usePlan();
@@ -77,11 +78,14 @@ export default function Tratamientos() {
   const fetchTratamientos = async () => {
     if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase
+    let q = supabase
       .from('tratamientos')
       .select('*, paciente:pacientes(nombre, apellido), profesional:profesionales(nombre, apellido), servicio:servicios(nombre)')
-      .eq('centro_id', centroId)
-      .order('fecha_inicio', { ascending: false });
+      .eq('centro_id', centroId);
+    if (esProfesional && perfil?.profesional_id) {
+      q = q.eq('profesional_id', perfil.profesional_id);
+    }
+    const { data } = await q.order('fecha_inicio', { ascending: false });
     setTratamientos((data as any[]) ?? []);
     setLoading(false);
   };

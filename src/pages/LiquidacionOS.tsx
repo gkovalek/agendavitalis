@@ -63,14 +63,19 @@ function fmt(n: number) {
 }
 
 export default function LiquidacionOS() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const esProfesional = perfil?.rol_nombre === 'profesional';
   const { toast } = useToast();
   const { tiene, planMinimoPara } = usePlan();
 
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth()); // 0-indexed
   const [anio, setAnio] = useState(hoy.getFullYear());
-  const [profFilter, setProfFilter] = useState<string>('todos');
+  const [profFilter, setProfFilter] = useState<string>(
+    perfil?.rol_nombre === 'profesional' && perfil?.profesional_id
+      ? perfil.profesional_id
+      : 'todos'
+  );
   const [loading, setLoading] = useState(false);
 
   const [turnos, setTurnos] = useState<Turno[]>([]);
@@ -106,7 +111,7 @@ export default function LiquidacionOS() {
     const hasta = new Date(anio, mes + 1, 0);
     const hastaStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(hasta.getDate()).padStart(2, '0')}`;
 
-    const { data, error } = await supabase
+    let qTurnos = supabase
       .from('turnos')
       .select(`
         id, fecha, profesional_id, pedido_sesiones_autorizadas,
@@ -116,8 +121,13 @@ export default function LiquidacionOS() {
       .eq('centro_id', centroId!)
       .eq('estado', 'finalizado')
       .gte('fecha', desde)
-      .lte('fecha', hastaStr)
-      .order('fecha');
+      .lte('fecha', hastaStr);
+    if (esProfesional && perfil?.profesional_id) {
+      qTurnos = qTurnos.eq('profesional_id', perfil.profesional_id);
+    } else if (profFilter !== 'todos') {
+      qTurnos = qTurnos.eq('profesional_id', profFilter);
+    }
+    const { data, error } = await qTurnos.order('fecha');
 
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     setTurnos((data as any[]) ?? []);

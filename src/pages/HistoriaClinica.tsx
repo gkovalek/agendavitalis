@@ -257,7 +257,7 @@ export default function HistoriaClinica() {
   const fetchEntradas = useCallback(async () => {
     if (!centroId) return;
     setLoading(true);
-    const { data } = await supabase
+    let q = supabase
       .from('historia_clinica')
       .select(`
         id, fecha, comentario_evolucion, comentarios_extras, variables_json, ficha_modelo_id, created_at,
@@ -265,12 +265,16 @@ export default function HistoriaClinica() {
         profesional:profesionales(id, nombre, apellido),
         ficha_modelo:fichas_modelo(nombre)
       `)
-      .eq('centro_id', centroId)
+      .eq('centro_id', centroId);
+    if (perfil?.rol_nombre === 'profesional' && perfil?.profesional_id) {
+      q = q.eq('profesional_id', perfil.profesional_id);
+    }
+    const { data } = await q
       .order('fecha', { ascending: false })
       .order('created_at', { ascending: false });
     setEntradas((data ?? []) as unknown as EntradaHistoria[]);
     setLoading(false);
-  }, [centroId]);
+  }, [centroId, perfil?.rol_nombre, perfil?.profesional_id]);
 
   const fetchFichas = useCallback(async () => {
     if (!centroId) return;

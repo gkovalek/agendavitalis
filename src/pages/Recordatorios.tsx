@@ -75,11 +75,17 @@ export default function Recordatorios() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const planMensual = limitePlan;
 
+  const esProfesional = perfil?.rol_nombre === 'profesional';
+
   /* ─── Filtros ─── */
   const manana = getManana();
   const [fechaDesde, setFechaDesde] = useState(manana);
   const [fechaHasta, setFechaHasta] = useState(manana);
-  const [filtroProfesional, setFiltroProfesional] = useState('todos');
+  const [filtroProfesional, setFiltroProfesional] = useState(
+    perfil?.rol_nombre === 'profesional' && perfil?.profesional_id
+      ? perfil.profesional_id
+      : 'todos'
+  );
   const [filtroServicio, setFiltroServicio] = useState('todos');
 
   /* ─── Loading / enviando ─── */
