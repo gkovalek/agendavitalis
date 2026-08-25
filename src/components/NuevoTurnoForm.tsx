@@ -21,6 +21,7 @@ interface Props {
   profesionalId: string;
   profesionalNombre: string;
   preselectedAgendaId?: string;
+  editableFechaHora?: boolean;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -68,7 +69,9 @@ interface TurnoHistorial {
 
 type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
 
-export function NuevoTurnoForm({ fecha, hora, profesionalId: profesionalIdProp, profesionalNombre: profesionalNombreProp, preselectedAgendaId, onSuccess, onCancel }: Props) {
+export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId: profesionalIdProp, profesionalNombre: profesionalNombreProp, preselectedAgendaId, editableFechaHora, onSuccess, onCancel }: Props) {
+  const [fecha, setFecha] = useState(fechaProp);
+  const [hora, setHora] = useState(horaProp);
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
 
@@ -300,6 +303,11 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId: profesionalIdProp, 
       toast({ title: 'Error', description: 'Seleccioná paciente y servicio', variant: 'destructive' });
       return;
     }
+    const turnoDateTime = new Date(`${fecha}T${hora}`);
+    if (turnoDateTime < new Date()) {
+      toast({ title: 'Horario inválido', description: 'No se pueden crear turnos en horarios ya pasados.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
 
     let finalTratamientoId: string | null = null;
@@ -372,8 +380,21 @@ export function NuevoTurnoForm({ fecha, hora, profesionalId: profesionalIdProp, 
 
   return (
     <div className="space-y-4">
-      <div className="border-b pb-3">
-        <p className="text-sm text-muted-foreground">{fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
+      <div className="border-b pb-3 space-y-2">
+        {editableFechaHora ? (
+          <div className="flex gap-3 items-end">
+            <div className="space-y-1 flex-1">
+              <Label className="text-xs">Fecha</Label>
+              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} min={new Date().toISOString().slice(0, 10)} />
+            </div>
+            <div className="space-y-1 w-28">
+              <Label className="text-xs">Hora</Label>
+              <Input type="time" value={hora} onChange={e => setHora(e.target.value)} step={1800} />
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{fecha} — <strong>{hora}</strong>{horaFin ? ` a ${horaFin}` : ''}</p>
+        )}
         {profesionalNombre && <p className="text-sm font-medium text-foreground">{profesionalNombre}</p>}
       </div>
 

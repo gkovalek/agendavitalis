@@ -14,4 +14,11 @@ if (dsn) {
   });
 }
 
+// Desregistrar service workers legacy que puedan interferir con requests a Supabase
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
+}
+
 createRoot(document.getElementById("root")!).render(<App />);

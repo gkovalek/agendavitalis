@@ -859,6 +859,7 @@ export default function Dashboard() {
               profesionalId={newTurnoSlot.profesional_id}
               profesionalNombre={newTurnoSlot.profesional_nombre}
               preselectedAgendaId={newTurnoSlot.agenda_id}
+              editableFechaHora={newTurnoSlot.hora === '09:00'}
               onSuccess={() => { setNewTurnoSlot(null); fetchData(); }}
               onCancel={() => setNewTurnoSlot(null)}
             />

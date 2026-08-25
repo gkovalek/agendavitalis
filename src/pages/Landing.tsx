@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, Bot, CalendarDays, Check, ChevronRight, Clock3, ShieldCheck, Sparkles, Users, Zap } from 'lucide-react';
+import { ArrowRight, BarChart3, Bot, CalendarDays, Check, ChevronRight, Clock3, Menu, ShieldCheck, Sparkles, Users, X, Zap } from 'lucide-react';
 
 const features = [
   { icon: CalendarDays, title: 'Agenda inteligente', text: 'Organizá profesionales, servicios y turnos desde una vista clara y rápida.' },
@@ -61,6 +62,7 @@ function AgendaDemo() {
 }
 
 export default function Landing() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <div className="min-h-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A]">
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl">
@@ -75,8 +77,21 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Link to="/login" className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 sm:inline-flex">Ingresar</Link>
             <Link to="/registro" className="btn-primary-glow inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white">Comenzar gratis <ArrowRight className="h-4 w-4"/></Link>
+            <button onClick={() => setMobileMenuOpen(o => !o)} className="ml-1 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 md:hidden" aria-label="Menú">
+              {mobileMenuOpen ? <X className="h-5 w-5"/> : <Menu className="h-5 w-5"/>}
+            </button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <nav className="border-t border-slate-100 bg-white/95 px-5 py-4 md:hidden">
+            <div className="flex flex-col gap-1">
+              {[['#producto','Producto'],['#funciones','Funciones'],['#como-funciona','Cómo funciona'],['#precios','Precios']].map(([href, label]) => (
+                <a key={href} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">{label}</a>
+              ))}
+              <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">Ingresar</Link>
+            </div>
+          </nav>
+        )}
       </header>
 
       <main>
@@ -85,7 +100,7 @@ export default function Landing() {
           <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[.92fr_1.08fr]">
             <div className="vitalis-fade-up">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm"><Sparkles className="h-3.5 w-3.5"/> Gestión inteligente para centros de salud</div>
-              <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.06] tracking-[-.045em] sm:text-5xl lg:text-6xl">Tu centro, <span className="vitalis-gradient-text">más simple.</span><br/>Tu equipo, más enfocado.</h1>
+              <h1 className="max-w-2xl text-2xl font-extrabold leading-[1.06] tracking-[-.045em] sm:text-4xl lg:text-6xl">Tu centro, <span className="vitalis-gradient-text">más simple.</span><br/>Tu equipo, más enfocado.</h1>
               <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">Vitalis conecta agenda, pacientes, caja y automatizaciones en una experiencia diseñada para que tu centro crezca sin sumar complejidad.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link to="/registro" className="btn-primary-glow inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-semibold text-white">Probar Vitalis gratis <ArrowRight className="h-4 w-4"/></Link>

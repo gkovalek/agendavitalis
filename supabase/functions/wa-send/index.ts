@@ -1,6 +1,6 @@
-const EVOLUTION_URL  = 'http://72.61.58.46:8080';
-const EVOLUTION_INST = 'Secretaria_Vitalis';
-const EVOLUTION_KEY  = 'MiClaveSecreta2026';
+const EVOLUTION_URL  = Deno.env.get('EVOLUTION_URL')  ?? 'http://72.61.58.46:8080';
+const EVOLUTION_INST = Deno.env.get('EVOLUTION_INSTANCE') ?? 'Secretaria_Vitalis';
+const EVOLUTION_KEY  = Deno.env.get('EVOLUTION_API_KEY') ?? '';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

@@ -11,9 +11,10 @@ const supabase = createClient(
 );
 
 Deno.serve(async () => {
+  // Cambiar estado a 'cancelado' en lugar de eliminar para preservar historial
   const { error, count } = await supabase
     .from('turnos')
-    .delete({ count: 'exact' })
+    .update({ estado: 'cancelado', motivo_cancelacion: 'Expirado por falta de pago' }, { count: 'exact' })
     .eq('estado', 'pendiente_pago')
     .not('pago_expira_at', 'is', null)
     .lt('pago_expira_at', new Date().toISOString());
@@ -23,6 +24,6 @@ Deno.serve(async () => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  console.log(`Turnos expirados eliminados: ${count}`);
-  return new Response(JSON.stringify({ eliminados: count }), { status: 200 });
+  console.log(`Turnos expirados cancelados: ${count}`);
+  return new Response(JSON.stringify({ cancelados: count }), { status: 200 });
 });

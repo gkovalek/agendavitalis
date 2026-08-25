@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { normalizeDiasTrabajo, getDayName } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 
@@ -11,16 +10,17 @@ const reservaSchema = z.object({
   nombre:   z.string().trim().min(1, 'El nombre es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Nombre inválido'),
   apellido: z.string().trim().min(1, 'El apellido es obligatorio').max(60).regex(/^[\p{L}\s'.-]+$/u, 'Apellido inválido'),
   dni:      z.string().trim().regex(/^\d{7,8}$/, 'DNI inválido (7-8 dígitos)').optional().or(z.literal('')),
-  celular:  z.string().trim().regex(/^[\d\s+()-]{8,20}$/, 'Teléfono inválido').optional().or(z.literal('')),
+  celular:  z.string().trim().regex(/^\d{8,12}$/, 'Ingresá solo números (ej: 1123456789)').optional().or(z.literal('')),
   email:    z.string().trim().email('Email inválido').max(120).optional().or(z.literal('')),
 });
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
-interface Centro      { id: string; nombre: string; direccion: string | null; telefono: string | null; mp_user_id: string | null; }
-interface Profesional { id: string; titulo: string | null; nombre: string; apellido: string; mp_user_id: string | null; }
-interface Servicio    { id: string; nombre: string; duracion_minutos: number; agenda_id: string | null; }
-interface PCS         { profesional_id: string; servicio_id: string; dias_trabajo: string[]; hora_inicio: string; hora_fin: string; capacidad_simultanea: number; agenda_id: string | null; cobro_anticipado: string; }
-interface SlotInfo    { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
+interface Centro          { id: string; nombre: string; direccion: string | null; telefono: string | null; mp_user_id: string | null; }
+interface Profesional     { id: string; titulo: string | null; nombre: string; apellido: string; mp_user_id: string | null; }
+interface Servicio        { id: string; nombre: string; duracion_minutos: number; agenda_id: string | null; }
+interface PCS             { id: string; profesional_id: string; servicio_id: string; capacidad_simultanea: number; agenda_id: string | null; cobro_anticipado: string; }
+interface PcsHorarioDia   { pcs_id: string; dia_semana: number; hora_inicio: string; hora_fin: string; }
+interface SlotInfo        { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
 type Step = 'profesional' | 'servicio' | 'fecha_hora' | 'datos' | 'confirmado';
 const STEP_NUM: Record<Exclude<Step, 'confirmado'>, number> = { profesional: 1, servicio: 2, fecha_hora: 3, datos: 4 };
@@ -48,15 +48,12 @@ function getInitials(nombre: string, apellido: string) {
   return `${(apellido[0] ?? '').toUpperCase()}${(nombre[0] ?? '').toUpperCase()}`;
 }
 
-function isDayWorking(date: Date, pcsRecords: PCS[], profId: string, servicioId: string): boolean {
+function isDayWorking(date: Date, pcsRecords: PCS[], horarios: PcsHorarioDia[], profId: string, servicioId: string): boolean {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today) return false;
-  const dayName = getDayName(date.getDay());
-  return pcsRecords.some(p =>
-    p.profesional_id === profId &&
-    p.servicio_id === servicioId &&
-    p.dias_trabajo.includes(dayName),
-  );
+  const dayOfWeek = date.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+  const pcsIds = new Set(pcsRecords.filter(p => p.profesional_id === profId && p.servicio_id === servicioId).map(p => p.id));
+  return horarios.some(h => pcsIds.has(h.pcs_id) && h.dia_semana === dayOfWeek);
 }
 
 // ── Componente ───────────────────────────────────────────────────────────────
@@ -67,6 +64,7 @@ export default function PortalPublico() {
   const [centro, setCentro]             = useState<Centro | null>(null);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [pcsRecords, setPcsRecords]     = useState<PCS[]>([]);
+  const [horarioDia, setHorarioDia]     = useState<PcsHorarioDia[]>([]);
   const [loadingInit, setLoadingInit]   = useState(true);
 
   const [step, setStep]                       = useState<Step>('profesional');
@@ -97,7 +95,7 @@ export default function PortalPublico() {
   useEffect(() => {
     if (centroIdParam) { setResolvedCentroId(centroIdParam); return; }
     if (!slug) { setLoadingInit(false); return; }
-    supabase.from('centros').select('id').eq('slug', slug).single()
+    supabase.from('centros').select('id').eq('slug', slug).maybeSingle()
       .then(({ data }) => {
         if (!data?.id) setLoadingInit(false);
         else setResolvedCentroId(data.id);
@@ -111,11 +109,21 @@ export default function PortalPublico() {
     Promise.all([
       supabase.from('centros').select('id, nombre, direccion, telefono, mp_user_id').eq('id', resolvedCentroId).single(),
       supabase.from('profesionales').select('id, titulo, nombre, apellido, mp_user_id').eq('centro_id', resolvedCentroId).eq('activo', true).order('apellido'),
-      supabase.from('profesional_centro_servicio').select('profesional_id, servicio_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda_id, cobro_anticipado').eq('centro_id', resolvedCentroId).eq('activo', true),
-    ]).then(([cRes, pRes, pcsRes]) => {
+      supabase.from('profesional_centro_servicio').select('id, profesional_id, servicio_id, capacidad_simultanea, agenda_id, cobro_anticipado').eq('centro_id', resolvedCentroId).eq('activo', true),
+    ]).then(async ([cRes, pRes, pcsRes]) => {
       setCentro(cRes.data);
       setProfesionales(pRes.data ?? []);
-      setPcsRecords(((pcsRes.data as PCS[]) ?? []).map(r => ({ ...r, dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo) })));
+      const pcs = (pcsRes.data as PCS[]) ?? [];
+      setPcsRecords(pcs);
+      // Cargar horarios por día para todos los PCS del centro
+      if (pcs.length > 0) {
+        const { data: horData } = await supabase
+          .from('pcs_horario_dia')
+          .select('pcs_id, dia_semana, hora_inicio, hora_fin')
+          .in('pcs_id', pcs.map(p => p.id))
+          .eq('activo', true);
+        setHorarioDia((horData as PcsHorarioDia[]) ?? []);
+      }
       setLoadingInit(false);
     }).catch(() => {
       setLoadingInit(false);
@@ -140,16 +148,23 @@ export default function PortalPublico() {
     if (!selectedProfId || !selectedServicioId || !resolvedCentroId) return;
     setLoadingSlots(true);
 
-    const dateStr = formatDate(selectedDate);
-    const dayName = getDayName(selectedDate.getDay());
+    const dateStr   = formatDate(selectedDate);
+    const dayOfWeek = selectedDate.getDay(); // 0=Dom, 1=Lun, ...
 
-    const pcsActivos = pcsRecords.filter(p =>
-      p.profesional_id === selectedProfId &&
-      p.servicio_id === selectedServicioId &&
-      normalizeDiasTrabajo(p.dias_trabajo).includes(dayName),
+    const pcsIds = new Set(
+      pcsRecords
+        .filter(p => p.profesional_id === selectedProfId && p.servicio_id === selectedServicioId)
+        .map(p => p.id),
     );
 
-    if (pcsActivos.length === 0) { setSlots([]); setLoadingSlots(false); return; }
+    const horariosParaDia = horarioDia.filter(h => pcsIds.has(h.pcs_id) && h.dia_semana === dayOfWeek);
+
+    if (horariosParaDia.length === 0) { setSlots([]); setLoadingSlots(false); return; }
+
+    // pcsActivos solo para calcular capacidad_simultanea
+    const pcsActivos = pcsRecords.filter(p =>
+      p.profesional_id === selectedProfId && p.servicio_id === selectedServicioId,
+    );
 
     const servicio  = servicios.find(s => s.id === selectedServicioId);
     const intervalo = servicio?.duracion_minutos ?? 30;
@@ -165,7 +180,7 @@ export default function PortalPublico() {
     }
 
     const allSlots = new Set<string>();
-    pcsActivos.forEach(pcs => generateSlots(pcs.hora_inicio, pcs.hora_fin, intervalo).forEach(s => allSlots.add(s)));
+    horariosParaDia.forEach(h => generateSlots(h.hora_inicio, h.hora_fin, intervalo).forEach(s => allSlots.add(s)));
 
     // Filtrar por servicio_id para no contar turnos de otros servicios del mismo profesional.
     // Excluir 'cancelado' y 'pendiente_pago' (expirados o no confirmados) para no bloquear slots.
@@ -223,7 +238,7 @@ export default function PortalPublico() {
       p_nombre:    data.nombre,
       p_apellido:  data.apellido,
       p_dni:       data.dni    || null,
-      p_celular:   data.celular || null,
+      p_celular:   data.celular ? `+549${data.celular.replace(/\D/g, '')}` : null,
       p_email:     data.email  || null,
     });
     const pacienteId = rpcError ? null : (pacienteIdResult as string | null);
@@ -331,20 +346,31 @@ export default function PortalPublico() {
         .kine-btn:active:not(:disabled) { transform:scale(.98); }
         .kine-btn-new:hover { border-color:#21C8C0 !important; }
         .kine-input:focus   { outline:none; border-color:#21C8C0 !important; box-shadow:0 0 0 3px rgba(33,200,192,.15) !important; }
-        .kine-date-strip { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
+        .kine-portal { grid-template-columns: 380px 1fr; }
+        .kine-brand  { display: flex; }
+        .kine-date-strip { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
         .kine-date-strip::-webkit-scrollbar { display:none; }
+        .kine-date { min-height:44px; }
+        .kine-slots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:8px; }
+        .kine-slot { min-height:44px; }
+        .kine-form-name-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
         @media (max-width:768px) {
           .kine-portal  { grid-template-columns:1fr !important; }
-          .kine-brand   { position:relative !important; height:auto !important; padding:24px 24px 20px !important; }
-          .kine-brand-body { display:none !important; }
-          .kine-booking { padding:24px 16px 48px !important; }
+          .kine-brand   { display:none !important; overflow:hidden !important; }
+          .kine-booking { padding:24px 16px 80px !important; }
+          .kine-slots-grid { grid-template-columns:repeat(2,1fr) !important; }
+          .kine-form-name-grid { grid-template-columns:1fr !important; }
+          .kine-confirm-sticky { position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:#F8FAFC; border-top:1px solid #E2E8F0; z-index:10; display:flex; gap:10px; align-items:center; justify-content:space-between; }
+        }
+        @media (min-width:769px) and (max-width:1024px) {
+          .kine-slots-grid { grid-template-columns:repeat(3,1fr) !important; }
         }
       `}</style>
 
-      <div className="kine-portal" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', minHeight: '100vh', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" }}>
+      <div className="kine-portal" style={{ display: 'grid', minHeight: '100vh', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" }}>
 
         {/* ═══════════════════════════════════════ LEFT PANEL ══ */}
-        <aside className="kine-brand" style={{ background: 'linear-gradient(155deg,#060D18 0%,#0B1628 45%,#0F2040 100%)', display: 'flex', flexDirection: 'column', padding: '48px 40px', position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
+        <aside className="kine-brand" style={{ background: 'linear-gradient(155deg,#060D18 0%,#0B1628 45%,#0F2040 100%)', flexDirection: 'column', padding: '48px 40px', position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
 
           {/* Subtle glow */}
           <div style={{ position: 'absolute', top: -80, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle,rgba(33,200,192,.12) 0%,transparent 70%)', pointerEvents: 'none' }} />
@@ -491,7 +517,7 @@ export default function PortalPublico() {
                 {/* Date strip */}
                 <div className="kine-date-strip" style={{ marginBottom: 24 }}>
                   {dateStripDates.map((d, i) => {
-                    const working    = isDayWorking(d, pcsRecords, selectedProfId, selectedServicioId);
+                    const working    = isDayWorking(d, pcsRecords, horarioDia, selectedProfId, selectedServicioId);
                     const isSelected = formatDate(d) === formatDate(selectedDate);
                     return (
                       <button key={i} disabled={!working} className="kine-date" onClick={() => { setSelectedDate(d); setSelectedHora(''); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 52, padding: '10px 8px', borderRadius: 12, border: `2px solid ${isSelected ? '#21C8C0' : '#E2E8F0'}`, background: isSelected ? '#21C8C0' : '#fff', cursor: working ? 'pointer' : 'default', flexShrink: 0, opacity: working ? 1 : .35, transition: 'all .22s ease' }}>
@@ -509,7 +535,7 @@ export default function PortalPublico() {
                   : slots.length === 0
                     ? <div style={{ textAlign: 'center', padding: '28px 0', color: '#64748B', fontSize: 14, background: '#fff', borderRadius: 14, border: '1.5px solid #E2E8F0' }}>No hay turnos disponibles para este día.</div>
                     : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 8 }}>
+                      <div className="kine-slots-grid">
                         {slots.map(slot => (
                           <button key={slot.hora} disabled={!slot.disponible} className="kine-slot" onClick={() => setSelectedHora(slot.hora)} style={{ padding: '10px 6px', borderRadius: 10, border: `1.5px solid ${selectedHora === slot.hora ? '#234A73' : '#E2E8F0'}`, background: selectedHora === slot.hora ? '#234A73' : '#fff', color: selectedHora === slot.hora ? '#fff' : slot.disponible ? '#0F172A' : '#64748B', fontSize: 13, fontWeight: 500, cursor: slot.disponible ? 'pointer' : 'default', opacity: slot.disponible ? 1 : .4, textDecoration: slot.disponible ? 'none' : 'line-through', transition: 'all .2s ease' }}>
                             {slot.hora}
@@ -550,7 +576,7 @@ export default function PortalPublico() {
 
                 {/* Form */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="kine-form-name-grid">
                     {(['nombre', 'apellido'] as const).map(field => (
                       <div key={field}>
                         <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: '#64748B', marginBottom: 6 }}>{field === 'nombre' ? 'Nombre *' : 'Apellido *'}</label>
@@ -560,19 +586,22 @@ export default function PortalPublico() {
                     ))}
                   </div>
                   <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: '#64748B', marginBottom: 6 }}>DNI</label>
+                    <Input className="kine-input" value={form.dni} maxLength={8} inputMode="numeric" onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} placeholder="12345678" style={{ borderColor: formErrors.dni ? '#E05252' : '#E2E8F0' }} />
+                    {formErrors.dni && <p style={{ fontSize: 11, color: '#E05252', marginTop: 4 }}>{formErrors.dni}</p>}
+                  </div>
+                  <div>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: '#64748B', marginBottom: 6 }}>Teléfono / WhatsApp</label>
-                    <Input className="kine-input" value={form.celular} maxLength={20} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} placeholder="+54 9 11 0000 0000" style={{ borderColor: formErrors.celular ? '#E05252' : '#E2E8F0' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${formErrors.celular ? '#E05252' : '#E2E8F0'}`, borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                      <span style={{ padding: '0 10px', fontSize: 14, color: '#64748B', background: '#F8FAFC', borderRight: '1px solid #E2E8F0', height: '100%', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', minHeight: 40 }}>+54 9</span>
+                      <Input className="kine-input" value={form.celular} maxLength={12} inputMode="numeric" onChange={e => setForm(f => ({ ...f, celular: e.target.value.replace(/\D/g, '') }))} placeholder="11 2345 6789" style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }} />
+                    </div>
                     {formErrors.celular && <p style={{ fontSize: 11, color: '#E05252', marginTop: 4 }}>{formErrors.celular}</p>}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: '#64748B', marginBottom: 6 }}>Email</label>
                     <Input className="kine-input" type="email" value={form.email} maxLength={120} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="tu@email.com" style={{ borderColor: formErrors.email ? '#E05252' : '#E2E8F0' }} />
                     {formErrors.email && <p style={{ fontSize: 11, color: '#E05252', marginTop: 4 }}>{formErrors.email}</p>}
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: '#64748B', marginBottom: 6 }}>DNI</label>
-                    <Input className="kine-input" value={form.dni} maxLength={8} inputMode="numeric" onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} placeholder="12345678" style={{ borderColor: formErrors.dni ? '#E05252' : '#E2E8F0' }} />
-                    {formErrors.dni && <p style={{ fontSize: 11, color: '#E05252', marginTop: 4 }}>{formErrors.dni}</p>}
                   </div>
                 </div>
 
@@ -595,7 +624,7 @@ export default function PortalPublico() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 }}>
+                <div className="kine-confirm-sticky" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 }}>
                   <button onClick={() => setStep('fecha_hora')} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#64748B', padding: '12px 16px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>Volver
                   </button>

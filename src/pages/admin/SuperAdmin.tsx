@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Building2, Users, CreditCard, ShieldAlert, Percent, AlertTriangle, Cpu, DollarSign } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Building2, Users, CreditCard, ShieldAlert, Percent, AlertTriangle, Cpu, DollarSign, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SUPERADMIN_EMAIL = 'gkovalek@hotmail.com';
@@ -44,6 +48,16 @@ interface TokenResumen {
   total_output: number;
   total_tokens: number;
   costo_usd: number;
+}
+
+interface UsuarioCentro {
+  id: string;
+  auth_user_id: string;
+  nombre: string;
+  mail: string;
+  activo: boolean;
+  rol_id: string;
+  _rol_nombre?: string;
 }
 
 interface ErrorLog {
@@ -87,6 +101,7 @@ export default function SuperAdmin() {
   const [cargando, setCargando]   = useState(true);
   const [analizando, setAnalizando]         = useState<Record<string, boolean>>({});
   const [analisisResultado, setAnalisisResultado] = useState<Record<string, { causa: string; solucion: string }>>({});
+  const [usuariosModal, setUsuariosModal] = useState<{ centroId: string; centroNombre: string } | null>(null);
 
   const esSuperAdmin = perfil?.mail === SUPERADMIN_EMAIL;
 
@@ -343,6 +358,9 @@ export default function SuperAdmin() {
                               {c.suscripcion_estado !== 'trial' && (
                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEstado(c.id, 'trial')}>→ Trial</Button>
                               )}
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setUsuariosModal({ centroId: c.id, centroNombre: c.nombre })}>
+                                <Users className="w-3 h-3" /> Usuarios
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -522,6 +540,239 @@ export default function SuperAdmin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Dialog Gestión de Usuarios ── */}
+      {usuariosModal && (
+        <GestionUsuariosDialog
+          centroId={usuariosModal.centroId}
+          centroNombre={usuariosModal.centroNombre}
+          onClose={() => setUsuariosModal(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente: GestionUsuariosDialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GestionUsuariosDialog({ centroId, centroNombre, onClose }: {
+  centroId: string;
+  centroNombre: string;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [usuarios, setUsuarios] = useState<UsuarioCentro[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [resetPassId, setResetPassId] = useState<string | null>(null);
+  const [nuevaPass, setNuevaPass] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState({ nombre: '', apellido: '', mail: '', password: '', rol: 'secretaria' });
+
+  useEffect(() => { cargarUsuarios(); }, [centroId]);
+
+  async function cargarUsuarios() {
+    setCargando(true);
+    const { data } = await supabase
+      .from('usuarios')
+      .select('id, auth_user_id, nombre, mail, activo, rol_id, roles(nombre)')
+      .eq('centro_id', centroId)
+      .order('activo', { ascending: false });
+
+    setUsuarios((data ?? []).map((u: { id: string; auth_user_id: string; nombre: string; mail: string; activo: boolean; rol_id: string; roles?: { nombre: string } | { nombre: string }[] }) => ({
+      ...u,
+      _rol_nombre: Array.isArray(u.roles) ? u.roles[0]?.nombre : (u.roles as { nombre: string })?.nombre ?? '—',
+    })));
+    setCargando(false);
+  }
+
+  async function crearUsuario() {
+    if (!form.nombre.trim() || !form.mail.trim() || !form.password) {
+      toast({ title: 'Completá nombre, mail y contraseña', variant: 'destructive' }); return;
+    }
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('admin-gestionar-usuario', {
+      body: { action: 'crear', ...form, centro_id: centroId },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    setSaving(false);
+    if (error || !data?.ok) {
+      const msg = data?.error === 'email_already_exists' ? 'El mail ya está registrado' : (data?.error ?? error?.message);
+      toast({ title: 'Error al crear usuario', description: msg, variant: 'destructive' });
+    } else {
+      toast({ title: 'Usuario creado' });
+      setForm({ nombre: '', apellido: '', mail: '', password: '', rol: 'secretaria' });
+      setMostrarForm(false);
+      cargarUsuarios();
+    }
+  }
+
+  async function resetPass(authUserId: string) {
+    if (!nuevaPass || nuevaPass.length < 6) {
+      toast({ title: 'Mínimo 6 caracteres', variant: 'destructive' }); return;
+    }
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('admin-gestionar-usuario', {
+      body: { action: 'resetear_pass', auth_user_id: authUserId, nueva_password: nuevaPass },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    setSaving(false);
+    if (error || !data?.ok) {
+      toast({ title: 'Error al resetear', description: data?.error ?? error?.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Contraseña actualizada' });
+      setResetPassId(null);
+      setNuevaPass('');
+    }
+  }
+
+  async function toggleUsuario(u: UsuarioCentro) {
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const action = u.activo ? 'desactivar' : 'reactivar';
+    const { data, error } = await supabase.functions.invoke('admin-gestionar-usuario', {
+      body: { action, auth_user_id: u.auth_user_id, usuario_id: u.id },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    setSaving(false);
+    if (error || !data?.ok) {
+      toast({ title: 'Error', description: data?.error ?? error?.message, variant: 'destructive' });
+    } else {
+      toast({ title: u.activo ? 'Usuario desactivado' : 'Usuario reactivado' });
+      cargarUsuarios();
+    }
+  }
+
+  const ROL_COLOR: Record<string, string> = {
+    administrador: 'bg-purple-100 text-purple-700',
+    secretaria:    'bg-blue-100 text-blue-700',
+    profesional:   'bg-green-100 text-green-700',
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="w-4 h-4" /> Usuarios — {centroNombre}
+          </DialogTitle>
+        </DialogHeader>
+
+        {cargando ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="space-y-4">
+            {/* Lista de usuarios */}
+            <div className="space-y-2">
+              {usuarios.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Sin usuarios creados aún.</p>
+              )}
+              {usuarios.map(u => (
+                <div key={u.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border ${!u.activo ? 'opacity-50 bg-muted/30' : 'bg-card'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{u.nombre}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROL_COLOR[u._rol_nombre ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {u._rol_nombre}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{u.mail}</p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    {resetPassId === u.id ? (
+                      <div className="flex gap-1 items-center">
+                        <Input
+                          className="h-7 w-32 text-xs"
+                          placeholder="nueva pass"
+                          value={nuevaPass}
+                          onChange={e => setNuevaPass(e.target.value)}
+                        />
+                        <Button size="sm" className="h-7 text-xs" disabled={saving} onClick={() => resetPass(u.auth_user_id)}>
+                          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Guardar'}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setResetPassId(null); setNuevaPass(''); }}>
+                          ✕
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setResetPassId(u.id)}>
+                        Resetear pass
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`h-7 text-xs ${u.activo ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}`}
+                      disabled={saving}
+                      onClick={() => toggleUsuario(u)}
+                    >
+                      {u.activo ? 'Desactivar' : 'Reactivar'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Formulario nuevo usuario */}
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium bg-muted/40 hover:bg-muted/60 transition-colors"
+                onClick={() => setMostrarForm(f => !f)}
+              >
+                <span className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Agregar usuario</span>
+                {mostrarForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {mostrarForm && (
+                <div className="p-4 space-y-3 bg-card">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Nombre *</Label>
+                      <Input className="h-8 text-sm" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Apellido</Label>
+                      <Input className="h-8 text-sm" value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Mail *</Label>
+                      <Input className="h-8 text-sm" type="email" value={form.mail} onChange={e => setForm(f => ({ ...f, mail: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Contraseña inicial *</Label>
+                      <Input className="h-8 text-sm" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="space-y-1 max-w-[200px]">
+                    <Label className="text-xs">Rol *</Label>
+                    <Select value={form.rol} onValueChange={v => setForm(f => ({ ...f, rol: v }))}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="secretaria">Secretaria</SelectItem>
+                        <SelectItem value="profesional">Profesional</SelectItem>
+                        <SelectItem value="administrador">Administrador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button className="h-8 text-sm w-full" disabled={saving} onClick={crearUsuario}>
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Crear usuario
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

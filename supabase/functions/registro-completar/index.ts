@@ -83,11 +83,20 @@ serve(async (req) => {
       userId = authData.user.id;
     }
 
+    // Generar slug único a partir del nombre del centro
+    const baseSlug = d.nombreCentro
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '')
+      .slice(0, 40);
+    const slug = `${baseSlug}${Date.now().toString(36)}`;
+
     // Crear centro
     const { data: centroData, error: centroErr } = await supabase
       .from('centros')
       .insert({
         nombre: d.nombreCentro,
+        slug,
         plan: d.plan,
         billing_email: d.email,
         suscripcion_estado: 'activo',

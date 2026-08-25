@@ -40,11 +40,11 @@ Deno.serve(async (req: Request) => {
   const { data: { user }, error: authErr } = await supabaseUser.auth.getUser();
   if (authErr || !user) return json({ error: 'unauthorized' }, 401);
 
-  // ── 2. Obtener centro_id del perfil ─────────────────────────────────────
+  // ── 2. Obtener centro_id del usuario ────────────────────────────────────
   const { data: perfil } = await supabaseAdmin
-    .from('perfiles')
+    .from('usuarios')
     .select('centro_id')
-    .eq('id', user.id)
+    .eq('auth_user_id', user.id)
     .single();
 
   if (!perfil?.centro_id) return json({ error: 'no_centro' }, 400);
