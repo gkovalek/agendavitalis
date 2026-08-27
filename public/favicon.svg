@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="vg" x1="0%" y1="0%" x2="60%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <!-- V shape: brazo izquierdo + brazo derecho con rounded caps -->
+  <path d="M 18 12 L 46 82 Q 50 88 54 82 L 74 28"
+        stroke="url(#vg)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Círculo grande -->
+  <circle cx="74" cy="58" r="12" fill="#93C5FD"/>
+  <!-- Círculo pequeño -->
+  <circle cx="84" cy="36" r="7.5" fill="#93C5FD"/>
+</svg>

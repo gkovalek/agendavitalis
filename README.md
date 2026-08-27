@@ -1,86 +1,27 @@
-# Vitalis — SaaS de Gestión de Centros de Salud
-
-Plataforma SaaS para la gestión integral de centros de salud (kinesiología, fisioterapia, etc.). Incluye agenda, portal público de turnos, cobros con MercadoPago, bot de WhatsApp con IA y panel de administración.
+# Vitalis — SaaS de gestión de centros de salud
 
 **URL producción:** https://agendavitalis.app  
-**Supabase project:** gsmrccofuegcmujycydd (sa-east-1)
+**Stack:** React 18 + TypeScript + Vite · Supabase (PostgreSQL + Auth + Edge Functions) · MercadoPago · Evolution API (WhatsApp)
 
 ---
 
-## Stack técnico
+## Planes comerciales
 
-| Capa | Tecnología |
-|---|---|
-| Frontend | React 18 + TypeScript + Vite |
-| UI | shadcn/ui + Tailwind CSS |
-| Backend | Supabase (PostgreSQL + Auth + Edge Functions) |
-| Pagos | MercadoPago (Connect) |
-| WhatsApp | Evolution API + n8n + Claude API |
-| Email | Resend |
-| Deploy | VPS en Hostinger (`72.61.58.46`) |
+| | Starter | Profesional | Premium |
+|---|---|---|---|
+| **Precio/mes** | $40.000 ARS | $50.000 ARS | $80.000 ARS |
+| Portal público | ✓ | ✓ | ✓ |
+| Cobro con MercadoPago | ✓ | ✓ | ✓ |
+| Agendas | hasta 3 | hasta 6 | ilimitadas |
+| Recordatorios WA/mes | 200 | 350 | 500 |
+| Agente IA WhatsApp | ✗ | ✓ | ✓ |
+| Historias clínicas | ✗ | ✓ (sin adjuntos) | ✓ + 500 MB |
+| Caja del día | ✓ | ✓ | ✓ |
+| Módulo Obras Sociales | ✗ | ✓ | ✓ |
+| Módulo Financiero (EERR) | ✗ | ✓ | ✓ |
+| Tableros de indicadores | ✗ | ✗ | ✓ |
 
----
-
-## Módulos principales
-
-- **Dashboard / Agenda** — vista de turnos por día, semana y mes
-- **Portal Público** (`/reservas/:slug`) — pacientes sacan turnos sin login
-- **Historia Clínica** — notas clínicas por paciente
-- **Tratamientos** — seguimiento de bloques de sesiones
-- **Caja del día** — ingresos y egresos por profesional
-- **Recordatorios** — envío manual de WhatsApp
-- **Liquidación OS** — cálculo mensual por obra social
-- **Obras Sociales** — configuración de aranceles por profesional
-- **Chat WhatsApp** (`/secretaria`) — bandeja de conversaciones + gestión de FAQs
-- **SuperAdmin** (`/admin`) — gestión de centros, usuarios, ingresos MP, tokens IA
-
----
-
-## Edge Functions (Supabase)
-
-| Función | Propósito |
-|---|---|
-| `admin-gestionar-usuario` | Crear / resetear pass / desactivar usuarios de un centro |
-| `analizar-error` | Analiza logs de error con Claude IA |
-| `limpiar-turnos-expirados` | Cancela turnos `pendiente_pago` vencidos |
-| `mp-crear-pago` | Crea pago MP desde app interna |
-| `mp-oauth` | OAuth con MercadoPago |
-| `mp-pago-portal` | Crea pago MP desde portal público |
-| `mp-webhook` | Recibe notificaciones de MP |
-| `registro-centro` | Alta de centro (trial) |
-| `registro-completar` | Completa registro post-pago MP |
-| `registro-pago` | Crea pago MP para nuevo centro |
-| `wa-asistente` | Bot WhatsApp IA con Claude |
-| `wa-send` | Envía mensajes via Evolution API |
-
----
-
-## Deploy
-
-```bash
-# Frontend
-npm run build
-scp -r dist/. root@72.61.58.46:/opt/vitalis/dist/
-
-# Edge Function
-npx supabase functions deploy <nombre> --project-ref gsmrccofuegcmujycydd
-```
-
-> Siempre usar `dist/.` (con punto), nunca `dist/*`.
-
----
-
-## Variables de entorno
-
-Copiar `.env.example` a `.env` y completar:
-
-```env
-VITE_SUPABASE_URL=https://gsmrccofuegcmujycydd.supabase.co
-VITE_SUPABASE_ANON_KEY=...
-VITE_SENTRY_DSN=...          # opcional
-```
-
-Las secrets de Edge Functions se configuran en Supabase Dashboard → Edge Functions → Secrets.
+Los planes se gestionan en `src/hooks/use-plan.ts`. Las keys de DB son `basico / intermedio / premium`.
 
 ---
 
@@ -88,29 +29,86 @@ Las secrets de Edge Functions se configuran en Supabase Dashboard → Edge Funct
 
 ```
 src/
-  components/     # Componentes reutilizables (AppLayout, NuevoTurnoForm, etc.)
-  contexts/       # AuthContext
-  hooks/          # use-plan, use-mobile, use-centro-config
-  pages/          # Páginas por módulo
-    admin/        # SuperAdmin
-  lib/            # supabase.ts
+├── components/          # TopNavbar, AppSidebar, SplashScreen, VitalisLogo, ...
+├── contexts/            # AuthContext (sesión + perfil + centro)
+├── hooks/               # use-plan.ts, useCentroConfig, ...
+├── pages/
+│   ├── Landing.tsx      # Página pública con pricing y FAQ
+│   ├── Registro.tsx     # Alta de nuevo centro (con pago MP)
+│   ├── PortalPublico.tsx# Portal de reservas por slug del centro
+│   ├── Dashboard.tsx    # Panel principal
+│   ├── HistoriaClinica.tsx
+│   ├── Recordatorios.tsx
+│   ├── EERR.tsx         # Estado de Resultados (plan Profesional+)
+│   ├── Reportes.tsx     # Dashboard de indicadores (plan Premium)
+│   ├── SecretariaWhatsApp.tsx
+│   └── admin/SuperAdmin.tsx
 supabase/
-  functions/      # Edge Functions (Deno runtime)
-  migrations/     # Migraciones SQL
+└── functions/           # Edge Functions (Deno)
+    ├── registro-pago
+    ├── registro-completar
+    ├── mp-webhook
+    ├── wa-asistente
+    ├── wa-send
+    ├── admin-cobro-centro   ← genera débito automático MP por centro
+    └── admin-gestionar-usuario
 ```
 
 ---
 
-## Roles de usuario
+## Deploy
 
-| Rol | Acceso |
-|---|---|
-| `administrador` | Acceso completo al centro |
-| `secretaria` | Agenda, turnos, recordatorios, caja |
-| `profesional` | Solo datos propios (turnos, historia clínica, caja, OS) |
+### Frontend
+```bash
+npm run build
+scp -r dist/. root@72.61.58.46:/opt/vitalis/dist/
+```
+> Usar `dist/.` (con punto), NO `dist/*`.
+
+### Edge Functions
+```bash
+npx supabase functions deploy <nombre> --project-ref gsmrccofuegcmujycydd
+```
 
 ---
 
-## Seguridad RLS
+## Desarrollo local
 
-El portal público (`/reservas/:slug`) funciona con el rol Supabase `anon`. Las políticas RLS necesarias están en `supabase/migrations/20260821_fix_centros_rls.sql`.
+```bash
+npm install
+npm run dev
+```
+
+Variables de entorno necesarias: ver `.env.example` (no incluido en el repo).
+
+---
+
+## SuperAdmin
+
+Acceso en `/admin` con la cuenta `gkovalek@hotmail.com`. Permite:
+- Ver y gestionar todos los centros registrados
+- Administrar usuarios de cada centro (crear, resetear contraseña, desactivar)
+- Ver facturación por centro y generar débito automático vía MercadoPago Preapproval
+
+**SQL requerido antes de usar la pestaña Facturación:**
+```sql
+ALTER TABLE centros
+  ADD COLUMN IF NOT EXISTS mp_preapproval_id text,
+  ADD COLUMN IF NOT EXISTS mp_preapproval_status text;
+```
+
+---
+
+## Bugs conocidos
+
+| Bug | Estado |
+|---|---|
+| BUG-007: turno creado desde app se auto-cancela | Pendiente investigar |
+| BUG-008: Recordatorios defaultea a D+1 | Pendiente |
+| BUG-009: PCS con servicio_id=NULL (data sucia) | Pendiente limpiar |
+
+---
+
+## Supabase
+
+**Project ref:** `gsmrccofuegcmujycydd` (región sa-east-1)

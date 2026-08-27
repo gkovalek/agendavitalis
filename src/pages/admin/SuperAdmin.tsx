@@ -54,10 +54,21 @@ interface UsuarioCentro {
   id: string;
   auth_user_id: string;
   nombre: string;
+  apellido?: string;
   mail: string;
   activo: boolean;
   rol_id: string;
   _rol_nombre?: string;
+}
+
+interface FacturacionCentro {
+  plan: string;
+  suscripcion_estado: string;
+  suscripcion_vence: string | null;
+  billing_email: string | null;
+  mp_preapproval_id: string | null;
+  mp_preapproval_status: string | null;
+  agendas_count: number;
 }
 
 interface ErrorLog {
@@ -557,6 +568,15 @@ export default function SuperAdmin() {
 // Componente: GestionUsuariosDialog
 // ─────────────────────────────────────────────────────────────────────────────
 
+const PLAN_MONTO: Record<string, number> = {
+  start:       40000,
+  starter:     40000,
+  basico:      40000,
+  intermedio:  50000,
+  profesional: 50000,
+  premium:     80000,
+};
+
 function GestionUsuariosDialog({ centroId, centroNombre, onClose }: {
   centroId: string;
   centroNombre: string;
@@ -564,30 +584,50 @@ function GestionUsuariosDialog({ centroId, centroNombre, onClose }: {
 }) {
   const { toast } = useToast();
   const [usuarios, setUsuarios] = useState<UsuarioCentro[]>([]);
+  const [facturacion, setFacturacion] = useState<FacturacionCentro | null>(null);
   const [cargando, setCargando] = useState(true);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [resetPassId, setResetPassId] = useState<string | null>(null);
   const [nuevaPass, setNuevaPass] = useState('');
   const [saving, setSaving] = useState(false);
+  const [generandoDebito, setGenerandoDebito] = useState(false);
+  const [initPoint, setInitPoint] = useState<string | null>(null);
 
   const [form, setForm] = useState({ nombre: '', apellido: '', mail: '', password: '', rol: 'secretaria' });
 
-  useEffect(() => { cargarUsuarios(); }, [centroId]);
+  useEffect(() => { cargarDatos(); }, [centroId]);
 
-  async function cargarUsuarios() {
+  async function cargarDatos() {
     setCargando(true);
-    const { data } = await supabase
-      .from('usuarios')
-      .select('id, auth_user_id, nombre, mail, activo, rol_id, roles(nombre)')
-      .eq('centro_id', centroId)
-      .order('activo', { ascending: false });
+    const [{ data: uData }, { data: cData }, { count: aCount }] = await Promise.all([
+      supabase
+        .from('usuarios')
+        .select('id, auth_user_id, nombre, apellido, mail, activo, rol_id, roles(nombre)')
+        .eq('centro_id', centroId)
+        .order('activo', { ascending: false }),
+      supabase
+        .from('centros')
+        .select('plan, suscripcion_estado, suscripcion_vence, billing_email, mp_preapproval_id, mp_preapproval_status')
+        .eq('id', centroId)
+        .single(),
+      supabase
+        .from('agendas')
+        .select('id', { count: 'exact', head: true })
+        .eq('centro_id', centroId),
+    ]);
 
-    setUsuarios((data ?? []).map((u: { id: string; auth_user_id: string; nombre: string; mail: string; activo: boolean; rol_id: string; roles?: { nombre: string } | { nombre: string }[] }) => ({
+    setUsuarios((uData ?? []).map((u: { id: string; auth_user_id: string; nombre: string; apellido?: string; mail: string; activo: boolean; rol_id: string; roles?: { nombre: string } | { nombre: string }[] }) => ({
       ...u,
       _rol_nombre: Array.isArray(u.roles) ? u.roles[0]?.nombre : (u.roles as { nombre: string })?.nombre ?? '—',
     })));
+
+    if (cData) {
+      setFacturacion({ ...cData, agendas_count: aCount ?? 0 });
+    }
     setCargando(false);
   }
+
+  function cargarUsuarios() { cargarDatos(); }
 
   async function crearUsuario() {
     if (!form.nombre.trim() || !form.mail.trim() || !form.password) {
@@ -654,123 +694,262 @@ function GestionUsuariosDialog({ centroId, centroNombre, onClose }: {
     profesional:   'bg-green-100 text-green-700',
   };
 
+  async function generarDebito() {
+    if (!facturacion) return;
+    setGenerandoDebito(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const monto = PLAN_MONTO[facturacion.plan?.toLowerCase()] ?? 40000;
+    const { data, error } = await supabase.functions.invoke('admin-cobro-centro', {
+      body: {
+        action: 'crear_preapproval',
+        centro_id: centroId,
+        centro_nombre: centroNombre,
+        plan: facturacion.plan,
+        monto,
+        payer_email: facturacion.billing_email ?? '',
+      },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    setGenerandoDebito(false);
+    if (error || !data?.ok) {
+      toast({ title: 'Error al generar débito', description: data?.error ?? error?.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Débito generado', description: 'Enviá el link al responsable del centro.' });
+      setInitPoint(data.init_point);
+      cargarDatos();
+    }
+  }
+
+  async function consultarDebito() {
+    if (!facturacion?.mp_preapproval_id) return;
+    setGenerandoDebito(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('admin-cobro-centro', {
+      body: { action: 'consultar_preapproval', centro_id: centroId },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    setGenerandoDebito(false);
+    if (error || !data?.ok) {
+      toast({ title: 'Error al consultar', description: data?.error ?? error?.message, variant: 'destructive' });
+    } else {
+      toast({ title: `Estado: ${data.status}` });
+      cargarDatos();
+    }
+  }
+
+  const PREAPPROVAL_COLOR: Record<string, string> = {
+    authorized: 'bg-green-100 text-green-700',
+    pending:    'bg-yellow-100 text-yellow-700',
+    paused:     'bg-orange-100 text-orange-700',
+    cancelled:  'bg-red-100 text-red-700',
+  };
+
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="w-4 h-4" /> Usuarios — {centroNombre}
+            <Building2 className="w-4 h-4" /> {centroNombre}
           </DialogTitle>
         </DialogHeader>
 
         {cargando ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="space-y-4">
-            {/* Lista de usuarios */}
-            <div className="space-y-2">
-              {usuarios.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin usuarios creados aún.</p>
-              )}
-              {usuarios.map(u => (
-                <div key={u.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border ${!u.activo ? 'opacity-50 bg-muted/30' : 'bg-card'}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{u.nombre}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROL_COLOR[u._rol_nombre ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {u._rol_nombre}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{u.mail}</p>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    {resetPassId === u.id ? (
-                      <div className="flex gap-1 items-center">
-                        <Input
-                          className="h-7 w-32 text-xs"
-                          placeholder="nueva pass"
-                          value={nuevaPass}
-                          onChange={e => setNuevaPass(e.target.value)}
-                        />
-                        <Button size="sm" className="h-7 text-xs" disabled={saving} onClick={() => resetPass(u.auth_user_id)}>
-                          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Guardar'}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setResetPassId(null); setNuevaPass(''); }}>
-                          ✕
-                        </Button>
+          <Tabs defaultValue="usuarios">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="usuarios" className="flex-1 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> Usuarios ({usuarios.length})
+              </TabsTrigger>
+              <TabsTrigger value="facturacion" className="flex-1 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5" /> Facturación
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Tab Usuarios ── */}
+            <TabsContent value="usuarios" className="space-y-4">
+              <div className="space-y-2">
+                {usuarios.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">Sin usuarios creados aún.</p>
+                )}
+                {usuarios.map(u => (
+                  <div key={u.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border ${!u.activo ? 'opacity-50 bg-muted/30' : 'bg-card'}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{u.nombre}{u.apellido ? ` ${u.apellido}` : ''}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROL_COLOR[u._rol_nombre ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {u._rol_nombre}
+                        </span>
                       </div>
-                    ) : (
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setResetPassId(u.id)}>
-                        Resetear pass
+                      <p className="text-xs text-muted-foreground">{u.mail}</p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      {resetPassId === u.id ? (
+                        <div className="flex gap-1 items-center">
+                          <Input
+                            className="h-7 w-32 text-xs"
+                            placeholder="nueva pass"
+                            value={nuevaPass}
+                            onChange={e => setNuevaPass(e.target.value)}
+                          />
+                          <Button size="sm" className="h-7 text-xs" disabled={saving} onClick={() => resetPass(u.auth_user_id)}>
+                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Guardar'}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setResetPassId(null); setNuevaPass(''); }}>
+                            ✕
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setResetPassId(u.id)}>
+                          Resetear pass
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={`h-7 text-xs ${u.activo ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}`}
+                        disabled={saving}
+                        onClick={() => toggleUsuario(u)}
+                      >
+                        {u.activo ? 'Desactivar' : 'Reactivar'}
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={`h-7 text-xs ${u.activo ? 'text-red-600 border-red-200' : 'text-green-600 border-green-200'}`}
-                      disabled={saving}
-                      onClick={() => toggleUsuario(u)}
-                    >
-                      {u.activo ? 'Desactivar' : 'Reactivar'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border rounded-lg overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium bg-muted/40 hover:bg-muted/60 transition-colors"
+                  onClick={() => setMostrarForm(f => !f)}
+                >
+                  <span className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Agregar usuario</span>
+                  {mostrarForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+                {mostrarForm && (
+                  <div className="p-4 space-y-3 bg-card">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nombre *</Label>
+                        <Input className="h-8 text-sm" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Apellido</Label>
+                        <Input className="h-8 text-sm" value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Mail *</Label>
+                        <Input className="h-8 text-sm" type="email" value={form.mail} onChange={e => setForm(f => ({ ...f, mail: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Contraseña inicial *</Label>
+                        <Input className="h-8 text-sm" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="space-y-1 max-w-[200px]">
+                      <Label className="text-xs">Rol *</Label>
+                      <Select value={form.rol} onValueChange={v => setForm(f => ({ ...f, rol: v }))}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="secretaria">Secretaria</SelectItem>
+                          <SelectItem value="profesional">Profesional</SelectItem>
+                          <SelectItem value="administrador">Administrador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="h-8 text-sm w-full" disabled={saving} onClick={crearUsuario}>
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Crear usuario
                     </Button>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            </TabsContent>
 
-            {/* Formulario nuevo usuario */}
-            <div className="border rounded-lg overflow-hidden">
-              <button
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium bg-muted/40 hover:bg-muted/60 transition-colors"
-                onClick={() => setMostrarForm(f => !f)}
-              >
-                <span className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Agregar usuario</span>
-                {mostrarForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
+            {/* ── Tab Facturación ── */}
+            <TabsContent value="facturacion" className="space-y-4">
+              {facturacion && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-card p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground">Plan</p>
+                      <p className="text-sm font-semibold capitalize">{facturacion.plan ?? '—'}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground">Estado suscripción</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ESTADO_COLOR[facturacion.suscripcion_estado] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {facturacion.suscripcion_estado ?? '—'}
+                      </span>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground">Agendas activas</p>
+                      <p className="text-sm font-semibold">{facturacion.agendas_count}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground">Monto mensual</p>
+                      <p className="text-sm font-semibold">
+                        {(PLAN_MONTO[facturacion.plan?.toLowerCase()] ?? 40000).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                    {facturacion.billing_email && (
+                      <div className="col-span-2 rounded-lg border bg-card p-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">Email de facturación</p>
+                        <p className="text-sm">{facturacion.billing_email}</p>
+                      </div>
+                    )}
+                    {facturacion.suscripcion_vence && (
+                      <div className="col-span-2 rounded-lg border bg-card p-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">Vencimiento</p>
+                        <p className="text-sm">{new Date(facturacion.suscripcion_vence).toLocaleDateString('es-AR')}</p>
+                      </div>
+                    )}
+                  </div>
 
-              {mostrarForm && (
-                <div className="p-4 space-y-3 bg-card">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Nombre *</Label>
-                      <Input className="h-8 text-sm" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+                  {/* Estado débito automático */}
+                  <div className="rounded-lg border bg-card p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Débito automático MercadoPago</p>
+                      {facturacion.mp_preapproval_status ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PREAPPROVAL_COLOR[facturacion.mp_preapproval_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {facturacion.mp_preapproval_status}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">Sin configurar</span>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Apellido</Label>
-                      <Input className="h-8 text-sm" value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />
+
+                    {initPoint && (
+                      <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-1">
+                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Link de aprobación generado</p>
+                        <a href={initPoint} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-600 dark:text-blue-400 underline break-all">
+                          {initPoint}
+                        </a>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 h-9 text-sm"
+                        disabled={generandoDebito}
+                        onClick={generarDebito}
+                      >
+                        {generandoDebito ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                        {facturacion.mp_preapproval_id ? 'Regenerar débito' : 'Generar débito automático'}
+                      </Button>
+                      {facturacion.mp_preapproval_id && (
+                        <Button variant="outline" className="h-9 text-sm" disabled={generandoDebito} onClick={consultarDebito}>
+                          Actualizar estado
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Mail *</Label>
-                      <Input className="h-8 text-sm" type="email" value={form.mail} onChange={e => setForm(f => ({ ...f, mail: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Contraseña inicial *</Label>
-                      <Input className="h-8 text-sm" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div className="space-y-1 max-w-[200px]">
-                    <Label className="text-xs">Rol *</Label>
-                    <Select value={form.rol} onValueChange={v => setForm(f => ({ ...f, rol: v }))}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="secretaria">Secretaria</SelectItem>
-                        <SelectItem value="profesional">Profesional</SelectItem>
-                        <SelectItem value="administrador">Administrador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="h-8 text-sm w-full" disabled={saving} onClick={crearUsuario}>
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Crear usuario
-                  </Button>
-                </div>
+                </>
               )}
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         )}
       </DialogContent>
     </Dialog>

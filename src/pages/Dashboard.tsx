@@ -458,9 +458,9 @@ export default function Dashboard() {
   }, [selectedDate]);
 
   return (
-    <div className="flex h-[calc(100vh-48px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-56px)] overflow-hidden">
       {/* ── LEFT PANEL ── */}
-      <aside className="w-[300px] shrink-0 border-r bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
+      <aside className="w-[310px] shrink-0 border-r border-border bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
         {!esProfesional && (
           <div>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
@@ -477,7 +477,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="border rounded-lg bg-background w-full">
+        <div className="border border-border rounded-2xl bg-card shadow-sm w-full overflow-hidden">
           <Calendar mode="single" selected={selectedDate} onSelect={d => d && setSelectedDate(d)} className="w-full" />
         </div>
 
@@ -524,7 +524,7 @@ export default function Dashboard() {
 
       {/* ── MAIN ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-background shrink-0 gap-3">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/40 shadow-sm shrink-0 gap-3">
           <div className="min-w-0">
             <h1 className="text-[14px] font-semibold truncate">
               {selectedProfId === 'todos' ? 'Panel principal · Todos los profesionales' : `Agenda · ${selectedProf?.nombre ?? ''} ${selectedProf?.apellido ?? ''}`}
@@ -551,7 +551,7 @@ export default function Dashboard() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1"
+            <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1 rounded-xl btn-primary-glow"
               onClick={() => {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : '';
                 const prof = profesionales.find(p => p.id === profId);

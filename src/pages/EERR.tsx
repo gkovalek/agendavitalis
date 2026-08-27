@@ -172,11 +172,11 @@ export default function EERR() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // Guard DESPUÉS de todos los hooks — evita violación de Rules of Hooks
-  if (!tiene('eerr')) {
+  if (!tiene('modulo_financiero')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
         <Lock className="w-8 h-8 opacity-40" />
-        <p className="text-sm font-medium">Estado de Resultados requiere plan Premium</p>
+        <p className="text-sm font-medium">Estado de Resultados requiere plan Profesional</p>
       </div>
     );
   }

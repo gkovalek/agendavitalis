@@ -5,27 +5,30 @@ export type Plan = 'basico' | 'intermedio' | 'premium';
 export const PLAN_RANK: Record<Plan, number> = { basico: 0, intermedio: 1, premium: 2 };
 
 export const PLAN_LABEL: Record<Plan, string> = {
-  basico:     'Básico',
-  intermedio: 'Intermedio',
+  basico:     'Starter',
+  intermedio: 'Profesional',
   premium:    'Premium',
 };
 
 export const PLAN_PRECIO_USD: Record<Plan, number> = {
   basico:     40000,
-  intermedio: 55000,
-  premium:    70000,
+  intermedio: 50000,
+  premium:    80000,
 };
 
 const FEATURE_MIN_PLAN = {
-  tratamientos:     'intermedio',
-  historia_clinica: 'intermedio',
-  adjuntos_hc:      'premium',
-  obras_sociales:   'intermedio',
-  liquidacion_os:   'intermedio',
-  reportes:         'intermedio',
-  servicios_ilimit: 'basico',
-  eerr:             'premium',
-  whatsapp_bot:     'premium',
+  tratamientos:      'intermedio',
+  historia_clinica:  'intermedio',
+  adjuntos_hc:       'premium',
+  obras_sociales:    'intermedio',
+  liquidacion_os:    'intermedio',
+  modulo_financiero: 'intermedio',
+  reportes:          'intermedio',
+  indicadores:       'premium',
+  preautorizacion_os:'premium',
+  servicios_ilimit:  'basico',
+  eerr:              'premium',
+  whatsapp_bot:      'intermedio',
 } as const satisfies Record<string, Plan>;
 
 export type Feature = keyof typeof FEATURE_MIN_PLAN;

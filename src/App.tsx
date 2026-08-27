@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TutorialProvider, useTutorialContext } from "@/contexts/TutorialContext";
 import { AppLayout } from "@/components/AppLayout";
 import { Tutorial } from "@/components/Tutorial";
+import { SplashScreen } from "@/components/SplashScreen";
 import { Loader2 } from "lucide-react";
 
 const Login = lazy(() => import("@/pages/Login"));
@@ -81,6 +82,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppRoutesWithTutorial() {
   const { session } = useAuth();
   const { startTutorial, tutorialActive, stopTutorial } = useTutorialContext();
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     if (session && localStorage.getItem('vitalis_tutorial_done') !== '1') {
@@ -91,6 +93,7 @@ function AppRoutesWithTutorial() {
 
   return (
     <>
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       <Tutorial active={tutorialActive} onClose={stopTutorial} />
       <AppRoutes />
     </>

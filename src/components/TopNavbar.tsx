@@ -6,15 +6,7 @@ import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
 import { useTutorialContext } from '@/contexts/TutorialContext';
 import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle } from 'lucide-react';
-
-function VitalisIsotipo({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 66 Q28 44 40 32 Q53 18 68 16" stroke="#234A73" strokeWidth="9" strokeLinecap="round" fill="none"/>
-      <path d="M14 50 Q30 32 44 22 Q56 13 70 11" stroke="#21C8C0" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.9"/>
-    </svg>
-  );
-}
+import { VitalisLogo } from './VitalisLogo';
 
 interface NavItem {
   label: string;
@@ -51,8 +43,8 @@ const BASE_NAV_GROUPS: NavGroup[] = [
     label: 'Caja',
     items: [
       { label: 'Caja del día', href: '/caja' },
-      { label: 'Dashboard financiero', href: '/reportes', requiere: 'reportes' },
-      { label: 'Estado de Resultados', href: '/eerr', requiere: 'eerr' },
+      { label: 'Dashboard financiero', href: '/reportes', requiere: 'indicadores' },
+      { label: 'Estado de Resultados', href: '/eerr', requiere: 'modulo_financiero' },
     ],
   },
   {
@@ -97,8 +89,8 @@ function DropdownMenu({
           ${group.disabled
             ? 'text-white/30 cursor-default'
             : isActive
-              ? 'text-white bg-white/15'
-              : 'text-white/75 hover:text-white hover:bg-white/10 cursor-pointer'
+              ? 'text-primary bg-primary/20'
+              : 'text-white/70 hover:text-white hover:bg-white/10 cursor-pointer'
           }
         `}
       >
@@ -201,11 +193,10 @@ export function TopNavbar() {
     : 'U';
 
   return (
-    <header className="h-12 flex items-stretch bg-[#080E1A] shrink-0 z-40 relative select-none border-b border-white/8">
+    <header className="h-14 flex items-stretch bg-[#080E1A] shrink-0 z-40 relative select-none border-b border-white/10">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-4 border-r border-white/10 shrink-0">
-        <VitalisIsotipo size={20} />
-        <span className="text-white font-extrabold text-[13px] tracking-[0.1em] uppercase">VITALIS</span>
+      <div className="flex items-center px-4 border-r border-white/10 shrink-0">
+        <VitalisLogo variant="navbar" />
       </div>
 
       {/* Nav */}
@@ -217,7 +208,7 @@ export function TopNavbar() {
             flex items-center px-4 h-full text-[13px] font-semibold
             transition-colors whitespace-nowrap border-none shrink-0 cursor-pointer
             ${location.pathname === '/dashboard'
-              ? 'bg-white/15 text-white'
+              ? 'text-primary bg-primary/20'
               : 'text-white/70 hover:text-white hover:bg-white/10'
             }
           `}
@@ -248,11 +239,11 @@ export function TopNavbar() {
       </nav>
 
       {/* Right */}
-      <div className="flex items-center gap-1 px-3 shrink-0 border-l border-white/20">
+      <div className="flex items-center gap-1 px-3 shrink-0 border-l border-white/10">
         {mostrarConfig && (
           <button
             onClick={() => navigate('/configuracion')}
-            className="p-2 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
             title="Configuración"
           >
             <Settings className="w-4 h-4" />
@@ -263,12 +254,12 @@ export function TopNavbar() {
           <button
             data-tutorial="user-menu"
             onClick={() => setUserMenuOpen(v => !v)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <div className="w-7 h-7 rounded-full bg-white/25 flex items-center justify-center text-[11px] font-bold text-white">
+            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-[11px] font-bold text-primary">
               {initials}
             </div>
-            <span className="text-[13px] hidden sm:block">{perfil?.nombre?.split(' ')[0]}</span>
+            <span className="text-[13px] hidden sm:block font-medium">{perfil?.nombre?.split(' ')[0]}</span>
           </button>
 
           {userMenuOpen && (

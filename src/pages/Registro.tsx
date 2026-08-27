@@ -28,8 +28,8 @@ const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado',
 const TITULOS     = ['Dr.','Dra.','Lic.','Kinesiólogo/a','Prof.','Otro'];
 
 const PLANES_DEF: { id: Plan; label: string }[] = [
-  { id: 'basico',      label: 'Básico'      },
-  { id: 'intermedio',  label: 'Intermedio'  },
+  { id: 'basico',      label: 'Starter'     },
+  { id: 'intermedio',  label: 'Profesional' },
   { id: 'premium',     label: 'Premium'     },
 ];
 

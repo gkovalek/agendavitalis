@@ -30,7 +30,6 @@ interface FAQ {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const WA_SEND_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wa-send`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function relativeTime(iso: string) {
@@ -150,12 +149,10 @@ export default function SecretariaWhatsApp() {
     const text = reply.trim();
     setReply('');
 
-    // 1. Enviar via n8n (proxy HTTPS → Evolution API HTTP interno)
+    // 1. Enviar via wa-send EF (autenticado con JWT de sesión)
     try {
-      await fetch(WA_SEND_URL, { // no auth needed: verify_jwt=false
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number: selected.celular, text }),
+      await supabase.functions.invoke('wa-send', {
+        body: { number: selected.celular, text },
       });
     } catch (e) { console.error('Send error', e); }
 

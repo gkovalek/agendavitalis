@@ -1,2 +1,2 @@
 [functions.admin-gestionar-usuario]
-verify_jwt = true
+verify_jwt = false

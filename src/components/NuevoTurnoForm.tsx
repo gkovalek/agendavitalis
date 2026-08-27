@@ -188,7 +188,7 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
         const pcsIdsConHorario = new Set((horData ?? []).map((h: any) => h.pcs_id));
 
         const list: Servicio[] = pcsForAgenda
-          .filter((r: any) => pcsIdsConHorario.has(r.id))
+          .filter((r: any) => pcsIdsConHorario.size === 0 || pcsIdsConHorario.has(r.id))
           .map((r: any) => ({
             id: r.servicios.id,
             nombre: r.servicios.nombre,
@@ -201,8 +201,8 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
         if (unique.length === 1) setServicioId(unique[0].id);
         if (unique.length === 0) {
           toast({
-            title: 'Sin servicios para este día',
-            description: 'El profesional no tiene servicios configurados para el día seleccionado.',
+            title: 'Agenda sin servicios',
+            description: 'Este profesional no tiene servicios asignados para esta agenda.',
             variant: 'destructive',
           });
         }

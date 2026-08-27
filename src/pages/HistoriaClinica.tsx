@@ -55,7 +55,7 @@ interface Adjunto {
 
 const HOY = new Date().toISOString().split('T')[0];
 const BUCKET = 'historia-clinica';
-const MAX_MB = 20;
+const MAX_MB = 500;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 /* ─────────────────── AdjuntoIcon (fuera del render) ─── */
@@ -167,13 +167,9 @@ function PanelDetalle({
           </p>
           <div>
             <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileSelect} />
-            {tiene('adjuntos_hc') ? (
+            {tiene('adjuntos_hc') && (
               <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
                 {uploading ? <><Loader2 className="w-3 h-3 animate-spin" /> Subiendo...</> : <><Plus className="w-3 h-3" /> Adjuntar</>}
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1 opacity-50 cursor-not-allowed" disabled title="Disponible en plan Premium">
-                <Plus className="w-3 h-3" /> Adjuntar
               </Button>
             )}
           </div>

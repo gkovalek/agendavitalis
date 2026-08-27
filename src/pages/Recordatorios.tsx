@@ -60,7 +60,7 @@ function formatHora(h: string) {
 /* ═══════════════════════════════════════════════════ */
 export default function Recordatorios() {
   const { centroId, perfil } = useAuth();
-  const LIMITE_POR_PLAN: Record<string, number> = { basico: 100, intermedio: 300, premium: 500 };
+  const LIMITE_POR_PLAN: Record<string, number> = { basico: 200, intermedio: 350, premium: 500 };
   const limitePlan = LIMITE_POR_PLAN[perfil?.plan ?? 'basico'] ?? 100;
   const { toast } = useToast();
   const { get } = useCentroConfig(centroId);
