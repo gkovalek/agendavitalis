@@ -1,0 +1,2 @@
+[functions.os-ceo-agent]
+verify_jwt = false

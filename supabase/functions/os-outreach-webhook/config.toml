@@ -1,0 +1,2 @@
+[functions.os-outreach-webhook]
+verify_jwt = false
