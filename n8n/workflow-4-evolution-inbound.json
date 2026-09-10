@@ -1,0 +1,245 @@
+{
+  "name": "Vitalis - Evolution Inbound con Media (Dual Agent)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evolution-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-wh-evo",
+      "name": "Webhook Evolution",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear evento de Evolution API (messages.upsert)\nconst body = $input.first().json.body ?? $input.first().json;\nconst data = body.data ?? body;\nconst msg = data.message ?? {};\nconst key = data.key ?? {};\n\n// Ignorar mensajes propios del bot\nif (key.fromMe) return [];\n\nconst celular = (key.remoteJid ?? '').replace('@s.whatsapp.net', '').replace('@g.us', '');\nconst instanceId = body.instance ?? $env['EVOLUTION_INSTANCE'];\n\nlet messageType = 'text';\nlet userText = '';\nlet mediaKey = null;\n\nif (msg.conversation) {\n  messageType = 'text';\n  userText = msg.conversation;\n} else if (msg.extendedTextMessage) {\n  messageType = 'text';\n  userText = msg.extendedTextMessage.text;\n} else if (msg.imageMessage) {\n  messageType = 'image';\n  mediaKey = 'imageMessage';\n} else if (msg.audioMessage || msg.pttMessage) {\n  messageType = 'audio';\n  mediaKey = msg.audioMessage ? 'audioMessage' : 'pttMessage';\n} else if (msg.documentMessage) {\n  messageType = 'document';\n  mediaKey = 'documentMessage';\n} else if (msg.videoMessage) {\n  messageType = 'text';\n  userText = '[El paciente envió un video — no puedo procesarlo, pero podés consultarme por texto o imagen]';\n} else {\n  return [];\n}\n\nreturn [{ json: { celular, instanceId, messageType, userText, mediaKey, rawMsg: msg } }];"
+      },
+      "id": "node-parse",
+      "name": "Parsear Mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "id": "1", "leftValue": "={{ $json.messageType }}", "rightValue": "text", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "id": "2", "leftValue": "={{ $json.messageType }}", "rightValue": "audio", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "id": "3", "leftValue": "={{ $json.messageType }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "id": "4", "leftValue": "={{ $json.messageType }}", "rightValue": "document", "operator": { "type": "string", "operation": "equals" } }] } }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-switch",
+      "name": "Tipo de mensaje",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env['EVOLUTION_URL'] }}/chat/getBase64FromMediaMessage/{{ $json.instanceId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "apikey", "value": "={{ $env['EVOLUTION_API_KEY'] }}" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "={{ JSON.stringify($json.rawMsg) }}" },
+            { "name": "convertToMp4", "value": "false" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-dl-audio",
+      "name": "Descargar Audio Base64",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar audio para wa-asistente-audio (GPT-4o)\nconst base64 = $input.first().json.base64 ?? $input.first().json.data ?? '';\nconst mime = $input.first().json.mimetype ?? 'audio/ogg';\nconst prev = $node['Parsear Mensaje'].json ?? {};\nreturn [{ json: { celular: prev.celular, audioBase64: base64, audioMimetype: mime } }];"
+      },
+      "id": "node-prep-audio",
+      "name": "Preparar Audio GPT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env['SUPABASE_URL'] }}/functions/v1/wa-asistente-audio",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ celular: $json.celular, audioBase64: $json.audioBase64, audioMimetype: $json.audioMimetype }) }}",
+        "options": {}
+      },
+      "id": "node-wa-audio",
+      "name": "wa-asistente-audio (GPT-4o)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 160],
+      "notes": "GPT-4o procesa audio directamente — sin Whisper intermedio"
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env['EVOLUTION_URL'] }}/chat/getBase64FromMediaMessage/{{ $json.instanceId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "apikey", "value": "={{ $env['EVOLUTION_API_KEY'] }}" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "message", "value": "={{ JSON.stringify($json.rawMsg) }}" }]
+        },
+        "options": {}
+      },
+      "id": "node-dl-image",
+      "name": "Descargar Imagen Base64",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base64 = $input.first().json.base64 ?? $input.first().json.data ?? '';\nconst mime = $input.first().json.mimetype ?? 'image/jpeg';\nconst prev = $node['Parsear Mensaje'].json ?? {};\nreturn [{ json: { celular: prev.celular, userText: '[El paciente envió una imagen]', messageType: 'image', imageBase64: base64, imageMimetype: mime } }];"
+      },
+      "id": "node-image-result",
+      "name": "Preparar Imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 320]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env['EVOLUTION_URL'] }}/chat/getBase64FromMediaMessage/{{ $json.instanceId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "apikey", "value": "={{ $env['EVOLUTION_API_KEY'] }}" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "message", "value": "={{ JSON.stringify($json.rawMsg) }}" }]
+        },
+        "options": {}
+      },
+      "id": "node-dl-doc",
+      "name": "Descargar Documento Base64",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base64 = $input.first().json.base64 ?? $input.first().json.data ?? '';\nconst mime = $input.first().json.mimetype ?? 'application/pdf';\nconst nombre = $input.first().json.fileName ?? 'documento';\nconst prev = $node['Parsear Mensaje'].json ?? {};\nreturn [{ json: { celular: prev.celular, userText: `[El paciente envió un documento: ${nombre}]`, messageType: 'document', documentBase64: base64, documentMimetype: mime, documentName: nombre } }];"
+      },
+      "id": "node-doc-result",
+      "name": "Preparar Documento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 480]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env['SUPABASE_URL'] }}/functions/v1/wa-asistente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ celular: $json.celular, userText: $json.userText, messageType: $json.messageType, imageBase64: $json.imageBase64 ?? undefined, imageMimetype: $json.imageMimetype ?? undefined, documentBase64: $json.documentBase64 ?? undefined, documentMimetype: $json.documentMimetype ?? undefined, documentName: $json.documentName ?? undefined }) }}",
+        "options": {}
+      },
+      "id": "node-wa-asistente",
+      "name": "wa-asistente (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 360],
+      "notes": "Claude procesa texto, imágenes y documentos PDF"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\": true}",
+        "options": {}
+      },
+      "id": "node-respond",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1520, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Evolution": {
+      "main": [[{ "node": "Parsear Mensaje", "type": "main", "index": 0 }]]
+    },
+    "Parsear Mensaje": {
+      "main": [[{ "node": "Tipo de mensaje", "type": "main", "index": 0 }]]
+    },
+    "Tipo de mensaje": {
+      "main": [
+        [{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Audio Base64", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Imagen Base64", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Documento Base64", "type": "main", "index": 0 }]
+      ]
+    },
+    "Descargar Audio Base64": {
+      "main": [[{ "node": "Preparar Audio GPT", "type": "main", "index": 0 }]]
+    },
+    "Preparar Audio GPT": {
+      "main": [[{ "node": "wa-asistente-audio (GPT-4o)", "type": "main", "index": 0 }]]
+    },
+    "wa-asistente-audio (GPT-4o)": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    },
+    "Descargar Imagen Base64": {
+      "main": [[{ "node": "Preparar Imagen", "type": "main", "index": 0 }]]
+    },
+    "Preparar Imagen": {
+      "main": [[{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }]]
+    },
+    "Descargar Documento Base64": {
+      "main": [[{ "node": "Preparar Documento", "type": "main", "index": 0 }]]
+    },
+    "Preparar Documento": {
+      "main": [[{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }]]
+    },
+    "wa-asistente (Claude)": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

@@ -24,7 +24,7 @@ const PLANES = [
     key: 'starter',
     nombre: 'Starter',
     precio: 40000,
-    descripcion: 'Para centros que arrancan o quieren ordenar su operación.',
+    descripcion: 'Para centros y profesionales que arrancan o quieren ordenar su operación.',
     destacado: false,
     features: [
       { label: 'Portal público personalizado', ok: true },
@@ -45,7 +45,7 @@ const PLANES = [
     key: 'profesional',
     nombre: 'Profesional',
     precio: 50000,
-    descripcion: 'Para centros en crecimiento que necesitan más herramientas.',
+    descripcion: 'Para centros y profesionales en crecimiento que necesitan más herramientas.',
     destacado: true,
     features: [
       { label: 'Portal público personalizado', ok: true },
@@ -66,7 +66,7 @@ const PLANES = [
     key: 'premium',
     nombre: 'Premium',
     precio: 80000,
-    descripcion: 'Para centros consolidados que quieren control total.',
+    descripcion: 'Para centros y profesionales consolidados que quieren control total.',
     destacado: false,
     features: [
       { label: 'Portal público personalizado', ok: true },
@@ -143,7 +143,7 @@ function PreciosSection() {
                   <span className="text-4xl font-extrabold text-white">
                     ${precioMostrar(plan.precio).toLocaleString('es-AR')}
                   </span>
-                  <span className="mb-1 text-sm text-slate-400">/mes</span>
+                  <span className="mb-1 text-sm text-slate-400">/mes por profesional</span>
                 </div>
                 {semestral && (
                   <p className="mt-1 text-xs text-slate-500">
@@ -358,7 +358,18 @@ export default function Landing() {
         <FaqSection />
       </main>
 
-      <footer className="border-t bg-white px-5 py-8 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><VitalisLogo variant="landing" /><div>© {new Date().getFullYear()} Vitalis. Gestión que impulsa tu centro.</div></div></footer>
+      <footer className="border-t bg-white px-5 py-8 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+          <VitalisLogo variant="landing" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span>© {new Date().getFullYear()} Vitalis. Gestión que impulsa tu centro.</span>
+            <span className="hidden sm:inline">·</span>
+            <a href="/politica-privacidad" className="hover:text-[#00ADBB] transition-colors">Política de Privacidad</a>
+            <span className="hidden sm:inline">·</span>
+            <a href="/terminos" className="hover:text-[#00ADBB] transition-colors">Términos y Condiciones</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

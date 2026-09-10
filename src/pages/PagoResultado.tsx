@@ -89,6 +89,10 @@ export default function PagoResultado({ tipo }: { tipo: 'success' | 'failure' | 
           success: nuevoEstado === 'approved',
         }),
       }).catch(console.error);
+
+      if (nuevoEstado === 'approved' && typeof window.fbq === 'function') {
+        window.fbq('track', 'CompleteRegistration');
+      }
     }
 
     if (!tipoRegistro && turnoId) {

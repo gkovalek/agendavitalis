@@ -1,26 +1,23 @@
 -- =============================================================================
 -- VITALIS OS v1 — pg_cron Schedules
--- Run AFTER deploying all Edge Functions
--- Requires: pg_cron extension enabled in Supabase (Dashboard → Extensions)
+-- Prerequisito: pg_cron habilitado en Supabase Dashboard → Database → Extensions
+-- Prerequisito: pg_net habilitado (viene activo por defecto en Supabase)
+-- Ejecutar en: SQL Editor del proyecto gsmrccofuegcmujycydd
 -- =============================================================================
 
--- Enable pg_cron if not already enabled
--- CREATE EXTENSION IF NOT EXISTS pg_cron;
-
--- Note: Replace YOUR_SUPABASE_URL and YOUR_ANON_KEY with actual values
--- Or use the Supabase secret approach via pg_net + vault
+-- IMPORTANTE: No commitear este archivo con el key real
+-- Usar solo para ejecutar en SQL Editor, luego limpiar
 
 -- CEO Agent: daily 06:00 UTC (approve pending outreach, check guardrails)
 SELECT cron.schedule(
   'os-ceo-daily',
   '0 6 * * *',
   $$
-  SELECT
-    net.http_post(
-      url := 'YOUR_SUPABASE_URL/functions/v1/os-ceo-agent',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
-      body := '{"action": "daily"}'::jsonb
-    )
+  SELECT net.http_post(
+    url := 'https://gsmrccofuegcmujycydd.supabase.co/functions/v1/os-ceo-agent',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbXJjY29mdWVnY211anljeWRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyNTMyNSwiZXhwIjoyMDg5MDAxMzI1fQ.6HdtqI7Vy2Y6wwJFhFQtwBK4hmBKdeuSIJ8-Og3JkDE"}'::jsonb,
+    body := '{"action": "daily"}'::jsonb
+  )
   $$
 );
 
@@ -29,44 +26,41 @@ SELECT cron.schedule(
   'os-ceo-weekly-report',
   '0 10 * * 1',
   $$
-  SELECT
-    net.http_post(
-      url := 'YOUR_SUPABASE_URL/functions/v1/os-ceo-agent',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
-      body := '{"action": "weekly_report"}'::jsonb
-    )
+  SELECT net.http_post(
+    url := 'https://gsmrccofuegcmujycydd.supabase.co/functions/v1/os-ceo-agent',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbXJjY29mdWVnY211anljeWRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyNTMyNSwiZXhwIjoyMDg5MDAxMzI1fQ.6HdtqI7Vy2Y6wwJFhFQtwBK4hmBKdeuSIJ8-Og3JkDE"}'::jsonb,
+    body := '{"action": "weekly_report"}'::jsonb
+  )
   $$
 );
 
--- Growth Agent: Monday/Wednesday/Friday 07:00 UTC (prospect + propose)
+-- Growth Agent: Monday/Wednesday/Friday 07:00 UTC
 SELECT cron.schedule(
   'os-growth-mwf',
   '0 7 * * 1,3,5',
   $$
-  SELECT
-    net.http_post(
-      url := 'YOUR_SUPABASE_URL/functions/v1/os-growth-agent',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
-      body := '{"action": "propose"}'::jsonb
-    )
+  SELECT net.http_post(
+    url := 'https://gsmrccofuegcmujycydd.supabase.co/functions/v1/os-growth-agent',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbXJjY29mdWVnY211anljeWRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyNTMyNSwiZXhwIjoyMDg5MDAxMzI1fQ.6HdtqI7Vy2Y6wwJFhFQtwBK4hmBKdeuSIJ8-Og3JkDE"}'::jsonb,
+    body := '{"action": "propose"}'::jsonb
+  )
   $$
 );
 
--- Finance Agent: every Sunday 05:00 UTC (metrics snapshot + ROI + campaign health)
+-- Finance Agent: every Sunday 05:00 UTC
 SELECT cron.schedule(
   'os-finance-weekly',
   '0 5 * * 0',
   $$
-  SELECT
-    net.http_post(
-      url := 'YOUR_SUPABASE_URL/functions/v1/os-finance-agent',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
-      body := '{}'::jsonb
-    )
+  SELECT net.http_post(
+    url := 'https://gsmrccofuegcmujycydd.supabase.co/functions/v1/os-finance-agent',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbXJjY29mdWVnY211anljeWRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyNTMyNSwiZXhwIjoyMDg5MDAxMzI1fQ.6HdtqI7Vy2Y6wwJFhFQtwBK4hmBKdeuSIJ8-Og3JkDE"}'::jsonb,
+    body := '{}'::jsonb
+  )
   $$
 );
 
--- Dead leads cron: daily 04:00 UTC (mark no-response leads as dead after 14 days)
+-- Dead leads: daily 04:00 UTC (marca dead los que no respondieron en 14 días)
 SELECT cron.schedule(
   'os-dead-leads',
   '0 4 * * *',
@@ -75,7 +69,6 @@ SELECT cron.schedule(
   SET
     estado = 'dead',
     response_class = 'no_response',
-    funnel_stage = 'contact',
     updated_at = now()
   WHERE
     estado = 'delivered'
@@ -84,25 +77,23 @@ SELECT cron.schedule(
   $$
 );
 
--- Outreach send batch: daily 06:30 UTC (after CEO approves, trigger batch send)
--- This ensures approved messages from the 06:00 CEO run get sent promptly
+-- Outreach send batch: daily 06:30 UTC (envía aprobados del ciclo CEO 06:00)
 SELECT cron.schedule(
   'os-outreach-send-batch',
   '30 6 * * *',
   $$
-  SELECT
-    net.http_post(
-      url := 'YOUR_SUPABASE_URL/functions/v1/os-outreach-send',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
-      body := '{}'::jsonb
-    )
+  SELECT net.http_post(
+    url := 'https://gsmrccofuegcmujycydd.supabase.co/functions/v1/os-outreach-send',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbXJjY29mdWVnY211anljeWRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyNTMyNSwiZXhwIjoyMDg5MDAxMzI1fQ.6HdtqI7Vy2Y6wwJFhFQtwBK4hmBKdeuSIJ8-Og3JkDE"}'::jsonb,
+    body := '{}'::jsonb
+  )
   $$
 );
 
 -- =============================================================================
--- To verify cron jobs are registered:
--- SELECT * FROM cron.job;
+-- Para verificar que quedaron registrados:
+--   SELECT jobid, jobname, schedule, command FROM cron.job;
 --
--- To unschedule:
--- SELECT cron.unschedule('os-ceo-daily');
+-- Para eliminar un cron:
+--   SELECT cron.unschedule('os-ceo-daily');
 -- =============================================================================

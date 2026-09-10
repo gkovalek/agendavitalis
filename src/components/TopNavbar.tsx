@@ -5,8 +5,9 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
 import { useTutorialContext } from '@/contexts/TutorialContext';
-import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle, Menu, X, ChevronRight } from 'lucide-react';
 import { VitalisLogo } from './VitalisLogo';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface NavItem {
   label: string;
@@ -136,6 +137,140 @@ function DropdownMenu({
   );
 }
 
+function MobileNavDrawer({
+  open, onClose, navGroups, onNavigate, tieneFeature, planMinimoPara, onLocked,
+  perfil, esAdmin, esSecretario, signOut, startTutorial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  navGroups: NavGroup[];
+  onNavigate: (href: string) => void;
+  tieneFeature: (f: Feature) => boolean;
+  planMinimoPara: (f: Feature) => string;
+  onLocked: (planNombre: string) => void;
+  perfil: any;
+  esAdmin: boolean;
+  esSecretario: boolean;
+  signOut: () => void;
+  startTutorial: () => void;
+}) {
+  const location = useLocation();
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+  const go = (href: string) => { onNavigate(href); onClose(); };
+
+  return (
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent side="left" className="!w-[300px] sm:!w-[340px] bg-[#080E1A] border-r border-white/10 !p-0 flex flex-col">
+        <SheetHeader className="px-4 py-4 border-b border-white/10">
+          <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+          <VitalisLogo variant="navbar" />
+        </SheetHeader>
+
+        {/* User info */}
+        <div className="px-4 py-3 border-b border-white/10">
+          <p className="text-[13px] font-semibold text-white">{perfil?.nombre}</p>
+          <p className="text-xs text-white/40 truncate mt-0.5">{perfil?.mail}</p>
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 overflow-y-auto py-2">
+          {/* Panel principal */}
+          <button
+            onClick={() => go('/dashboard')}
+            className={`w-full flex items-center justify-between px-4 py-3 text-[13px] font-semibold transition-colors
+              ${location.pathname === '/dashboard' ? 'text-primary bg-primary/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+          >
+            Panel principal
+            <ChevronRight className="w-4 h-4 opacity-40" />
+          </button>
+
+          {navGroups.map((group) => {
+            if (group.disabled) return null;
+            const isExpanded = expandedGroup === group.label;
+            const isActive = group.items.some(i => i.href && location.pathname.startsWith(i.href));
+
+            return (
+              <div key={group.label}>
+                <button
+                  onClick={() => setExpandedGroup(isExpanded ? null : group.label)}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-[13px] font-medium transition-colors
+                    ${isActive ? 'text-primary' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+                >
+                  {group.label}
+                  <ChevronDown className={`w-4 h-4 opacity-60 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isExpanded && (
+                  <div className="bg-white/5 border-l-2 border-primary/30 ml-4">
+                    {group.items.map((item, i) => {
+                      const bloqueado = item.requiere ? !tieneFeature(item.requiere) : false;
+                      return (
+                        <button
+                          key={i}
+                          disabled={item.disabled}
+                          onClick={() => {
+                            if (bloqueado) { onLocked(planMinimoPara(item.requiere!)); return; }
+                            if (item.href && !item.disabled) go(item.href);
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors text-left
+                            ${item.disabled
+                              ? 'text-white/20 cursor-default'
+                              : bloqueado
+                                ? 'text-white/30'
+                                : location.pathname === item.href
+                                  ? 'text-primary font-medium'
+                                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                          <span>{item.label}</span>
+                          {bloqueado && <Lock className="w-3 h-3 shrink-0 opacity-40" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Bottom actions */}
+        <div className="border-t border-white/10 py-2">
+          {!esSecretario && (
+            <button
+              onClick={() => go('/mi-perfil')}
+              className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <UserCircle className="w-4 h-4" /> Mi perfil
+            </button>
+          )}
+          {esAdmin && (
+            <button
+              onClick={() => go('/configuracion')}
+              className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <Settings className="w-4 h-4" /> Configuración
+            </button>
+          )}
+          <button
+            onClick={() => { startTutorial(); onClose(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" /> Ver tutorial
+          </button>
+          <button
+            onClick={() => { signOut(); onClose(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Cerrar sesión
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function TopNavbar() {
   const navigate = useNavigate();
   const { perfil, centroId, signOut } = useAuth();
@@ -145,6 +280,7 @@ export function TopNavbar() {
   const { startTutorial } = useTutorialContext();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const rol = perfil?.rol_nombre ?? 'admin';
@@ -156,20 +292,13 @@ export function TopNavbar() {
     return BASE_NAV_GROUPS
       .map(group => {
         let items = group.items;
-
-        if (esProfesional) {
-          items = items.filter(i => i.href !== '/profesionales');
-        }
-
+        if (esProfesional) items = items.filter(i => i.href !== '/profesionales');
         if (esSecretario) {
           const verCaja = get('secretario_ver_caja') !== 'false';
           const verLiquidacion = get('secretario_ver_liquidacion') !== 'false';
           if (!verCaja && group.label === 'Caja') return null;
-          if (!verLiquidacion) {
-            items = items.filter(i => i.href !== '/liquidacion-os');
-          }
+          if (!verLiquidacion) items = items.filter(i => i.href !== '/liquidacion-os');
         }
-
         if (items.length === 0) return null;
         return { ...group, items };
       })
@@ -188,118 +317,153 @@ export function TopNavbar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // Cerrar menú mobile al navegar
+  useEffect(() => { setMobileMenuOpen(false); }, [location.pathname]);
+
   const initials = perfil?.nombre
     ? perfil.nombre.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
     : 'U';
 
+  const onLocked = (planNombre: string) => toast({
+    title: `Disponible en plan ${planNombre}`,
+    description: 'Actualizá tu plan para acceder a este módulo.',
+  });
+
   return (
-    <header className="h-14 flex items-stretch bg-[#080E1A] shrink-0 z-40 relative select-none border-b border-white/10">
-      {/* Brand */}
-      <div className="flex items-center px-4 border-r border-white/10 shrink-0">
-        <VitalisLogo variant="navbar" />
-      </div>
-
-      {/* Nav */}
-      <nav className="flex items-stretch flex-1 min-w-0">
-        <button
-          data-tutorial="dashboard"
-          onClick={() => navigate('/dashboard')}
-          className={`
-            flex items-center px-4 h-full text-[13px] font-semibold
-            transition-colors whitespace-nowrap border-none shrink-0 cursor-pointer
-            ${location.pathname === '/dashboard'
-              ? 'text-primary bg-primary/20'
-              : 'text-white/70 hover:text-white hover:bg-white/10'
-            }
-          `}
-        >
-          Panel principal
-        </button>
-        {navGroups.map((group, i) => {
-          const tutorialMap: Record<string, string> = {
-            Pacientes: 'nav-pacientes',
-            Agendas: 'nav-agendas',
-            Caja: 'nav-caja',
-          };
-          return (
-            <DropdownMenu
-              key={i}
-              group={group}
-              onNavigate={navigate}
-              tieneFeature={tiene}
-              planMinimoPara={planMinimoPara}
-              tutorialId={tutorialMap[group.label]}
-              onLocked={(planNombre) => toast({
-                title: `Disponible en plan ${planNombre}`,
-                description: 'Actualizá tu plan para acceder a este módulo.',
-              })}
-            />
-          );
-        })}
-      </nav>
-
-      {/* Right */}
-      <div className="flex items-center gap-1 px-3 shrink-0 border-l border-white/10">
-        {mostrarConfig && (
-          <button
-            onClick={() => navigate('/configuracion')}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            title="Configuración"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        )}
-
-        <div className="relative" ref={userMenuRef}>
-          <button
-            data-tutorial="user-menu"
-            onClick={() => setUserMenuOpen(v => !v)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-[11px] font-bold text-primary">
-              {initials}
-            </div>
-            <span className="text-[13px] hidden sm:block font-medium">{perfil?.nombre?.split(' ')[0]}</span>
-          </button>
-
-          {userMenuOpen && (
-            <div className="absolute right-0 top-[calc(100%+4px)] bg-popover border border-border rounded-lg shadow-xl min-w-[210px] py-1 z-[100]">
-              <div className="px-4 py-3 border-b border-border">
-                <p className="text-[13px] font-semibold text-foreground">{perfil?.nombre}</p>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{perfil?.mail}</p>
-              </div>
-              {!esSecretario && (
-                <button
-                  onClick={() => { setUserMenuOpen(false); navigate('/mi-perfil'); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
-                >
-                  <UserCircle className="w-4 h-4 opacity-60" /> Mi perfil
-                </button>
-              )}
-              {mostrarConfig && (
-                <button
-                  onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
-                >
-                  <Settings className="w-4 h-4 opacity-60" /> Configuración
-                </button>
-              )}
-              <button
-                onClick={() => { setUserMenuOpen(false); startTutorial(); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
-              >
-                <HelpCircle className="h-4 w-4 opacity-60" /> Ver tutorial
-              </button>
-              <button
-                onClick={() => { setUserMenuOpen(false); signOut(); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-destructive hover:bg-destructive/10 text-left transition-colors"
-              >
-                <LogOut className="w-4 h-4" /> Cerrar sesión
-              </button>
-            </div>
-          )}
+    <>
+      <header className="h-14 flex items-stretch bg-[#080E1A] shrink-0 z-40 relative select-none border-b border-white/10">
+        {/* Brand */}
+        <div className="flex items-center px-4 border-r border-white/10 shrink-0">
+          <VitalisLogo variant="navbar" />
         </div>
-      </div>
-    </header>
+
+        {/* Nav — solo desktop */}
+        <nav className="hidden md:flex items-stretch flex-1 min-w-0">
+          <button
+            data-tutorial="dashboard"
+            onClick={() => navigate('/dashboard')}
+            className={`
+              flex items-center px-4 h-full text-[13px] font-semibold
+              transition-colors whitespace-nowrap border-none shrink-0 cursor-pointer
+              ${location.pathname === '/dashboard'
+                ? 'text-primary bg-primary/20'
+                : 'text-white/70 hover:text-white hover:bg-white/10'
+              }
+            `}
+          >
+            Panel principal
+          </button>
+          {navGroups.map((group, i) => {
+            const tutorialMap: Record<string, string> = {
+              Pacientes: 'nav-pacientes',
+              Agendas: 'nav-agendas',
+              Caja: 'nav-caja',
+            };
+            return (
+              <DropdownMenu
+                key={i}
+                group={group}
+                onNavigate={navigate}
+                tieneFeature={tiene}
+                planMinimoPara={planMinimoPara}
+                tutorialId={tutorialMap[group.label]}
+                onLocked={onLocked}
+              />
+            );
+          })}
+        </nav>
+
+        {/* Hamburger — solo mobile */}
+        <button
+          className="md:hidden flex items-center justify-center px-4 text-white/70 hover:text-white transition-colors ml-1"
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label="Abrir menú"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Spacer mobile */}
+        <div className="flex-1 md:hidden" />
+
+        {/* Right */}
+        <div className="flex items-center gap-1 px-3 shrink-0 border-l border-white/10">
+          {mostrarConfig && (
+            <button
+              onClick={() => navigate('/configuracion')}
+              className="hidden md:flex p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              title="Configuración"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
+
+          <div className="relative" ref={userMenuRef}>
+            <button
+              data-tutorial="user-menu"
+              onClick={() => setUserMenuOpen(v => !v)}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-[11px] font-bold text-primary">
+                {initials}
+              </div>
+              <span className="text-[13px] hidden sm:block font-medium">{perfil?.nombre?.split(' ')[0]}</span>
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+4px)] bg-popover border border-border rounded-lg shadow-xl min-w-[210px] py-1 z-[100]">
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="text-[13px] font-semibold text-foreground">{perfil?.nombre}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{perfil?.mail}</p>
+                </div>
+                {!esSecretario && (
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/mi-perfil'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                  >
+                    <UserCircle className="w-4 h-4 opacity-60" /> Mi perfil
+                  </button>
+                )}
+                {mostrarConfig && (
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                  >
+                    <Settings className="w-4 h-4 opacity-60" /> Configuración
+                  </button>
+                )}
+                <button
+                  onClick={() => { setUserMenuOpen(false); startTutorial(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                >
+                  <HelpCircle className="h-4 w-4 opacity-60" /> Ver tutorial
+                </button>
+                <button
+                  onClick={() => { setUserMenuOpen(false); signOut(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-destructive hover:bg-destructive/10 text-left transition-colors"
+                >
+                  <LogOut className="w-4 h-4" /> Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile drawer */}
+      <MobileNavDrawer
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        navGroups={navGroups}
+        onNavigate={navigate}
+        tieneFeature={tiene}
+        planMinimoPara={planMinimoPara}
+        onLocked={onLocked}
+        perfil={perfil}
+        esAdmin={esAdmin}
+        esSecretario={esSecretario}
+        signOut={signOut}
+        startTutorial={startTutorial}
+      />
+    </>
   );
 }

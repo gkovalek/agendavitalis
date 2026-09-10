@@ -201,15 +201,16 @@ export default function MiPerfil() {
                 {mpConnecting ? 'Conectando con Mercado Pago…' : 'Cargando estado…'}
               </div>
             ) : mpUserId ? (
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                   <span>Cuenta conectada:</span>
-                  <span className="font-mono font-medium">{mpUserId}</span>
+                  <span className="font-mono font-medium truncate">{mpUserId}</span>
                 </div>
                 <Button
                   variant="destructive"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={handleMpDisconnect}
                   disabled={mpDisconnecting}
                 >
@@ -218,12 +219,12 @@ export default function MiPerfil() {
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <XCircle className="h-4 w-4" />
+                  <XCircle className="h-4 w-4 shrink-0" />
                   No tenés ninguna cuenta conectada
                 </div>
-                <Button size="sm" onClick={handleMpConnect}>
+                <Button size="sm" className="w-full sm:w-auto" onClick={handleMpConnect}>
                   Conectar Mercado Pago
                 </Button>
               </div>

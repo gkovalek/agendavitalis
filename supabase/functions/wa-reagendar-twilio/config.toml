@@ -1,0 +1,2 @@
+[functions.wa-reagendar-twilio]
+verify_jwt = false

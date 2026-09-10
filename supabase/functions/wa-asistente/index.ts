@@ -490,6 +490,7 @@ Entendé el motivo: sacar turno, cancelar, reagendar, consulta de horarios/preci
 
 PASO 3 — DETALLES (según el motivo)
 Para turnos: profesional → servicio → fecha preferida → usá check_slots para mostrar horarios reales → el paciente elige hora.
+⚠️ OBLIGATORIO: NUNCA emitas "book_turno" sin haber llamado "check_slots" primero en este mismo intercambio. Si el paciente eligió hora pero no llamaste check_slots aún, hacelo antes de confirmar.
 Para consultas: respondé con la info de arriba (horarios reales, precios_particular, qué OS acepta cada profesional).
 
 PASO 4 — INFORMAR / ASESORAR
@@ -588,7 +589,20 @@ Solo incluí en "data" los campos relevantes.`;
     ? textoEnriquecido   // mensaje simple — string plano (ahorra tokens)
     : contentBlocks;     // multimodal — array de bloques
 
+  // Extraer nombre/apellido de TODO el historial (no solo los últimos 20)
+  // para no perder identidad del paciente en conversaciones largas
+  let nombreGuardado = '';
+  let apellidoGuardado = '';
+  for (const h of historial) {
+    if (h.data?.nombre) nombreGuardado = h.data.nombre;
+    if (h.data?.apellido) apellidoGuardado = h.data.apellido;
+  }
+  const identidadCtx = nombreGuardado
+    ? `[Contexto: el paciente ya se identificó como ${nombreGuardado}${apellidoGuardado ? ' ' + apellidoGuardado : ''}. No volver a pedirle el nombre.]`
+    : '';
+
   const msgs = [
+    ...(identidadCtx ? [{ role: 'user' as const, content: identidadCtx }, { role: 'assistant' as const, content: 'Entendido, ya tengo su nombre.' }] : []),
     ...historial.filter(h => h.role !== 'system').slice(-20).map(h => ({ role: h.role, content: String(h.content) })),
     { role: 'user', content: userContent },
   ];
@@ -721,7 +735,10 @@ Solo incluí en "data" los campos relevantes.`;
         const pcs         = pcsRows.find(p => p.profesional_id === profId && p.servicio_id === servId);
         const cobro       = pcs?.cobro_anticipado ?? 'ninguno';
         const hors        = horariosPorPcs[pcs?.id ?? ''] ?? [];
-        const precioTotal = hors[0]?.precio ?? 0;
+        // Buscar precio del día específico del turno (0=dom,1=lun,...,6=sab)
+        const diaTurno    = new Date(`${fecha}T12:00:00`).getDay();
+        const horDia      = hors.find(h => h.dia === diaTurno) ?? hors[0];
+        const precioTotal = horDia?.precio ?? 0;
         // Calcular monto a cobrar según el porcentaje configurado
         const porcentaje  = cobro === '100%' ? 1 : cobro === '50%' ? 0.5 : 0;
         const montoCobro  = Math.round(precioTotal * porcentaje);

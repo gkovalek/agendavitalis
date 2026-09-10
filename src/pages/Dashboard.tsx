@@ -7,7 +7,8 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Plus, Users, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { NuevoTurnoForm } from '@/components/NuevoTurnoForm';
@@ -121,6 +122,7 @@ export default function Dashboard() {
     return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
   });
   const isMobile = useIsMobile();
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -459,8 +461,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-[calc(100vh-56px)] overflow-hidden">
-      {/* ── LEFT PANEL ── */}
-      <aside className="w-[310px] shrink-0 border-r border-border bg-muted/40 flex flex-col gap-3 p-3 overflow-y-auto">
+      {/* ── LEFT PANEL (desktop only) ── */}
+      <aside className="hidden md:flex w-[310px] shrink-0 border-r border-border bg-muted/40 flex-col gap-3 p-3 overflow-y-auto">
         {!esProfesional && (
           <div>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
@@ -551,6 +553,11 @@ export default function Dashboard() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
+            <Button size="sm" variant="outline" className="md:hidden h-8 text-[12px] gap-1 rounded-xl"
+              onClick={() => setFiltrosOpen(true)}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
+            </Button>
             <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[12px] gap-1 rounded-xl btn-primary-glow"
               onClick={() => {
                 const profId = selectedProfId !== 'todos' ? selectedProfId : '';
@@ -878,6 +885,72 @@ export default function Dashboard() {
         onClose={() => setReprogramarTurno(null)}
         onReprogramado={() => { setReprogramarTurno(null); fetchData(); }}
       />
+
+      {/* ── FILTROS SHEET (mobile) ── */}
+      <Sheet open={filtrosOpen} onOpenChange={setFiltrosOpen}>
+        <SheetContent side="left" className="!w-[300px] !p-0 flex flex-col bg-background">
+          <SheetHeader className="px-4 py-3 border-b border-border">
+            <SheetTitle className="text-[14px]">Filtros</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-4 p-4 overflow-y-auto flex-1">
+            {!esProfesional && (
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Profesional</p>
+                <select
+                  value={selectedProfId}
+                  onChange={e => { setSelectedProfId(e.target.value); setMobileColIndex(0); }}
+                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="todos">Todos</option>
+                  {profesionales.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="border border-border rounded-2xl bg-card shadow-sm overflow-hidden">
+              <Calendar mode="single" selected={selectedDate} onSelect={d => { if (d) { setSelectedDate(d); setFiltrosOpen(false); } }} className="w-full" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Filtrar estados</p>
+              <div className="flex flex-col gap-2">
+                {ESTADO_COUNTS_LABELS.map(e => {
+                  const count = estadoResumen[e.key] ?? 0;
+                  const checked = selectedEstados.includes(e.key);
+                  return (
+                    <label key={e.key} className="flex items-center gap-2 cursor-pointer select-none">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={ch => {
+                          if (ch) setSelectedEstados(prev => [...prev, e.key]);
+                          else setSelectedEstados(prev => prev.filter(x => x !== e.key));
+                        }}
+                      />
+                      <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground flex-1">
+                        <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                        {e.label}
+                      </span>
+                      <span className="text-[12px] font-medium text-foreground">{count}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            {selectedProfId !== 'todos' && agendasDelProf.length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Agendas</p>
+                <div className="flex flex-wrap gap-1">
+                  {agendasDelProf.map(a => (
+                    <span key={a.id} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                      {a.nombre}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {contextMenu && (
         <TurnoContextMenu

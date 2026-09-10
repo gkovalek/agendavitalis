@@ -104,7 +104,29 @@
       "name": "Confirmar Turno",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1340, 120]
+      "position": [1340, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{$env[\"TWILIO_ACCOUNT_SID\"]}}/Messages.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Basic {{Buffer.from($env[\"TWILIO_ACCOUNT_SID\"] + ':' + $env[\"TWILIO_AUTH_TOKEN\"]).toString('base64')}}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "=From={{encodeURIComponent($env[\"TWILIO_FROM_WHATSAPP\"])}}&To={{encodeURIComponent($('Parsear Respuesta').first().json.from_raw)}}&Body={{encodeURIComponent('✅ ¡Tu turno está confirmado! Te esperamos. Si necesitás hacer algún cambio, respondé este mensaje.')}}"
+      },
+      "id": "node-msg-confirmado",
+      "name": "Mensaje Confirmado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 80]
     },
     {
       "parameters": {
@@ -138,6 +160,149 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            { "name": "Authorization", "value": "=Basic {{Buffer.from($env[\"TWILIO_ACCOUNT_SID\"] + ':' + $env[\"TWILIO_AUTH_TOKEN\"]).toString('base64')}}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "=From={{encodeURIComponent($env[\"TWILIO_FROM_WHATSAPP\"])}}&To={{encodeURIComponent($('Parsear Respuesta').first().json.from_raw)}}&Body={{encodeURIComponent('❌ Tu turno fue cancelado. Si querés reagendar, respondé con \"reagendar\" y te mostramos los turnos disponibles.')}}"
+      },
+      "id": "node-msg-cancelado",
+      "name": "Mensaje Cancelado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 280]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/turnos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "id,profesional_id,servicio_id,fecha,hora_inicio" },
+            { "name": "id", "value": "=eq.{{$json.turno_id}}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-turno",
+      "name": "Obtener Turno Actual",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/profesional_centro_servicio",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "id,profesionales(nombre,apellido,titulo),servicios(nombre,duracion_minutos)" },
+            { "name": "profesional_id", "value": "=eq.{{$json[0].profesional_id}}" },
+            { "name": "servicio_id", "value": "=eq.{{$json[0].servicio_id}}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-pcs",
+      "name": "Obtener PCS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/pcs_horario_dia",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "dia_semana,hora_inicio,hora_fin" },
+            { "name": "pcs_id", "value": "=eq.{{$json[0].id}}" },
+            { "name": "activo", "value": "=eq.true" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-horarios",
+      "name": "Obtener Horarios",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"SUPABASE_URL\"]}}/rest/v1/turnos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env[\"SUPABASE_SERVICE_KEY\"]}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env[\"SUPABASE_SERVICE_KEY\"]}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "fecha,hora_inicio" },
+            { "name": "profesional_id", "value": "=eq.{{$('Obtener Turno Actual').first().json[0].profesional_id}}" },
+            { "name": "estado", "value": "=neq.cancelado" },
+            { "name": "fecha", "value": "=gte.{{new Date().toISOString().split('T')[0]}}" },
+            { "name": "fecha", "value": "=lte.{{new Date(Date.now() + 14*24*3600*1000).toISOString().split('T')[0]}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-ocupados",
+      "name": "Obtener Turnos Ocupados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recopilar datos de nodos anteriores\nconst turnoActual = $('Obtener Turno Actual').first().json[0];\nconst pcs = $('Obtener PCS').first().json[0];\nconst horarios = $('Obtener Horarios').all().map(i => i.json).flat();\nconst ocupadosRaw = $('Obtener Turnos Ocupados').all().map(i => i.json).flat();\nconst fromRaw = $('Combinar').first().json.from_raw;\n\nif (!turnoActual || !pcs || !horarios.length) {\n  return [{ json: {\n    from_raw: fromRaw,\n    mensaje: '¡Entendido! Para reagendar escribinos directamente: https://wa.me/543624075957?text=Hola%2C+quiero+reagendar+mi+turno'\n  }}];\n}\n\nconst prof = pcs.profesionales;\nconst servicio = pcs.servicios;\nconst duracion = servicio?.duracion_minutos ?? 60;\n\n// Mapa de horarios por día de semana\nconst horarioMap = {};\nfor (const h of horarios) {\n  if (!horarioMap[h.dia_semana]) horarioMap[h.dia_semana] = [];\n  horarioMap[h.dia_semana].push({ inicio: h.hora_inicio, fin: h.hora_fin });\n}\n\n// Set de slots ocupados\nconst ocupados = new Set(ocupadosRaw.map(t => `${t.fecha}T${t.hora_inicio}`));\n\n// Generar slots disponibles en los próximos 14 días (saltando hoy)\nconst slots = [];\nconst hoy = new Date();\nhoy.setHours(0, 0, 0, 0);\n\nfor (let dia = 1; dia <= 14 && slots.length < 5; dia++) {\n  const fecha = new Date(hoy);\n  fecha.setDate(hoy.getDate() + dia);\n  const diaSemana = fecha.getDay(); // 0=domingo\n  const franjas = horarioMap[diaSemana];\n  if (!franjas) continue;\n\n  const yyyy = fecha.getFullYear();\n  const mm = String(fecha.getMonth() + 1).padStart(2, '0');\n  const dd = String(fecha.getDate()).padStart(2, '0');\n  const fechaStr = `${yyyy}-${mm}-${dd}`;\n\n  const diasNombres = ['dom','lun','mar','mié','jue','vie','sáb'];\n  const mesesNombres = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];\n  const fechaLabel = `${diasNombres[diaSemana]} ${dd}/${mesesNombres[fecha.getMonth()]}`;\n\n  for (const franja of franjas) {\n    const [hIni, mIni] = franja.inicio.split(':').map(Number);\n    const [hFin, mFin] = franja.fin.split(':').map(Number);\n    let minutos = hIni * 60 + mIni;\n    const finMinutos = hFin * 60 + mFin;\n\n    while (minutos + duracion <= finMinutos && slots.length < 5) {\n      const hh = String(Math.floor(minutos / 60)).padStart(2, '0');\n      const mn = String(minutos % 60).padStart(2, '0');\n      const horaStr = `${hh}:${mn}:00`;\n      const key = `${fechaStr}T${horaStr}`;\n\n      if (!ocupados.has(key)) {\n        slots.push({ fecha: fechaStr, hora: horaStr, label: `${fechaLabel} a las ${hh}:${mn}` });\n      }\n      minutos += duracion;\n    }\n    if (slots.length >= 5) break;\n  }\n}\n\nconst profNombre = prof ? `${prof.titulo ?? ''} ${prof.nombre} ${prof.apellido}`.trim() : 'el profesional';\nconst servNombre = servicio?.nombre ?? 'la sesión';\n\nlet mensaje;\nif (slots.length === 0) {\n  mensaje = `Hola! 😊 No encontré turnos disponibles en los próximos 14 días con ${profNombre} para ${servNombre}. Escribinos directamente para coordinar: https://wa.me/543624075957`;\n} else {\n  const opciones = slots.map((s, i) => `${i + 1}. ${s.label}`).join('\\n');\n  mensaje = `Hola! 😊 Estos son los próximos turnos disponibles con ${profNombre} para ${servNombre}:\\n\\n${opciones}\\n\\nRespondé con el número de la opción que preferís y lo agendamos.`;\n}\n\nreturn [{ json: { from_raw: fromRaw, mensaje, slots } }];"
+      },
+      "id": "node-calc-slots",
+      "name": "Calcular Slots Disponibles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{$env[\"TWILIO_ACCOUNT_SID\"]}}/Messages.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
               "name": "Authorization",
               "value": "=Basic {{Buffer.from($env[\"TWILIO_ACCOUNT_SID\"] + ':' + $env[\"TWILIO_AUTH_TOKEN\"]).toString('base64')}}"
@@ -148,14 +313,14 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/x-www-form-urlencoded",
-        "body": "=From={{encodeURIComponent($env[\"TWILIO_FROM_WHATSAPP\"])}}&To={{encodeURIComponent($json.from_raw)}}&Body={{encodeURIComponent('¡Entendido! Podés escribirnos directamente para reagendar: https://wa.me/543624075957?text=Hola%2C+quiero+reagendar+mi+turno')}}",
+        "body": "=From={{encodeURIComponent($env[\"TWILIO_FROM_WHATSAPP\"])}}&To={{encodeURIComponent($json.from_raw)}}&Body={{encodeURIComponent($json.mensaje)}}",
         "options": {}
       },
-      "id": "node-reagendar",
-      "name": "Responder Reagendar",
+      "id": "node-twilio-reagendar",
+      "name": "Enviar Opciones Reagendar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1340, 440]
+      "position": [2440, 480]
     },
     {
       "parameters": {
@@ -169,7 +334,7 @@
       "name": "Responder Twilio",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1560, 280]
+      "position": [2660, 300]
     }
   ],
   "connections": {
@@ -189,17 +354,38 @@
       "main": [
         [{ "node": "Confirmar Turno", "type": "main", "index": 0 }],
         [{ "node": "Cancelar Turno", "type": "main", "index": 0 }],
-        [{ "node": "Responder Reagendar", "type": "main", "index": 0 }],
+        [{ "node": "Obtener Turno Actual", "type": "main", "index": 0 }],
         []
       ]
     },
     "Confirmar Turno": {
+      "main": [[{ "node": "Mensaje Confirmado", "type": "main", "index": 0 }]]
+    },
+    "Mensaje Confirmado": {
       "main": [[{ "node": "Responder Twilio", "type": "main", "index": 0 }]]
     },
     "Cancelar Turno": {
+      "main": [[{ "node": "Mensaje Cancelado", "type": "main", "index": 0 }]]
+    },
+    "Mensaje Cancelado": {
       "main": [[{ "node": "Responder Twilio", "type": "main", "index": 0 }]]
     },
-    "Responder Reagendar": {
+    "Obtener Turno Actual": {
+      "main": [[{ "node": "Obtener PCS", "type": "main", "index": 0 }]]
+    },
+    "Obtener PCS": {
+      "main": [[{ "node": "Obtener Horarios", "type": "main", "index": 0 }]]
+    },
+    "Obtener Horarios": {
+      "main": [[{ "node": "Obtener Turnos Ocupados", "type": "main", "index": 0 }]]
+    },
+    "Obtener Turnos Ocupados": {
+      "main": [[{ "node": "Calcular Slots Disponibles", "type": "main", "index": 0 }]]
+    },
+    "Calcular Slots Disponibles": {
+      "main": [[{ "node": "Enviar Opciones Reagendar", "type": "main", "index": 0 }]]
+    },
+    "Enviar Opciones Reagendar": {
       "main": [[{ "node": "Responder Twilio", "type": "main", "index": 0 }]]
     }
   },

@@ -1,0 +1,277 @@
+{
+  "name": "Asistente WhatsApp - Vitalis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wa-asistente",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook Evolution",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 300],
+      "webhookId": "vitalis-wa-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.body;\nconst event = raw?.event;\nif (!raw?.data || event !== 'messages.upsert') {\n  return [{ json: { skip: true, reason: 'not_message', event } }];\n}\nconst msgKey = raw.data.key || {};\nif (msgKey.fromMe) return [{ json: { skip: true, reason: 'fromMe' } }];\nconst remoteJid = msgKey.remoteJid || '';\nif (remoteJid.endsWith('@g.us')) return [{ json: { skip: true, reason: 'group' } }];\nconst status = raw.data.status;\nif (status && status !== 'PENDING') {\n  return [{ json: { skip: true, reason: 'duplicate_status', status } }];\n}\nconst TIPOS = ['conversation','extendedTextMessage','audioMessage','imageMessage','documentMessage','documentWithCaptionMessage'];\nconst messageType_raw = raw.data.messageType || '';\nif (!TIPOS.includes(messageType_raw)) {\n  return [{ json: { skip: true, reason: 'type_ignored', messageType_raw } }];\n}\nconst msgObj = raw.data.message || {};\nconst celular = remoteJid.replace(/@.+/, '');\nconst base = { skip: false, jid: remoteJid, celular, numberToSend: remoteJid,\n  pushName: raw.data.pushName || '', msgId: msgKey.id || '',\n  messageType_raw, msgKey, msgObj, centro_id: 'a1b2c3d4-0000-0000-0000-000000000001' };\nif (messageType_raw === 'conversation') {\n  const userText = msgObj.conversation || '';\n  if (!userText.trim()) return [{ json: { skip: true, reason: 'empty' } }];\n  return [{ json: { ...base, tipo: 'text', userText, msgKey: undefined, msgObj: undefined } }];\n}\nif (messageType_raw === 'extendedTextMessage') {\n  const userText = msgObj.extendedTextMessage?.text || '';\n  if (!userText.trim()) return [{ json: { skip: true, reason: 'empty' } }];\n  return [{ json: { ...base, tipo: 'text', userText, msgKey: undefined, msgObj: undefined } }];\n}\nif (messageType_raw === 'audioMessage') {\n  return [{ json: { ...base, tipo: 'audio', userText: '' } }];\n}\nif (messageType_raw === 'imageMessage') {\n  const caption = msgObj.imageMessage?.caption || '';\n  return [{ json: { ...base, tipo: 'image', userText: caption ? `[Imagen] ${caption}` : '[Imagen recibida]', caption } }];\n}\nif (messageType_raw === 'documentMessage' || messageType_raw === 'documentWithCaptionMessage') {\n  const docMsg = msgObj.documentMessage || {};\n  const caption = docMsg.caption || '';\n  const fileName = docMsg.fileName || 'documento';\n  return [{ json: { ...base, tipo: 'document', userText: `[Documento: ${fileName}] ${caption}`.trim(), fileName } }];\n}\nreturn [{ json: { skip: true, reason: 'unhandled', messageType_raw } }];"
+      },
+      "id": "node-parsear",
+      "name": "Parsear Mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.tipo }}", "operation": "equal", "value2": "text" }
+          ]
+        }
+      },
+      "id": "node-if-text",
+      "name": "Es Texto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [440, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.tipo }}", "operation": "equal", "value2": "audio" }
+          ]
+        }
+      },
+      "id": "node-if-audio",
+      "name": "Es Audio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.tipo }}", "operation": "equal", "value2": "image" }
+          ]
+        }
+      },
+      "id": "node-if-image",
+      "name": "Es Imagen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [440, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $input.first().json;\nreturn [{ json: {\n  celular: p.celular,\n  numberToSend: p.numberToSend,\n  pushName: p.pushName,\n  jid: p.jid,\n  msgId: p.msgId,\n  centro_id: p.centro_id,\n  tipo: 'text',\n  userText: p.userText,\n  imageBase64: null,\n  documentBase64: null\n}}];"
+      },
+      "id": "node-payload-text",
+      "name": "Payload Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://72.61.58.46:8080/chat/getBase64FromMediaMessage/Vitalis_secretaria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "apikey", "value": "MiClaveSecreta2026" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ message: { key: $json.msgKey, message: $json.msgObj }, convertToMp4: false }) }}",
+        "options": {}
+      },
+      "id": "node-dl-audio",
+      "name": "Descargar Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [660, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "Bearer REEMPLAZAR_OPENAI_API_KEY" }]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "whisper-1" },
+            { "name": "language", "value": "es" },
+            { "name": "response_format", "value": "json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-whisper",
+      "name": "Whisper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [880, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const whisperOut = $input.first().json;\nconst transcripcion = whisperOut.text || '[No se pudo transcribir]';\nconst parsed = $('Parsear Mensaje').first().json;\nreturn [{ json: {\n  celular: parsed.celular,\n  numberToSend: parsed.numberToSend,\n  pushName: parsed.pushName,\n  jid: parsed.jid,\n  msgId: parsed.msgId,\n  centro_id: parsed.centro_id,\n  tipo: 'audio',\n  userText: '[Audio transcripto]: ' + transcripcion,\n  imageBase64: null,\n  documentBase64: null\n}}];"
+      },
+      "id": "node-payload-audio",
+      "name": "Payload Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://72.61.58.46:8080/chat/getBase64FromMediaMessage/Vitalis_secretaria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "apikey", "value": "MiClaveSecreta2026" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ message: { key: $json.msgKey, message: $json.msgObj }, convertToMp4: false }) }}",
+        "options": {}
+      },
+      "id": "node-dl-image",
+      "name": "Descargar Imagen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [660, 580]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b64 = $input.first().json.base64 || '';\nconst parsed = $('Parsear Mensaje').first().json;\nreturn [{ json: {\n  celular: parsed.celular,\n  numberToSend: parsed.numberToSend,\n  pushName: parsed.pushName,\n  jid: parsed.jid,\n  msgId: parsed.msgId,\n  centro_id: parsed.centro_id,\n  tipo: 'image',\n  userText: parsed.userText,\n  imageBase64: b64,\n  documentBase64: null\n}}];"
+      },
+      "id": "node-payload-image",
+      "name": "Payload Imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 580]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parsear Mensaje').first().json;\nreturn [{ json: {\n  celular: parsed.celular,\n  numberToSend: parsed.numberToSend,\n  pushName: parsed.pushName,\n  jid: parsed.jid,\n  msgId: parsed.msgId,\n  centro_id: parsed.centro_id,\n  tipo: 'document',\n  userText: parsed.userText,\n  fileName: parsed.fileName || 'documento',\n  imageBase64: null,\n  documentBase64: null\n}}];"
+      },
+      "id": "node-payload-doc",
+      "name": "Payload Documento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 780]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "first"
+      },
+      "id": "node-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1320, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gsmrccofuegcmujycydd.supabase.co/functions/v1/wa-asistente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REEMPLAZAR_SUPABASE_ANON_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ celular: $json.celular, userText: $json.userText, imageBase64: $json.imageBase64, documentBase64: $json.documentBase64, centro_id: $json.centro_id }) }}",
+        "options": {}
+      },
+      "id": "node-ef-ia",
+      "name": "Edge Function IA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1540, 380]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node-respond",
+      "name": "Responder 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1760, 380]
+    }
+  ],
+  "connections": {
+    "Webhook Evolution": {
+      "main": [[{ "node": "Parsear Mensaje", "type": "main", "index": 0 }]]
+    },
+    "Parsear Mensaje": {
+      "main": [
+        [{ "node": "Es Texto?", "type": "main", "index": 0 }],
+        [{ "node": "Es Audio?", "type": "main", "index": 0 }],
+        [{ "node": "Es Imagen?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Es Texto?": {
+      "main": [
+        [{ "node": "Payload Texto", "type": "main", "index": 0 }],
+        [{ "node": "Es Audio?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Es Audio?": {
+      "main": [
+        [{ "node": "Descargar Audio", "type": "main", "index": 0 }],
+        [{ "node": "Es Imagen?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Es Imagen?": {
+      "main": [
+        [{ "node": "Descargar Imagen", "type": "main", "index": 0 }],
+        [{ "node": "Payload Documento", "type": "main", "index": 0 }]
+      ]
+    },
+    "Payload Texto": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+    },
+    "Descargar Audio": {
+      "main": [[{ "node": "Whisper", "type": "main", "index": 0 }]]
+    },
+    "Whisper": {
+      "main": [[{ "node": "Payload Audio", "type": "main", "index": 0 }]]
+    },
+    "Payload Audio": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 1 }]]
+    },
+    "Descargar Imagen": {
+      "main": [[{ "node": "Payload Imagen", "type": "main", "index": 0 }]]
+    },
+    "Payload Imagen": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 2 }]]
+    },
+    "Payload Documento": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 3 }]]
+    },
+    "Merge": {
+      "main": [[{ "node": "Edge Function IA", "type": "main", "index": 0 }]]
+    },
+    "Edge Function IA": {
+      "main": [[{ "node": "Responder 200", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

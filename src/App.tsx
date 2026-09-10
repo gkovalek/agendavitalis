@@ -40,6 +40,8 @@ const Registro = lazy(() => import("@/pages/Registro"));
 const SuscripcionVencida = lazy(() => import("@/pages/SuscripcionVencida"));
 const SuperAdmin = lazy(() => import("@/pages/admin/SuperAdmin"));
 const Ayuda = lazy(() => import("@/pages/Ayuda"));
+const PoliticaPrivacidad = lazy(() => import("@/pages/PoliticaPrivacidad"));
+const Terminos = lazy(() => import("@/pages/Terminos"));
 
 const queryClient = new QueryClient();
 
@@ -131,6 +133,8 @@ function AppRoutes() {
         <Route path="/landing" element={<Landing />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/suscripcion-vencida" element={<SuscripcionVencida />} />
+        <Route path="/politica-privacidad" element={<PoliticaPrivacidad />} />
+        <Route path="/terminos" element={<Terminos />} />
 
         {/* Rutas protegidas */}
         <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <Landing />} />
