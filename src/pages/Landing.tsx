@@ -362,7 +362,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <VitalisLogo variant="landing" />
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <span>© {new Date().getFullYear()} Vitalis. Gestión que impulsa tu centro.</span>
+            <span>© {new Date().getFullYear()} Vitalis. Gestión que impulsa tu centro. Servicio prestado por <strong>Kovalek, Gerardo Omar</strong> · CUIT 20-36019867-8</span>
             <span className="hidden sm:inline">·</span>
             <a href="/politica-privacidad" className="hover:text-[#00ADBB] transition-colors">Política de Privacidad</a>
             <span className="hidden sm:inline">·</span>

@@ -18,13 +18,26 @@ export default function Terminos() {
             <p className="text-gray-500 text-sm mt-1">Última actualización: 1 de septiembre de 2026</p>
           </div>
 
-          <Section title="1. Aceptación de los términos">
+          <Section title="1. Identificación del responsable">
+            <p>
+              La plataforma Vitalis (<strong>agendavitalis.app</strong>) es un servicio prestado por:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li><strong>Razón social:</strong> Kovalek, Gerardo Omar</li>
+              <li><strong>CUIT:</strong> 20-36019867-8</li>
+              <li><strong>Domicilio comercial:</strong> Santa Fe 388, Resistencia, Chaco, Argentina (CP 3500)</li>
+              <li><strong>Actividad:</strong> Servicios de asesoramiento, dirección y gestión empresarial / Servicios de rehabilitación física</li>
+              <li><strong>Contacto:</strong> info@agendavitalis.com</li>
+            </ul>
+          </Section>
+
+          <Section title="2. Aceptación de los términos">
             <p>
               Al acceder y utilizar la plataforma Vitalis (<strong>agendavitalis.app</strong>), aceptás los presentes Términos y Condiciones. Si no estás de acuerdo con alguno de estos términos, no utilices la plataforma.
             </p>
           </Section>
 
-          <Section title="2. Descripción del servicio">
+          <Section title="3. Descripción del servicio">
             <p>
               Vitalis es una plataforma SaaS (Software como Servicio) de gestión para centros de salud que incluye:
             </p>
@@ -38,14 +51,14 @@ export default function Terminos() {
             </ul>
           </Section>
 
-          <Section title="3. Registro y cuenta">
+          <Section title="4. Registro y cuenta">
             <p>
               Para utilizar la plataforma, el centro de salud debe registrarse proporcionando información veraz y actualizada. El usuario es responsable de mantener la confidencialidad de sus credenciales de acceso y de todas las actividades realizadas desde su cuenta.
             </p>
             <p>Vitalis se reserva el derecho de suspender o cancelar cuentas que violen estos términos.</p>
           </Section>
 
-          <Section title="4. Planes y pagos">
+          <Section title="5. Planes y pagos">
             <p>
               El acceso a Vitalis está sujeto al pago de una suscripción mensual o semestral según el plan elegido (Starter, Profesional o Premium). Los precios vigentes se informan en <Link to="/landing#precios" className="text-[#00ADBB] hover:underline">agendavitalis.app/landing</Link>.
             </p>
@@ -57,7 +70,7 @@ export default function Terminos() {
             </ul>
           </Section>
 
-          <Section title="5. Datos de pacientes y responsabilidad">
+          <Section title="6. Datos de pacientes y responsabilidad">
             <p>
               El centro de salud es responsable como "responsable del tratamiento" de los datos personales de sus pacientes ingresados en la plataforma, conforme a la Ley 25.326 de Protección de Datos Personales de Argentina.
             </p>
@@ -66,7 +79,7 @@ export default function Terminos() {
             </p>
           </Section>
 
-          <Section title="6. Uso aceptable">
+          <Section title="7. Uso aceptable">
             <p>El usuario se compromete a no:</p>
             <ul className="list-disc pl-6 space-y-1">
               <li>Utilizar la plataforma para actividades ilegales o no autorizadas.</li>
@@ -77,26 +90,26 @@ export default function Terminos() {
             </ul>
           </Section>
 
-          <Section title="7. Disponibilidad del servicio">
+          <Section title="8. Disponibilidad del servicio">
             <p>
               Vitalis se compromete a mantener una disponibilidad del servicio del 99% mensual. Podrán realizarse interrupciones programadas para mantenimiento, con aviso previo siempre que sea posible.
             </p>
             <p>No garantizamos disponibilidad ininterrumpida en casos de fuerza mayor, fallas de terceros proveedores o causas fuera de nuestro control.</p>
           </Section>
 
-          <Section title="8. Propiedad intelectual">
+          <Section title="9. Propiedad intelectual">
             <p>
               Todos los derechos de propiedad intelectual sobre la plataforma Vitalis, incluyendo código fuente, diseño, marca y contenidos propios, son propiedad exclusiva de Vitalis. El uso de la plataforma no otorga al usuario ningún derecho sobre dichos elementos.
             </p>
           </Section>
 
-          <Section title="9. Limitación de responsabilidad">
+          <Section title="10. Limitación de responsabilidad">
             <p>
               Vitalis no será responsable por daños indirectos, incidentales, especiales o consecuentes derivados del uso o la imposibilidad de uso de la plataforma. La responsabilidad total de Vitalis frente al cliente no superará el monto abonado en los últimos 3 meses de servicio.
             </p>
           </Section>
 
-          <Section title="10. Cancelación del servicio">
+          <Section title="11. Cancelación del servicio">
             <p>
               El usuario puede cancelar su suscripción en cualquier momento contactando a <a href="mailto:info@agendavitalis.app" className="text-[#00ADBB] hover:underline">info@agendavitalis.app</a>. La cuenta permanecerá activa hasta el final del período abonado.
             </p>
@@ -105,19 +118,19 @@ export default function Terminos() {
             </p>
           </Section>
 
-          <Section title="11. Modificaciones">
+          <Section title="12. Modificaciones">
             <p>
               Vitalis se reserva el derecho de modificar estos Términos y Condiciones. Los cambios significativos serán notificados con al menos 15 días de anticipación. El uso continuado de la plataforma tras la notificación implica la aceptación de los nuevos términos.
             </p>
           </Section>
 
-          <Section title="12. Ley aplicable y jurisdicción">
+          <Section title="13. Ley aplicable y jurisdicción">
             <p>
               Estos términos se rigen por las leyes de la República Argentina. Para cualquier controversia, las partes se someten a la jurisdicción de los tribunales ordinarios de la Ciudad de Buenos Aires.
             </p>
           </Section>
 
-          <Section title="13. Contacto">
+          <Section title="14. Contacto">
             <p>
               Para consultas sobre estos términos: <a href="mailto:info@agendavitalis.app" className="text-[#00ADBB] hover:underline">info@agendavitalis.app</a>
             </p>
