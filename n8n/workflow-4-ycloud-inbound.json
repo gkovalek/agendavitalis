@@ -1,0 +1,249 @@
+{
+  "name": "Vitalis - YCloud Inbound con Media (Dual Agent)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ycloud-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-wh-ycloud",
+      "name": "Webhook YCloud",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear evento de YCloud (whatsapp.inbound_message.received)\nconst body = $input.first().json.body ?? $input.first().json;\n\n// Solo procesar mensajes entrantes\nif (body.type !== 'whatsapp.inbound_message.received') return [];\n\nconst msg = body.whatsappInboundMessage ?? {};\n\n// Ignorar si no hay remitente\nif (!msg.from) return [];\n\nconst celular = msg.from; // formato E.164: 549XXXXXXXXXX\nconst tipo = msg.type ?? 'text';\n\nlet messageType = 'text';\nlet userText = '';\nlet mediaUrl = null;\nlet mediaMime = null;\nlet mediaName = null;\n\nif (tipo === 'text') {\n  messageType = 'text';\n  userText = msg.text?.body ?? '';\n} else if (tipo === 'image') {\n  messageType = 'image';\n  mediaUrl = msg.image?.link ?? null;\n  mediaMime = msg.image?.mime_type ?? 'image/jpeg';\n  userText = '[El paciente envió una imagen]';\n} else if (tipo === 'audio') {\n  messageType = 'audio';\n  mediaUrl = msg.audio?.link ?? null;\n  mediaMime = msg.audio?.mime_type ?? 'audio/mpeg';\n} else if (tipo === 'document') {\n  messageType = 'document';\n  mediaUrl = msg.document?.link ?? null;\n  mediaMime = msg.document?.mime_type ?? 'application/pdf';\n  mediaName = msg.document?.filename ?? 'documento';\n  userText = `[El paciente envió un documento: ${mediaName}]`;\n} else if (tipo === 'video') {\n  messageType = 'text';\n  userText = '[El paciente envió un video — consultame por texto o imagen]';\n} else {\n  return [];\n}\n\nif (!userText && messageType === 'text') return [];\n\nreturn [{ json: { celular, messageType, userText, mediaUrl, mediaMime, mediaName } }];"
+      },
+      "id": "node-parse",
+      "name": "Parsear Mensaje YCloud",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [{ "id": "1", "leftValue": "={{ $json.messageType }}", "rightValue": "text", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [{ "id": "2", "leftValue": "={{ $json.messageType }}", "rightValue": "audio", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [{ "id": "3", "leftValue": "={{ $json.messageType }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [{ "id": "4", "leftValue": "={{ $json.messageType }}", "rightValue": "document", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-switch",
+      "name": "Tipo de mensaje",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.mediaUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-API-Key", "value": "={{ $env['YCLOUD_API_KEY'] }}" }]
+        },
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "node-dl-audio",
+      "name": "Descargar Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst binaryData = item.binary?.data;\nif (!binaryData) return [];\nconst prev = $node['Parsear Mensaje YCloud'].json;\nconst base64 = binaryData.data;\nconst mime = prev.mediaMime ?? 'audio/mpeg';\nreturn [{ json: { celular: prev.celular, audioBase64: base64, audioMimetype: mime } }];"
+      },
+      "id": "node-prep-audio",
+      "name": "Preparar Audio GPT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env['SUPABASE_URL'] }}/functions/v1/wa-asistente-audio",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ celular: $json.celular, audioBase64: $json.audioBase64, audioMimetype: $json.audioMimetype }) }}",
+        "options": {}
+      },
+      "id": "node-wa-audio",
+      "name": "wa-asistente-audio (GPT-4o)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 160]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.mediaUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-API-Key", "value": "={{ $env['YCLOUD_API_KEY'] }}" }]
+        },
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "node-dl-image",
+      "name": "Descargar Imagen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst binaryData = item.binary?.data;\nif (!binaryData) return [];\nconst prev = $node['Parsear Mensaje YCloud'].json;\nconst base64 = binaryData.data;\nconst mime = prev.mediaMime ?? 'image/jpeg';\nreturn [{ json: { celular: prev.celular, userText: '[El paciente envió una imagen]', messageType: 'image', imageBase64: base64, imageMimetype: mime } }];"
+      },
+      "id": "node-image-result",
+      "name": "Preparar Imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 320]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.mediaUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-API-Key", "value": "={{ $env['YCLOUD_API_KEY'] }}" }]
+        },
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "node-dl-doc",
+      "name": "Descargar Documento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst binaryData = item.binary?.data;\nif (!binaryData) return [];\nconst prev = $node['Parsear Mensaje YCloud'].json;\nconst base64 = binaryData.data;\nconst mime = prev.mediaMime ?? 'application/pdf';\nconst nombre = prev.mediaName ?? 'documento';\nreturn [{ json: { celular: prev.celular, userText: `[El paciente envió un documento: ${nombre}]`, messageType: 'document', documentBase64: base64, documentMimetype: mime, documentName: nombre } }];"
+      },
+      "id": "node-doc-result",
+      "name": "Preparar Documento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env['SUPABASE_URL'] }}/functions/v1/wa-asistente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ celular: $json.celular, userText: $json.userText, messageType: $json.messageType, imageBase64: $json.imageBase64 ?? undefined, imageMimetype: $json.imageMimetype ?? undefined, documentBase64: $json.documentBase64 ?? undefined, documentMimetype: $json.documentMimetype ?? undefined, documentName: $json.documentName ?? undefined }) }}",
+        "options": {}
+      },
+      "id": "node-wa-asistente",
+      "name": "wa-asistente (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 360],
+      "notes": "Claude procesa texto, imágenes y documentos PDF"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\": true}",
+        "options": {}
+      },
+      "id": "node-respond",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1520, 300]
+    }
+  ],
+  "connections": {
+    "Webhook YCloud": {
+      "main": [[{ "node": "Parsear Mensaje YCloud", "type": "main", "index": 0 }]]
+    },
+    "Parsear Mensaje YCloud": {
+      "main": [[{ "node": "Tipo de mensaje", "type": "main", "index": 0 }]]
+    },
+    "Tipo de mensaje": {
+      "main": [
+        [{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Audio", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Imagen", "type": "main", "index": 0 }],
+        [{ "node": "Descargar Documento", "type": "main", "index": 0 }]
+      ]
+    },
+    "Descargar Audio": {
+      "main": [[{ "node": "Preparar Audio GPT", "type": "main", "index": 0 }]]
+    },
+    "Preparar Audio GPT": {
+      "main": [[{ "node": "wa-asistente-audio (GPT-4o)", "type": "main", "index": 0 }]]
+    },
+    "wa-asistente-audio (GPT-4o)": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    },
+    "Descargar Imagen": {
+      "main": [[{ "node": "Preparar Imagen", "type": "main", "index": 0 }]]
+    },
+    "Preparar Imagen": {
+      "main": [[{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }]]
+    },
+    "Descargar Documento": {
+      "main": [[{ "node": "Preparar Documento", "type": "main", "index": 0 }]]
+    },
+    "Preparar Documento": {
+      "main": [[{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }]]
+    },
+    "wa-asistente (Claude)": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

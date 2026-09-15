@@ -13,11 +13,10 @@ serve(async (req) => {
     });
   }
 
-  const EVOLUTION_URL = Deno.env.get('EVOLUTION_URL');
-  const EVOLUTION_KEY = Deno.env.get('EVOLUTION_KEY');
-  const EVOLUTION_INST = Deno.env.get('EVOLUTION_INSTANCE');
+  const YCLOUD_API_KEY = Deno.env.get('YCLOUD_API_KEY');
+  const YCLOUD_FROM = Deno.env.get('YCLOUD_FROM'); // número del negocio en E.164
 
-  if (!EVOLUTION_URL || !EVOLUTION_KEY || !EVOLUTION_INST) {
+  if (!YCLOUD_API_KEY || !YCLOUD_FROM) {
     return new Response(JSON.stringify({ ok: false, error: 'missing_env_vars' }), {
       status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
@@ -32,10 +31,10 @@ serve(async (req) => {
     });
   }
 
-  const res = await fetch(`${EVOLUTION_URL}/message/sendText/${EVOLUTION_INST}`, {
+  const res = await fetch('https://api.ycloud.com/v2/whatsapp/messages/sendDirectly', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_KEY },
-    body: JSON.stringify({ number, text }),
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': YCLOUD_API_KEY },
+    body: JSON.stringify({ from: YCLOUD_FROM, to: number, type: 'text', text: { body: text } }),
   });
 
   if (!res.ok) {
