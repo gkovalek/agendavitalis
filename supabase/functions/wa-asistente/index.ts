@@ -845,6 +845,30 @@ Solo incluí en "data" los campos relevantes.`;
         const horaInicio = hora.length === 5 ? `${hora}:00` : hora;
         const horaFin    = toTime(finMin);
 
+        // Guard: no crear turno duplicado si ya existe uno activo para este paciente/prof/fecha/hora
+        const { data: existingTurno } = await sb
+          .from('turnos')
+          .select('id, estado')
+          .eq('centro_id', centro_id)
+          .eq('profesional_id', profId)
+          .eq('paciente_id', pacienteId)
+          .eq('fecha', fecha)
+          .eq('hora_inicio', horaInicio)
+          .in('estado', ['pendiente_pago', 'reservado', 'confirmado'])
+          .maybeSingle();
+
+        if (existingTurno) {
+          if (existingTurno.estado === 'confirmado' || existingTurno.estado === 'reservado') {
+            finalReply = `✅ Ya tenés un turno registrado para el ${fecha} a las ${hora}. ¡Te esperamos!`;
+          } else {
+            finalReply = `Ya tenés un turno pendiente de pago para el ${fecha} a las ${hora}. Si el link de pago venció, contactá directamente al centro.`;
+          }
+          action = 'message';
+          // saltar INSERT
+          // eslint-disable-next-line no-throw-literal
+          throw { _duplicate: true, message: 'turno duplicado, skip insert' };
+        }
+
         const { data: turno, error: turnoError } = await sb
           .from('turnos')
           .insert({
@@ -904,8 +928,11 @@ Solo incluí en "data" los campos relevantes.`;
           }
         }
       } catch (e: any) {
-        await logError(centro_id, 'wa-asistente/book_turno', e.message, { celular, aData });
-        finalReply = 'Hubo un problema al registrar el turno. Contactá directamente al centro para confirmarlo.';
+        if (e._duplicate) { /* turno duplicado — finalReply ya fue seteado arriba */ }
+        else {
+          await logError(centro_id, 'wa-asistente/book_turno', e.message, { celular, aData });
+          finalReply = 'Hubo un problema al registrar el turno. Contactá directamente al centro para confirmarlo.';
+        }
       }
     }
   }
