@@ -406,7 +406,9 @@ async function procesarMensaje(params: {
   // ─── Cargar contexto completo (paralelo) ─────────────────────────────────────
   const profIds: string[] = [];
 
-  const [centroRes, profesRes, servRes, faqRes, pcsRes, pcsHorarioRes] = await Promise.all([
+  const hoy = new Date().toISOString().split('T')[0];
+
+  const [centroRes, profesRes, servRes, faqRes, pcsRes, pcsHorarioRes, turnoActivoRes] = await Promise.all([
     sb.from('centros').select('id,nombre,mp_user_id').eq('id', centro_id).single(),
     sb.from('profesionales').select('id,titulo,nombre,apellido,mp_user_id').eq('centro_id', centro_id).eq('activo', true),
     sb.from('servicios').select('id,nombre,duracion_minutos').eq('centro_id', centro_id).eq('activo', true),
@@ -419,6 +421,18 @@ async function procesarMensaje(params: {
       .select('pcs_id,dia_semana,hora_inicio,hora_fin,acepta_os,precio_particular,activo')
       .eq('centro_id', centro_id)
       .eq('activo', true),
+    // Turno activo del paciente: para saber si tiene un pendiente_pago/reservado/confirmado
+    conv?.paciente_id
+      ? sb.from('turnos')
+          .select('id,estado,fecha,hora_inicio,profesional_id,servicio_id,pago_expira_at')
+          .eq('centro_id', centro_id)
+          .eq('paciente_id', conv.paciente_id)
+          .gte('fecha', hoy)
+          .in('estado', ['pendiente_pago', 'reservado', 'confirmado'])
+          .order('fecha', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const centro      = centroRes.data   ?? {};
@@ -427,6 +441,7 @@ async function procesarMensaje(params: {
   const faqs        = faqRes.data      ?? [];
   const pcsRows     = pcsRes.data      ?? [];
   const pcsHorarios = pcsHorarioRes.data ?? [];
+  const turnoActivo = turnoActivoRes.data ?? null;
 
   // Cargar FAQs específicas por profesional y servicio (en paralelo)
   const profIdsList = profs.map((p: any) => p.id);
@@ -621,6 +636,21 @@ Ejemplos de respuesta correcta:
 
 NUNCA menciones valor_sesion ni aranceles internos.
 
+═══ ESTADO DE PAGO / TURNO ACTIVO ═══
+${turnoActivo
+  ? `⚠️ ESTE PACIENTE YA TIENE UN TURNO ACTIVO:
+  Estado: ${turnoActivo.estado}
+  Fecha: ${turnoActivo.fecha} | Hora: ${(turnoActivo.hora_inicio ?? '').slice(0,5)}
+  Turno ID: ${turnoActivo.id}
+
+REGLAS SEGÚN EL ESTADO:
+- Si estado="confirmado" → el pago ya fue acreditado. Responder: "✅ Tu turno del ${turnoActivo.fecha} a las ${(turnoActivo.hora_inicio ?? '').slice(0,5)} ya está confirmado. ¡Te esperamos!" — action "message"
+- Si estado="reservado" → el turno está agendado (sin cobro anticipado). Responder confirmando. — action "message"
+- Si estado="pendiente_pago" → el pago aún NO fue acreditado en el sistema. Si el paciente dice que pagó ("listo", "pagué", "ya pagué", "realicé el pago", "lo hice", "ya", "hecho", etc.) → emitir action "check_payment_status" (NO book_turno). El sistema va a verificar el estado real del pago en la base de datos.
+- NUNCA emitas "book_turno" si el paciente ya tiene un turno pendiente_pago — siempre usar "check_payment_status" cuando indique que pagó.`
+  : '(el paciente no tiene turnos activos próximos en el sistema)'
+}
+
 ═══ CASOS ESPECIALES ═══
 - Si el paciente manda una imagen, audio o archivo que no pude procesar: "Por ahora solo puedo leer texto. ¿En qué te puedo ayudar?"
 - Si no podés resolver la consulta con la info disponible → action "escalate"
@@ -629,11 +659,12 @@ NUNCA menciones valor_sesion ni aranceles internos.
 FECHA/HORA ACTUAL (Buenos Aires): ${now}
 
 RESPONDÉ ÚNICAMENTE con JSON válido (sin markdown):
-{"action":"message|check_slots|book_turno|cancel_turno|reagendar|escalate","reply":"texto para el paciente","data":{"profesional_id":"uuid","servicio_id":"uuid","fecha":"YYYY-MM-DD","hora":"HH:MM","nombre":"...","apellido":"...","dni":"..."}}
+{"action":"message|check_slots|book_turno|cancel_turno|reagendar|check_payment_status|escalate","reply":"texto para el paciente","data":{"profesional_id":"uuid","servicio_id":"uuid","fecha":"YYYY-MM-DD","hora":"HH:MM","nombre":"...","apellido":"...","dni":"..."}}
 
 OBLIGATORIO en "data" para book_turno: nombre, apellido, dni, profesional_id, servicio_id, fecha, hora.
 OBLIGATORIO en "data" para cancel_turno/reagendar: dni (para identificar al paciente).
 Para check_slots: incluí profesional_id, servicio_id y fecha.
+Para check_payment_status: no hace falta data, el sistema busca el turno activo del paciente.
 Solo incluí en "data" los campos relevantes.`;
 
   // ─── Mensajes para Claude ────────────────────────────────────────────────────
@@ -788,6 +819,35 @@ Solo incluí en "data" los campos relevantes.`;
       const ai2  = parsearRespuestaClaude(raw2);
       if (ai2.reply) finalReply = ai2.reply;
       if (ai2.action) { action = ai2.action; aData = { ...aData, ...ai2.data }; }
+    }
+  }
+
+  // ── check_payment_status: verifica si el pago ya impactó en DB ──────────────
+  if (action === 'check_payment_status') {
+    if (conv?.paciente_id) {
+      const { data: turnoFresh } = await sb
+        .from('turnos')
+        .select('id,estado,fecha,hora_inicio')
+        .eq('centro_id', centro_id)
+        .eq('paciente_id', conv.paciente_id)
+        .gte('fecha', hoy)
+        .in('estado', ['pendiente_pago', 'reservado', 'confirmado'])
+        .order('fecha', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (!turnoFresh) {
+        finalReply = 'No encontré turnos activos para vos. Si querés sacar uno, con gusto te ayudo.';
+      } else if (turnoFresh.estado === 'confirmado' || turnoFresh.estado === 'reservado') {
+        finalReply = `✅ ¡Tu pago fue acreditado! El turno del ${turnoFresh.fecha} a las ${(turnoFresh.hora_inicio ?? '').slice(0,5)} ya está confirmado. ¡Te esperamos!`;
+      } else {
+        // pendiente_pago — el webhook aún no llegó
+        finalReply = `Todavía no veo el pago acreditado en el sistema. A veces tarda unos minutos en procesarse. Si ya realizaste el pago, esperá unos minutos y escribinos nuevamente. Si seguís teniendo problemas, contactanos directamente.`;
+      }
+      action = 'message';
+    } else {
+      finalReply = 'No tengo registros de turnos para este número. Si querés sacar uno, con gusto te ayudo.';
+      action = 'message';
     }
   }
 
