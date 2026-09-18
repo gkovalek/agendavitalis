@@ -230,7 +230,7 @@ export default function Dashboard() {
         tratamiento:tratamientos(total_sesiones)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
       supabase.from('profesional_centro_servicio')
-        .select('profesional_id, agenda_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas(id, nombre, duracion_minutos, sesiones_por_bloque)')
+        .select('profesional_id, dias_trabajo, hora_inicio, hora_fin, capacidad_simultanea, agenda:agendas!profesional_centro_servicio_agenda_id_fkey(id, nombre, duracion_minutos, sesiones_por_bloque)')
         .eq('centro_id', centroId).eq('activo', true),
       supabase.from('dias_no_laborales')
         .select('profesional_id, fecha_desde, fecha_hasta')
@@ -239,6 +239,7 @@ export default function Dashboard() {
         .gte('fecha_hasta', dateStr),
     ]);
     const turnosList: Turno[] = (turnosRes.data as any[]) ?? [];
+    if (pcsRes.error) console.error('[Dashboard] pcsRes error:', pcsRes.error);
     const pcsListRaw: PCSRecord[] = ((pcsRes.data as any[]) ?? []).map((r: any) => ({
       ...r,
       dias_trabajo: normalizeDiasTrabajo(r.dias_trabajo),

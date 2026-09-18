@@ -133,7 +133,7 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
     if (!centroId || !profesionalId) return;
     supabase
       .from('profesional_centro_servicio')
-      .select('agenda:agendas(id, nombre)')
+      .select('agenda:agendas!profesional_centro_servicio_agenda_id_fkey(id, nombre)')
       .eq('centro_id', centroId)
       .eq('profesional_id', profesionalId)
       .eq('activo', true)
