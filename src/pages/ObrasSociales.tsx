@@ -256,6 +256,7 @@ export default function ObrasSociales() {
               ))}
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -312,6 +313,7 @@ export default function ObrasSociales() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

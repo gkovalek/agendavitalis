@@ -7,9 +7,8 @@ const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')      ?? '';
 const SUPABASE_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 const OPENAI_KEY       = Deno.env.get('OPENAI_API_KEY')    ?? '';
 const CENTRO_ID_ENV    = Deno.env.get('CENTRO_ID')         ?? '';
-const EVOLUTION_URL    = Deno.env.get('EVOLUTION_URL')     ?? '';
-const EVOLUTION_INST   = Deno.env.get('EVOLUTION_INSTANCE')    ?? '';
-const EVOLUTION_KEY    = Deno.env.get('EVOLUTION_KEY')     ?? '';
+const YCLOUD_API_KEY   = Deno.env.get('YCLOUD_API_KEY')    ?? '';
+const YCLOUD_FROM      = Deno.env.get('YCLOUD_FROM')       ?? '';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
 
@@ -62,6 +61,30 @@ function audioFormat(mimetype: string): string {
   return 'ogg'; // WhatsApp ptt es ogg por defecto
 }
 
+// Transcribir audio con Whisper
+async function transcribirAudio(audioBase64: string, mimetype: string): Promise<string | null> {
+  try {
+    const ext = mimetype.includes('ogg') ? 'ogg' : mimetype.includes('mp4') ? 'mp4' : mimetype.includes('mp3') || mimetype.includes('mpeg') ? 'mp3' : mimetype.includes('wav') ? 'wav' : 'ogg';
+    const bytes = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
+    const blob  = new Blob([bytes], { type: mimetype });
+    const form  = new FormData();
+    form.append('file', blob, `audio.${ext}`);
+    form.append('model', 'whisper-1');
+    form.append('language', 'es');
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_KEY}` },
+      body: form,
+    });
+    if (!r.ok) { console.error('[whisper] error', r.status, await r.text()); return null; }
+    const data = await r.json();
+    return data.text ?? null;
+  } catch (e) {
+    console.error('[whisper] excepción:', e);
+    return null;
+  }
+}
+
 async function callGPT(
   messages: Array<{ role: string; content: unknown }>,
   systemPrompt: string,
@@ -73,8 +96,7 @@ async function callGPT(
       'Content-Type':  'application/json',
     },
     body: JSON.stringify({
-      model:      'gpt-4o-audio-preview',
-      modalities: ['text'],
+      model:      'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
@@ -101,13 +123,17 @@ function parsearRespuesta(raw: string): { action: string; reply: string; data: R
 }
 
 async function sendWhatsApp(celular: string, mensaje: string): Promise<void> {
-  if (!EVOLUTION_URL || !EVOLUTION_KEY || !EVOLUTION_INST) return;
+  if (!YCLOUD_API_KEY || !YCLOUD_FROM) {
+    console.warn('[sendWhatsApp] YCLOUD_API_KEY o YCLOUD_FROM no configurados');
+    return;
+  }
   try {
-    await fetch(`${EVOLUTION_URL}/message/sendText/${EVOLUTION_INST}`, {
+    const res = await fetch('https://api.ycloud.com/v2/whatsapp/messages/sendDirectly', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
-      body: JSON.stringify({ number: celular, text: mensaje }),
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': YCLOUD_API_KEY },
+      body: JSON.stringify({ from: YCLOUD_FROM, to: celular, type: 'text', text: { body: mensaje } }),
     });
+    if (!res.ok) console.error('[sendWhatsApp] Error YCloud:', res.status, await res.text().catch(() => ''));
   } catch (e) {
     console.error('[sendWhatsApp] error:', e);
   }
@@ -156,7 +182,7 @@ async function procesarAudio(params: {
     .select('*')
     .eq('celular', celular)
     .eq('centro_id', centro_id)
-    .eq('estado', 'activa')
+    .in('estado', ['activa', 'derivada'])
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -173,6 +199,18 @@ async function procesarAudio(params: {
 
   const historial: Array<{ role: string; content: string; ts: string; type?: string; data?: Record<string,string> }> =
     conv?.historial ?? [];
+
+  // ─── Si un humano está a cargo o la conv está derivada, guardar audio y salir ─
+  if (conv?.modo === 'humano' || conv?.estado === 'derivada') {
+    console.log('[wa-asistente-audio] humano a cargo — guardando audio sin responder');
+    // Transcribir igual para que la secretaria vea qué dijo el paciente
+    const transcripcionHumano = await transcribirAudio(audioBase64, audioMimetype);
+    const tsH = new Date().toISOString();
+    const contenidoAudio = transcripcionHumano ? `🎙 ${transcripcionHumano}` : '🎙 [mensaje de voz]';
+    const historialConAudio = [...historial, { role: 'user', content: contenidoAudio, ts: tsH, type: 'audio' }].slice(-60);
+    await sb.from('conversaciones_wa').update({ historial: historialConAudio, updated_at: tsH }).eq('id', conv.id);
+    return { reply: '', action: 'human_handling', convId: conv?.id };
+  }
 
   // ─── Cargar contexto completo (paralelo) ─────────────────────────────────────
   const [centroRes, profesRes, servRes, faqRes, pcsRes, pcsHorarioRes] = await Promise.all([
@@ -333,8 +371,24 @@ RESPONDÉ ÚNICAMENTE con JSON válido (sin markdown):
 
 OBLIGATORIO en "data" para book_turno: nombre, apellido, dni, profesional_id, servicio_id, fecha, hora.`;
 
-  // ─── Llamar GPT-4o con audio ──────────────────────────────────────────────────
-  const fmt = audioFormat(audioMimetype);
+  // ─── Transcribir con Whisper → responder con GPT-4o-mini ────────────────────
+  const transcripcion = await transcribirAudio(audioBase64, audioMimetype);
+
+  if (!transcripcion) {
+    // Whisper falló — escalar a humano
+    await sb.from('conversaciones_wa').update({ estado: 'derivada', derivada_en: new Date().toISOString() }).eq('id', conv.id);
+    const ts = new Date().toISOString();
+    const nuevoHistorial = [
+      ...historial,
+      { role: 'user',      content: '[Mensaje de voz — no se pudo transcribir]', ts, type: 'audio' },
+      { role: 'assistant', content: 'No pude procesar el audio. Un asesor te responderá en breve.', ts },
+    ].slice(-60);
+    await sb.from('conversaciones_wa').update({ historial: nuevoHistorial, updated_at: ts }).eq('id', conv.id);
+    await sendWhatsApp(celular, 'No pude procesar el audio. Un asesor te responderá en breve.');
+    return { reply: 'No pude procesar el audio.', action: 'escalate', convId: conv.id };
+  }
+
+  console.log('[wa-asistente-audio] transcripción:', transcripcion);
 
   // Historial de texto para contexto (últimos 20 mensajes)
   const msgsHistorial = historial
@@ -342,14 +396,7 @@ OBLIGATORIO en "data" para book_turno: nombre, apellido, dni, profesional_id, se
     .slice(-20)
     .map(h => ({ role: h.role as 'user' | 'assistant', content: h.content }));
 
-  // Mensaje de usuario: audio como input_audio
-  const userMessage = {
-    role: 'user' as const,
-    content: [
-      { type: 'input_audio', input_audio: { data: audioBase64, format: fmt } },
-    ],
-  };
-
+  const userMessage = { role: 'user' as const, content: `[Mensaje de voz transcripto] ${transcripcion}` };
   const msgs = [...msgsHistorial, userMessage];
   const rawGPT = await callGPT(msgs, systemPrompt);
 
@@ -542,7 +589,7 @@ OBLIGATORIO en "data" para book_turno: nombre, apellido, dni, profesional_id, se
   const ts = new Date().toISOString();
   const nuevoHistorial = [
     ...historial.filter(h => h.type !== 'pending_booking'),
-    { role: 'user',      content: '[Mensaje de voz]', ts, type: 'audio' },
+    { role: 'user',      content: `🎙 ${transcripcion}`, ts, type: 'audio' },
     { role: 'assistant', content: finalReply,         ts },
   ].slice(-60);
 

@@ -16,9 +16,8 @@ const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_KEY    = Deno.env.get('ANTHROPIC_API_KEY')!;
 const CENTRO_ID_ENV    = Deno.env.get('CENTRO_ID') ?? '';          // fijo para Kine+
-const EVOLUTION_URL    = Deno.env.get('EVOLUTION_URL') ?? 'http://72.61.58.46:8080';
-const EVOLUTION_INST   = Deno.env.get('EVOLUTION_INSTANCE') ?? 'Secretaria_Vitalis';
-const EVOLUTION_KEY    = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+const YCLOUD_API_KEY   = Deno.env.get('YCLOUD_API_KEY') ?? '';
+const YCLOUD_FROM      = Deno.env.get('YCLOUD_FROM') ?? '';     // número del negocio E.164
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
 
@@ -186,29 +185,30 @@ function parsearRespuestaClaude(raw: string): { action: string; reply: string; d
   }
 }
 
-// ─── Evolution API sender ─────────────────────────────────────────────────────
+// ─── YCloud sender ────────────────────────────────────────────────────────────
 
 async function sendWhatsApp(celular: string, mensaje: string): Promise<void> {
-  if (!EVOLUTION_URL || !EVOLUTION_KEY || !EVOLUTION_INST) {
-    console.warn('[sendWhatsApp] Variables de Evolution no configuradas, omitiendo envío directo');
+  if (!YCLOUD_API_KEY || !YCLOUD_FROM) {
+    console.warn('[sendWhatsApp] YCLOUD_API_KEY o YCLOUD_FROM no configurados, omitiendo envío');
     return;
   }
   try {
-    const url = `${EVOLUTION_URL}/message/sendText/${EVOLUTION_INST}`;
-    const res = await fetch(url, {
+    const res = await fetch('https://api.ycloud.com/v2/whatsapp/messages/sendDirectly', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': EVOLUTION_KEY,
+        'X-API-Key': YCLOUD_API_KEY,
       },
       body: JSON.stringify({
-        number: celular,
-        text: mensaje,
+        from: YCLOUD_FROM,
+        to:   celular,
+        type: 'text',
+        text: { body: mensaje },
       }),
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
-      console.error('[sendWhatsApp] Error Evolution:', res.status, txt);
+      console.error('[sendWhatsApp] Error YCloud:', res.status, txt);
     } else {
       console.log('[sendWhatsApp] Mensaje enviado a', celular);
     }
@@ -228,6 +228,7 @@ Deno.serve(async (req: Request) => {
     userText: string;
     messageType?: string;
     centro_id?: string;
+    mediaUrl?: string | null;
     imageBase64?: string | null;
     imageMimetype?: string | null;
     documentBase64?: string | null;
@@ -240,19 +241,94 @@ Deno.serve(async (req: Request) => {
 
   const {
     celular, userText, messageType = 'text',
+    accion,
+    mediaUrl,
     imageBase64, imageMimetype,
     documentBase64, documentMimetype, documentName,
   } = body;
 
-  // centro_id: env var tiene prioridad (número dedicado); si no, viene del body
-  const centro_id = CENTRO_ID_ENV || body.centro_id || '';
+  // Resolver centro_id para multi-tenant
+  let centroId: string = Deno.env.get('CENTRO_ID') || body.centro_id || '';
 
-  if (!celular || !userText || !centro_id) {
-    return json({ error: 'faltan_campos', required: ['celular', 'userText', 'centro_id o env CENTRO_ID'] }, 400);
+  if (!centroId) {
+    // 1. Buscar por conversación activa del celular
+    const { data: convActiva } = await sb
+      .from('conversaciones_wa')
+      .select('centro_id')
+      .eq('celular', celular)
+      .eq('estado', 'activa')
+      .maybeSingle();
+
+    if (convActiva?.centro_id) {
+      centroId = convActiva.centro_id;
+    } else if (userText) {
+      // 2. Buscar slug en el primer mensaje
+      const { data: centros } = await sb
+        .from('centros')
+        .select('id, slug')
+        .eq('activo', true);
+
+      const textLower = userText.toLowerCase();
+      const centroMatch = centros?.find((c: { id: string; slug: string | null }) =>
+        c.slug && textLower.includes(c.slug.toLowerCase())
+      );
+      if (centroMatch) centroId = centroMatch.id;
+    }
+  }
+
+  if (!centroId) {
+    // Sin centro identificado: pedir al paciente que indique el centro
+    return new Response(
+      JSON.stringify({ ok: false, error: 'centro_not_identified' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Alias para compatibilidad con el resto del handler
+  const centro_id = centroId;
+
+  if (!celular || !userText) {
+    return json({ error: 'faltan_campos', required: ['celular', 'userText'] }, 400);
+  }
+
+  // ─── Acción directa desde botón (sin Claude) ─────────────────────────────────
+  if (messageType === 'button_reply' && (accion === 'confirmar' || accion === 'cancelar')) {
+    const nuevoEstado = accion === 'confirmar' ? 'confirmado' : 'cancelado';
+    const respuesta = accion === 'confirmar'
+      ? '✅ ¡Turno confirmado! Te esperamos.'
+      : '👍 Turno cancelado. Cuando quieras podés reagendar escribiéndonos.';
+
+    // Buscar turno activo del paciente (reservado o confirmado)
+    const { data: convRow } = await sb.from('conversaciones_wa')
+      .select('id,paciente_id').eq('centro_id', centro_id).eq('celular', celular)
+      .in('estado', ['activa','derivada']).order('updated_at', { ascending: false }).limit(1).single();
+
+    if (convRow?.paciente_id) {
+      const hoy = new Date().toISOString().split('T')[0];
+      // Buscar el próximo turno activo
+      const { data: turno } = await sb.from('turnos')
+        .select('id')
+        .eq('paciente_id', convRow.paciente_id)
+        .eq('centro_id', centro_id)
+        .gte('fecha', hoy)
+        .in('estado', ['reservado', 'confirmado'])
+        .order('fecha', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (turno?.id) {
+        await sb.from('turnos').update({ estado: nuevoEstado }).eq('id', turno.id);
+      }
+    }
+
+    // Enviar respuesta por WhatsApp
+    await sendWhatsApp(celular, respuesta);
+
+    return json({ ok: true, action: accion, reply: respuesta });
   }
 
   const resultado = await procesarMensaje({
     celular, userText, messageType, centro_id,
+    mediaUrl: mediaUrl ?? null,
     imageBase64: imageBase64 ?? null,
     imageMimetype: imageMimetype ?? null,
     documentBase64: documentBase64 ?? null,
@@ -270,13 +346,14 @@ async function procesarMensaje(params: {
   userText: string;
   messageType: string;
   centro_id: string;
+  mediaUrl?: string | null;
   imageBase64: string | null;
   imageMimetype: string | null;
   documentBase64: string | null;
   documentMimetype: string | null;
   documentName: string | null;
 }) {
-  const { celular, userText, messageType, centro_id, imageBase64, imageMimetype, documentBase64, documentMimetype, documentName } = params;
+  const { celular, userText, messageType, centro_id, mediaUrl, imageBase64, imageMimetype, documentBase64, documentMimetype, documentName } = params;
 
   // ─── Cargar / crear conversación ─────────────────────────────────────────────
   const { data: convRows } = await sb
@@ -284,7 +361,7 @@ async function procesarMensaje(params: {
     .select('*')
     .eq('celular', celular)
     .eq('centro_id', centro_id)
-    .eq('estado', 'activa')
+    .in('estado', ['activa', 'derivada'])
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -299,8 +376,22 @@ async function procesarMensaje(params: {
     conv = newConv;
   }
 
-  const historial: Array<{ role: string; content: string; ts: string; type?: string; data?: Record<string,string> }> =
+  const historial: Array<{ role: string; content: string; ts: string; type?: string; mediaUrl?: string; data?: Record<string,string> }> =
     conv?.historial ?? [];
+
+  // ─── Si un humano está a cargo o la conv está derivada, no responder ──────────
+  if (conv?.modo === 'humano' || conv?.estado === 'derivada') {
+    console.log('[wa-asistente] humano a cargo — guardando mensaje sin responder');
+    // Guardar el mensaje del paciente para que la secretaria lo vea
+    const tsH = new Date().toISOString();
+    const entradaUsuario: typeof historial[0] = {
+      role: 'user', content: params.userText || '[El paciente envió un archivo]', ts: tsH, type: params.messageType,
+      ...(params.mediaUrl ? { mediaUrl: params.mediaUrl } : {}),
+    };
+    const historialActualizado = [...historial, entradaUsuario].slice(-60);
+    await sb.from('conversaciones_wa').update({ historial: historialActualizado, updated_at: tsH }).eq('id', conv.id);
+    return { reply: '', action: 'human_handling', convId: conv?.id };
+  }
 
   // ─── Pending booking (Opción B) ───────────────────────────────────────────────
   const BOOKING_FIELDS = ['nombre','apellido','dni','profesional_id','servicio_id','fecha','hora'];
@@ -987,7 +1078,7 @@ Solo incluí en "data" los campos relevantes.`;
   // ─── Guardar pending_booking si Claude tiene todos los datos pero pidió confirmación
   const ts = new Date().toISOString();
   const entradas: typeof historial = [
-    { role: 'user',      content: userText,   ts, type: messageType },
+    { role: 'user', content: userText, ts, type: messageType, ...(mediaUrl ? { mediaUrl } : {}) },
     { role: 'assistant', content: finalReply, ts },
   ];
 

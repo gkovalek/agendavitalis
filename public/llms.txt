@@ -1,0 +1,12 @@
+# Vitalis
+
+> SaaS de gestión para centros de salud: agenda, historia clínica, obras sociales, cobros con MercadoPago e IA conversacional vía WhatsApp.
+
+Vitalis es una plataforma B2B para centros kinesiológicos y de rehabilitación en Argentina.
+No expone una API pública. Las reservas de pacientes se realizan vía portal público en /reservas/{slug}.
+
+## Links
+
+- Registro: https://agendavitalis.app/registro
+- Portal de reservas (ejemplo): https://agendavitalis.app/reservas/{slug-del-centro}
+- Landing: https://agendavitalis.app/landing

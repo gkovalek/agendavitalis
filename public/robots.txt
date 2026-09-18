@@ -1,14 +1,16 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
-Allow: /
+Allow: /landing
+Allow: /registro
+Allow: /reservas/
+Allow: /llms.txt
+Allow: /sitemap.xml
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /secretaria
+Disallow: /pacientes
+Disallow: /agendas
+Disallow: /caja
+Disallow: /configuracion
+Disallow: /mi-perfil
+
+Sitemap: https://agendavitalis.app/sitemap.xml

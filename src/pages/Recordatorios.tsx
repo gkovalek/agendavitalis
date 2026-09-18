@@ -78,9 +78,9 @@ export default function Recordatorios() {
   const esProfesional = perfil?.rol_nombre === 'profesional';
 
   /* ─── Filtros ─── */
-  const manana = getManana();
-  const [fechaDesde, setFechaDesde] = useState(manana);
-  const [fechaHasta, setFechaHasta] = useState(manana);
+  const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const [fechaDesde, setFechaDesde] = useState(hoyStr);
+  const [fechaHasta, setFechaHasta] = useState(hoyStr);
   const [filtroProfesional, setFiltroProfesional] = useState(
     perfil?.rol_nombre === 'profesional' && perfil?.profesional_id
       ? perfil.profesional_id
