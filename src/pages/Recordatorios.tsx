@@ -65,8 +65,9 @@ export default function Recordatorios() {
   const { toast } = useToast();
   const { get } = useCentroConfig(centroId);
 
-  const webhookUrl   = get('n8n_webhook_recordatorios');
-  const centroNombre = get('centro_nombre') || 'el centro';
+  const webhookUrl      = get('n8n_webhook_recordatorios');
+  const centroNombre    = get('centro_nombre') || 'el centro';
+  const centroDireccion = get('centro_direccion') || '';
 
   /* ─── Datos ─── */
   const [turnos, setTurnos] = useState<TurnoRecordatorio[]>([]);
@@ -183,6 +184,7 @@ export default function Recordatorios() {
       const payload = {
         centro_id: centroId,
         centro_nombre: centroNombre,
+        centro_direccion: centroDireccion,
         turnos: [{
           turno_id: turno.id,
           fecha: turno.fecha,
@@ -235,6 +237,7 @@ export default function Recordatorios() {
       const payload = {
         centro_id: centroId,
         centro_nombre: centroNombre,
+        centro_direccion: centroDireccion,
         turnos: aEnviar.map(t => ({
           turno_id: t.id,
           fecha: t.fecha,

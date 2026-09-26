@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extrae el array de turnos del body y prepara un item por cada uno\nconst body = $input.first().json.body;\nconst turnos = body.turnos || [];\nconst centroNombre = body.centro_nombre || 'el centro';\n\nreturn turnos.map(t => ({\n  json: {\n    turno_id:     t.turno_id,\n    to:           'whatsapp:+' + String(t.celular).replace(/^\\+/, ''),\n    from:         'whatsapp:+5493625456570',\n    nombre:       t.paciente_nombre,\n    fecha:        t.fecha.split('-').reverse().join('/'),\n    hora:         t.hora.substring(0, 5),\n    servicio:     t.servicio || '',\n    profesional:  t.profesional || '',\n    centro_nombre: centroNombre\n  }\n}));"
+        "jsCode": "// Extrae el array de turnos del body y prepara un item por cada uno\nconst body = $input.first().json.body;\nconst turnos = body.turnos || [];\nconst centroNombre = body.centro_nombre || 'el centro';\nconst centroDireccion = body.centro_direccion || '';\n\nreturn turnos.map(t => ({\n  json: {\n    turno_id:     t.turno_id,\n    to:           String(t.celular).startsWith('+') ? t.celular : '+' + String(t.celular),\n    nombre:       t.paciente_nombre,\n    dia:          t.fecha.split('-').reverse().join('/'),\n    hora:         t.hora.substring(0, 5),\n    servicio:     t.servicio || '',\n    profesional:  t.profesional || '',\n    centro_nombre: centroNombre,\n    direccion:    centroDireccion\n  }\n}));"
       },
       "id": "node-code-01",
       "name": "Preparar items",
@@ -27,50 +27,30 @@
     },
     {
       "parameters": {
-        "url": "https://api.twilio.com/2010-04-01/Accounts/REEMPLAZAR_CON_ACCOUNT_SID/Messages.json",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
+        "url": "https://api.ycloud.com/v2/whatsapp/messages",
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
             {
-              "name": "From",
-              "value": "={{ $json.from }}"
+              "name": "X-API-Key",
+              "value": "={{ $env['YCLOUD_API_KEY'] }}"
             },
             {
-              "name": "To",
-              "value": "={{ $json.to }}"
-            },
-            {
-              "name": "ContentSid",
-              "value": "HX5111b578b335001ca7d64be9222aff02"
-            },
-            {
-              "name": "ContentVariables",
-              "value": "={{ JSON.stringify({ \"1\": $json.nombre, \"2\": $json.centro_nombre, \"3\": $json.fecha, \"4\": $json.hora, \"5\": $json.profesional, \"6\": $json.servicio }) }}"
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        }
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"from\": \"+5493625456570\",\n  \"to\": \"{{ $json.to }}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"template_utility_20260916104443\",\n    \"language\": { \"code\": \"es_AR\" },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          { \"type\": \"text\", \"text\": \"{{ $json.nombre }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.dia }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.hora }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.servicio }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.profesional }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.centro_nombre }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $json.direccion }}\" }\n        ]\n      }\n    ]\n  }\n}",
+        "options": {}
       },
-      "id": "node-twilio-01",
-      "name": "Enviar WA Twilio",
+      "id": "node-ycloud-01",
+      "name": "Enviar WA YCloud",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [680, 300],
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "REEMPLAZAR_CON_ID_CREDENCIAL",
-          "name": "REEMPLAZAR_CON_NOMBRE_CREDENCIAL_TWILIO"
-        }
-      }
+      "position": [680, 300]
     }
   ],
   "connections": {
@@ -81,7 +61,7 @@
     },
     "Preparar items": {
       "main": [
-        [{ "node": "Enviar WA Twilio", "type": "main", "index": 0 }]
+        [{ "node": "Enviar WA YCloud", "type": "main", "index": 0 }]
       ]
     }
   },

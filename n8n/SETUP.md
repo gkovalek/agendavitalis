@@ -4,63 +4,70 @@
 
 | Variable | Valor |
 |---|---|
-| `SUPABASE_URL` | `https://xxxx.supabase.co` |
+| `SUPABASE_URL` | `https://gsmrccofuegcmujycydd.supabase.co` |
 | `SUPABASE_SERVICE_KEY` | Service role key de Supabase |
-| `TWILIO_ACCOUNT_SID` | Tu Account SID de Twilio |
-| `TWILIO_FROM_WHATSAPP` | `whatsapp:+14155238886` (tu número Twilio) |
-| `TWILIO_TEMPLATE_SID` | `HX5111b578b335001ca7d64be9222aff02` |
-
-## Credencial en n8n (Credentials > New > HTTP Basic Auth)
-
-- **Name**: `Twilio Basic Auth`
-- **User**: tu `TWILIO_ACCOUNT_SID`
-- **Password**: tu `TWILIO_AUTH_TOKEN`
+| `YCLOUD_API_KEY` | API Key de YCloud (WhatsApp Manager > Developers) |
 
 ---
 
-## Workflow 1 — Manual (desde la app)
+## Workflow 1 — Recordatorios manuales (desde la app)
 
-1. Importar `workflow-1-recordatorios-manual.json`
+1. Importar `workflow-1-envio-recordatorios.json`
 2. Activar el workflow
-3. Copiar la URL del webhook: `https://tudominio.hostinger.com/webhook/recordatorios-manual`
-4. En Supabase: `UPDATE centros SET configuracion = configuracion || '{"n8n_webhook_recordatorios": "https://tudominio.hostinger.com/webhook/recordatorios-manual"}' WHERE id = 'tu-centro-id'`
+3. Copiar la URL del webhook: `https://<tu-n8n>/webhook/vitalis-recordatorios`
+4. En Supabase Dashboard → Table Editor → `centros` → buscar el centro → campo `configuracion`:
+   ```json
+   { "n8n_webhook_recordatorios": "https://<tu-n8n>/webhook/vitalis-recordatorios" }
+   ```
 
-## Workflow 2 — Cron automático 20:00
+### Plantilla activa en YCloud
+- **Nombre**: `template_utility_20260916104443`
+- **Idioma**: `es_AR`
+- **Estado**: Activo (Calidad pendiente — apta para envío)
+- **Variables** (en orden):
 
-1. Importar `workflow-2-recordatorios-cron.json`
-2. **Verificar zona horaria del servidor Hostinger**: si es UTC, el cron debe ser `0 23 * * *` (UTC = Argentina+3). Si es UTC-3, usar `0 20 * * *`
-3. Activar el workflow
+| `{{N}}` | Campo enviado | Ejemplo |
+|---------|--------------|---------|
+| `{{1}}` | Nombre del paciente | `María` |
+| `{{2}}` | Día del turno (DD/MM/YYYY) | `28/09/2026` |
+| `{{3}}` | Hora del turno (HH:MM) | `10:00` |
+| `{{4}}` | Servicio | `Kinesiología` |
+| `{{5}}` | Profesional (Apellido, Nombre) | `García, Juan` |
+| `{{6}}` | Nombre del centro | `Kine+` |
+| `{{7}}` | Dirección del centro | `Av. Belgrano 1234` |
 
-## Workflow 3 — Respuestas inbound
+### Número origen YCloud
+- **Número**: `+5493625456570`
+- **WABA ID**: `1091435396905786`
+- **Phone Number ID**: `6a9b136791b24440ea6d2a87`
 
-1. Importar `workflow-3-respuestas-inbound.json`
+---
+
+## Workflow 4 — Mensajes inbound (bot IA)
+
+1. Importar `workflow-4-ycloud-inbound.json`
 2. Activar el workflow
-3. Copiar la URL del webhook: `https://tudominio.hostinger.com/webhook/twilio-inbound`
-4. En **Twilio Console**:
-   - Ir a Messaging > Senders > WhatsApp Senders
-   - Seleccionar tu número
-   - En "A MESSAGE COMES IN": `POST` → pegar la URL del webhook
-   - Guardar
+3. Copiar la URL del webhook: `https://<tu-n8n>/webhook/ycloud-inbound`
+4. En YCloud console → WhatsApp Manager → Settings → Webhook URL → pegar la URL
+
+### Variables de entorno adicionales para Workflow 4
+
+| Variable | Valor |
+|---|---|
+| `YCLOUD_API_KEY` | API Key de YCloud |
+| `SUPABASE_URL` | `https://gsmrccofuegcmujycydd.supabase.co` |
 
 ---
 
 ## Flujo completo
 
 ```
-[App - botón Enviar] ──POST──► Workflow 1 ──► Twilio ──► WhatsApp paciente
-[Cron 20:00]         ──────► Workflow 2 ──► Twilio ──► WhatsApp paciente
-[Paciente responde]  ──────► Twilio ──POST──► Workflow 3
-                                                  ├─ "1/confirmo" ──► Supabase PATCH estado=confirmado
-                                                  ├─ "2/cancelo"  ──► Supabase PATCH estado=cancelado
-                                                  └─ "3/reagendar"──► Twilio reply con link WA
+[App - botón Enviar recordatorio] ──POST──► Workflow 1 ──► YCloud API ──► WhatsApp paciente
+[Paciente responde]               ──────────────────────► YCloud webhook ──► Workflow 4 ──► wa-asistente EF
 ```
 
-## Respuestas reconocidas (Workflow 3)
+## Configuración en la app (Vitalis > Configuración)
 
-| Lo que escribe el paciente | Acción |
-|---|---|
-| 1, si, sí, confirmo, ok, dale, listo | → estado `confirmado` |
-| 2, no, cancelo, no puedo | → estado `cancelado` |
-| 3, reagendar, cambiar, otro horario | → responde con link WhatsApp |
-
-El cambio de estado en Supabase se refleja automáticamente en el Dashboard de Vitalis (color de la tarjeta del turno).
+Para que los recordatorios incluyan la dirección en el mensaje, asegurate de tener configurados:
+- **Nombre del centro** (`centro_nombre`)
+- **Dirección** (`centro_direccion`)
