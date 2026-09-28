@@ -21,7 +21,7 @@ npx supabase functions deploy <nombre> --project-ref gsmrccofuegcmujycydd
 
 ## Architecture
 
-**Stack:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Supabase (PostgreSQL + Auth + Edge Functions) + MercadoPago + Evolution API (WhatsApp).
+**Stack:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Supabase (PostgreSQL + Auth + Edge Functions) + MercadoPago + YCloud (WhatsApp).
 
 **Supabase project:** `gsmrccofuegcmujycydd` (sa-east-1)  
 **Production URL:** https://agendavitalis.app  
@@ -53,7 +53,7 @@ Each function needs a `config.toml` with `verify_jwt = true/false`. Public endpo
 |---|---|---|
 | `wa-asistente` | WhatsApp AI bot (Claude) — text/image/PDF | false |
 | `wa-asistente-audio` | WhatsApp AI bot (GPT-4o) — audio messages | false |
-| `wa-send` | Send WhatsApp message via Evolution API | false |
+| `wa-send` | Send WhatsApp message via YCloud | false |
 | `mp-webhook` | MercadoPago payment notifications | false |
 | `mp-pago-portal` | Create MP payment from public portal | false |
 | `registro-completar` | Complete registration after MP payment | false |

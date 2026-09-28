@@ -18,6 +18,7 @@ export interface CentroConfig {
   centro_web: string;
   secretario_ver_caja: string;
   secretario_ver_liquidacion: string;
+  youtube_video_id: string;
 }
 
 const DEFAULTS: CentroConfig = {
@@ -35,6 +36,7 @@ const DEFAULTS: CentroConfig = {
   centro_web: '',
   secretario_ver_caja: 'true',
   secretario_ver_liquidacion: 'true',
+  youtube_video_id: '',
 };
 
 export function useCentroConfig(centroId: string | null) {

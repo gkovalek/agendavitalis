@@ -297,11 +297,9 @@ export default function Configuracion() {
         centro_ciudad: get('centro_ciudad'),
         centro_mail: get('centro_mail'),
         centro_web: get('centro_web'),
+        youtube_video_id: get('youtube_video_id'),
         secretario_ver_caja: get('secretario_ver_caja') || 'true',
         secretario_ver_liquidacion: get('secretario_ver_liquidacion') || 'true',
-        intervalo_turnos: String(getNumber('intervalo_turnos')),
-        hora_inicio_agenda: get('hora_inicio_agenda') || '08:00',
-        hora_fin_agenda: get('hora_fin_agenda') || '20:00',
       });
       setInitialized(true);
     }
@@ -387,51 +385,25 @@ export default function Configuracion() {
         <Field label={<span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Sitio web (opcional)</span>}>
           <Input value={vals.centro_web ?? ''} onChange={e => setVals(v => ({ ...v, centro_web: e.target.value }))} placeholder="Ej: https://kineplus.com.ar" />
         </Field>
+        <Field label={<span className="flex items-center gap-1">📺 Video Turnero (YouTube)</span>}>
+          <Input
+            value={vals.youtube_video_id ?? ''}
+            onChange={e => {
+              // Aceptar URL completa o solo el ID
+              const raw = e.target.value.trim();
+              const match = raw.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+              setVals(v => ({ ...v, youtube_video_id: match ? match[1] : raw }));
+            }}
+            placeholder="Ej: 5qap5aO4i9A  o  https://youtube.com/watch?v=5qap5aO4i9A"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Pegá el link de YouTube o solo el ID. Se reproduce en la pantalla del Turnero.</p>
+        </Field>
         <Button
           size="sm"
           disabled={saving === 'centro' || !tableExists}
-          onClick={() => handleSave('centro', ['centro_nombre', 'centro_telefono', 'centro_direccion', 'centro_ciudad', 'centro_mail', 'centro_web'])}
+          onClick={() => handleSave('centro', ['centro_nombre', 'centro_telefono', 'centro_direccion', 'centro_ciudad', 'centro_mail', 'centro_web', 'youtube_video_id'])}
         >
           {saving === 'centro' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          <Save className="w-4 h-4 mr-2" /> Guardar
-        </Button>
-      </Section>
-
-      {/* Configuración de agenda */}
-      <Section
-        title="Agenda"
-        description="Intervalo de slots y horario de atención mostrado en el panel principal"
-        icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-      >
-        <Field label="Intervalo de turnos (minutos)">
-          <Select
-            value={vals.intervalo_turnos ?? '30'}
-            onValueChange={v => setVals(prev => ({ ...prev, intervalo_turnos: v }))}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[15, 20, 30, 45, 60].map(m => (
-                <SelectItem key={m} value={String(m)}>{m} minutos</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Horario inicio">
-            <Input type="time" value={vals.hora_inicio_agenda ?? '08:00'} onChange={e => setVals(v => ({ ...v, hora_inicio_agenda: e.target.value }))} className="w-32" />
-          </Field>
-          <Field label="Horario fin">
-            <Input type="time" value={vals.hora_fin_agenda ?? '20:00'} onChange={e => setVals(v => ({ ...v, hora_fin_agenda: e.target.value }))} className="w-32" />
-          </Field>
-        </div>
-        <Button
-          size="sm"
-          disabled={saving === 'agenda' || !tableExists}
-          onClick={() => handleSave('agenda', ['intervalo_turnos', 'hora_inicio_agenda', 'hora_fin_agenda'])}
-        >
-          {saving === 'agenda' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </Section>

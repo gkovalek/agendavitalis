@@ -42,7 +42,7 @@ interface Turno {
   paciente_id: string;
   servicio_id?: string | null;
   motivo_cancelacion?: string | null;
-  paciente?: { nombre: string; apellido: string };
+  paciente?: { nombre: string; apellido: string; celular?: string };
   servicio?: { nombre: string; agenda_id?: string | null } | null;
   tratamiento?: { total_sesiones: number } | null;
   sesion_num?: number;
@@ -88,7 +88,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { centroId, perfil } = useAuth();
   const { toast } = useToast();
-  const { getNumber, loading: configLoading } = useCentroConfig(centroId);
+  const { getNumber, get, loading: configLoading } = useCentroConfig(centroId);
   const esProfesional = perfil?.rol_nombre === 'profesional';
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -225,7 +225,7 @@ export default function Dashboard() {
       supabase.from('profesionales').select('id, nombre, apellido').eq('centro_id', centroId).eq('activo', true).order('apellido'),
       supabase.from('turnos').select(`
         id, fecha, hora_inicio, estado, profesional_id, paciente_id, servicio_id, motivo_cancelacion, tratamiento_id,
-        paciente:pacientes(nombre, apellido),
+        paciente:pacientes(nombre, apellido, celular),
         servicio:servicios(nombre, agenda_id),
         tratamiento:tratamientos(total_sesiones)
       `).eq('fecha', dateStr).eq('centro_id', centroId),
@@ -298,6 +298,14 @@ export default function Dashboard() {
   };
 
   useEffect(() => { fetchData(); }, [dateStr, centroId]);
+    useEffect(() => {
+    if (!centroId) return;
+    const channel = supabase
+      .channel(`turnos-realtime-${dateStr}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `centro_id=eq.${centroId}` }, () => { fetchData(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [dateStr, centroId]);
   useEffect(() => { setMobileColIndex(0); }, [profesionales]);
 
   const handleEstadoChange = async (turnoId: string, estado: TurnoEstado, motivo?: string) => {
@@ -328,6 +336,66 @@ export default function Dashboard() {
 
     fetchData();
     setContextMenu(null);
+  };
+
+  const handleEnviarRecordatorio = async (turno: Turno) => {
+    const webhookUrl = get('n8n_webhook_recordatorios');
+    const centroNombre = get('centro_nombre') || 'el centro';
+    const centroDireccion = get('centro_direccion') || '';
+
+    if (!webhookUrl) {
+      toast({ title: 'Webhook no configurado', description: 'Configuralo en Ajustes del centro.', variant: 'destructive' });
+      return;
+    }
+    if (!turno.paciente?.celular) {
+      toast({ title: 'Sin número de celular', description: 'El paciente no tiene celular registrado.', variant: 'destructive' });
+      return;
+    }
+
+    const normalizarCelular = (cel: string): string => {
+      let n = cel.replace(/\D/g, '');
+      if (n.startsWith('0')) n = n.slice(1);
+      if (!n.startsWith('54')) n = '54' + n;
+      if (n.startsWith('54') && !n.startsWith('549')) n = '549' + n.slice(2);
+      return '+' + n;
+    };
+
+    const prof = profesionales.find(p => p.id === turno.profesional_id);
+    const payload = {
+      centro_id: centroId,
+      centro_nombre: centroNombre,
+      centro_direccion: centroDireccion,
+      turnos: [{
+        turno_id: turno.id,
+        fecha: turno.fecha,
+        hora: turno.hora_inicio,
+        paciente_nombre: turno.paciente.nombre,
+        paciente_apellido: turno.paciente.apellido,
+        celular: turno.paciente.celular,
+        profesional: prof ? `${prof.apellido}, ${prof.nombre}` : '',
+        servicio: turno.servicio?.nombre ?? '',
+      }],
+    };
+
+    try {
+      const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      await supabase.from('recordatorios_log').insert({
+        centro_id: centroId,
+        turno_id: turno.id,
+        paciente_id: turno.paciente_id ?? null,
+        telefono: normalizarCelular(turno.paciente.celular),
+        tipo_mensaje: 'recordatorio_cita',
+        estado: 'enviado',
+        fecha_cita: turno.fecha,
+        fecha_envio: new Date().toISOString(),
+      });
+
+      toast({ title: '✓ Recordatorio enviado', description: `${turno.paciente.apellido}, ${turno.paciente.nombre}` });
+    } catch (err: any) {
+      toast({ title: 'Error al enviar', description: err.message, variant: 'destructive' });
+    }
   };
 
   const filteredTurnos = useMemo(() =>
@@ -976,7 +1044,7 @@ export default function Dashboard() {
           }}
           onEstadoChange={handleEstadoChange}
           onReprogramar={() => { setReprogramarTurno(contextMenu!.turno); setContextMenu(null); }}
-          onEnviarRecordatorio={() => toast({ title: 'Enviar recordatorio', description: 'Función en desarrollo — próximamente disponible.' })}
+          onEnviarRecordatorio={() => { handleEnviarRecordatorio(contextMenu!.turno); setContextMenu(null); }}
           onClose={() => setContextMenu(null)}
         />
       )}

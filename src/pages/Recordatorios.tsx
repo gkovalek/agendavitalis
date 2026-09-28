@@ -389,6 +389,7 @@ export default function Recordatorios() {
                 <TableHead className="text-[12px] font-semibold">Tipo de mensaje</TableHead>
                 <TableHead className="text-[12px] font-semibold">Fecha de envío</TableHead>
                 <TableHead className="text-[12px] font-semibold">Estado</TableHead>
+                <TableHead className="text-[12px] font-semibold">Turno</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -466,6 +467,35 @@ export default function Recordatorios() {
                       ) : (
                         <Badge variant="outline" className="text-[#0F6E56] border-[#9FE1CB] bg-[#E1F5EE] text-[11px] gap-1">
                           <CheckCircle className="h-3 w-3" /> Enviado
+                        </Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Estado del turno */}
+                    <TableCell>
+                      {t.estado === 'confirmado' ? (
+                        <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50 text-[11px] gap-1">
+                          <CheckCircle className="h-3 w-3" /> Confirmado
+                        </Badge>
+                      ) : t.estado === 'cancelado' ? (
+                        <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-[11px] gap-1">
+                          <AlertCircle className="h-3 w-3" /> Cancelado
+                        </Badge>
+                      ) : t.estado === 'finalizado' ? (
+                        <Badge variant="outline" className="text-zinc-500 border-zinc-200 bg-zinc-50 text-[11px] gap-1">
+                          <CheckCircle className="h-3 w-3" /> Finalizado
+                        </Badge>
+                      ) : t.estado === 'en_sala' ? (
+                        <Badge variant="outline" className="text-purple-700 border-purple-200 bg-purple-50 text-[11px] gap-1">
+                          <CheckCircle className="h-3 w-3" /> En sala
+                        </Badge>
+                      ) : t.estado === 'ausente' ? (
+                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50 text-[11px] gap-1">
+                          <AlertCircle className="h-3 w-3" /> Ausente
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground text-[11px] gap-1">
+                          <Clock className="h-3 w-3" /> Reservado
                         </Badge>
                       )}
                     </TableCell>

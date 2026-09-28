@@ -11,12 +11,14 @@ interface MsgItem {
   content: string;
   ts: string;
   type?: string;
+  mediaUrl?: string;
 }
 
 interface Conversacion {
   id: string;
   celular: string;
   estado: 'activa' | 'derivada' | 'cerrada';
+  modo?: string;
   historial: MsgItem[];
   updated_at: string;
 }
@@ -85,7 +87,7 @@ export default function SecretariaWhatsApp() {
     if (!centroId) return;
     const { data } = await supabase
       .from('conversaciones_wa')
-      .select('id, celular, estado, historial, updated_at')
+      .select('id, celular, estado, modo, historial, updated_at')
       .eq('centro_id', centroId)
       .order('updated_at', { ascending: false });
     setConvs((data as Conversacion[]) ?? []);
@@ -188,6 +190,19 @@ export default function SecretariaWhatsApp() {
   async function updateEstado(id: string, estado: 'activa' | 'derivada' | 'cerrada') {
     await supabase.from('conversaciones_wa').update({ estado }).eq('id', id);
     if (id === selectedId) setSelectedId(null);
+    loadConvs();
+  }
+
+  async function tomarConversacion(id: string) {
+    const { error } = await supabase
+      .from('conversaciones_wa')
+      .update({ modo: 'humano', estado: 'activa' })
+      .eq('id', id);
+    if (error) {
+      console.error('Error al tomar conversación:', error);
+      alert('Error al tomar la conversación. Intentá de nuevo.');
+      return;
+    }
     loadConvs();
   }
 
@@ -370,7 +385,7 @@ export default function SecretariaWhatsApp() {
                 )}
                 {selected.estado === 'derivada' && (
                   <button
-                    onClick={() => updateEstado(selected.id, 'activa')}
+                    onClick={() => tomarConversacion(selected.id)}
                     className="text-xs px-3 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors"
                   >
                     Tomar conversación
@@ -398,10 +413,14 @@ export default function SecretariaWhatsApp() {
                           : 'bg-green-100 text-green-900 shadow-sm rounded-tr-sm'
                       }`}
                     >
-                      {msg.type && msg.type !== 'text' && (
-                        <p className="text-[10px] font-medium opacity-50 mb-1 uppercase tracking-wide">
-                          {msg.type === 'secretary' ? 'Secretaria' : msg.type}
-                        </p>
+                      {msg.type === 'audio' && (
+                        <p className="text-[10px] font-medium opacity-50 mb-1 uppercase tracking-wide">Mensaje de voz</p>
+                      )}
+                      {msg.type === 'secretary' && (
+                        <p className="text-[10px] font-medium opacity-50 mb-1 uppercase tracking-wide">Secretaria</p>
+                      )}
+                      {(msg.type === 'image' || msg.mediaUrl?.startsWith('data:')) && msg.mediaUrl && (
+                        <img src={msg.mediaUrl} alt="Imagen del paciente" className="rounded mb-1 max-w-[200px] max-h-[200px] object-cover" />
                       )}
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                       <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-slate-400' : 'text-green-600'} text-right`}>

@@ -5,7 +5,8 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "ycloud-inbound",
-        "responseMode": "responseNode",
+        "responseMode": "onReceived",
+        "responseData": "",
         "options": {}
       },
       "id": "node-wh-ycloud",
@@ -16,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parsear evento de YCloud (whatsapp.inbound_message.received)\nconst body = $input.first().json.body ?? $input.first().json;\n\n// Solo procesar mensajes entrantes\nif (body.type !== 'whatsapp.inbound_message.received') return [];\n\nconst msg = body.whatsappInboundMessage ?? {};\n\n// Ignorar si no hay remitente\nif (!msg.from) return [];\n\nconst celular = msg.from; // formato E.164: 549XXXXXXXXXX\nconst tipo = msg.type ?? 'text';\n\nlet messageType = 'text';\nlet userText = '';\nlet mediaUrl = null;\nlet mediaMime = null;\nlet mediaName = null;\n\nif (tipo === 'text') {\n  messageType = 'text';\n  userText = msg.text?.body ?? '';\n} else if (tipo === 'image') {\n  messageType = 'image';\n  mediaUrl = msg.image?.link ?? null;\n  mediaMime = msg.image?.mime_type ?? 'image/jpeg';\n  userText = '[El paciente envió una imagen]';\n} else if (tipo === 'audio') {\n  messageType = 'audio';\n  mediaUrl = msg.audio?.link ?? null;\n  mediaMime = msg.audio?.mime_type ?? 'audio/mpeg';\n} else if (tipo === 'document') {\n  messageType = 'document';\n  mediaUrl = msg.document?.link ?? null;\n  mediaMime = msg.document?.mime_type ?? 'application/pdf';\n  mediaName = msg.document?.filename ?? 'documento';\n  userText = `[El paciente envió un documento: ${mediaName}]`;\n} else if (tipo === 'video') {\n  messageType = 'text';\n  userText = '[El paciente envió un video — consultame por texto o imagen]';\n} else {\n  return [];\n}\n\nif (!userText && messageType === 'text') return [];\n\nreturn [{ json: { celular, messageType, userText, mediaUrl, mediaMime, mediaName } }];"
+        "jsCode": "// Parsear evento de YCloud (whatsapp.inbound_message.received)\nconst body = $input.first().json.body ?? $input.first().json;\n\n// Solo procesar mensajes entrantes\nif (body.type !== 'whatsapp.inbound_message.received') return [];\n\nconst msg = body.whatsappInboundMessage ?? {};\n\n// Ignorar si no hay remitente\nif (!msg.from) return [];\n\n// Ignorar mensajes del propio bot (loop prevention)\nif (msg.fromMe === true || msg.direction === 'outbound') return [];\n// Ignorar si el remitente es el número del negocio\nconst BOT_NUMBER = '5493625456570';\nif (msg.from === BOT_NUMBER || msg.from === '+' + BOT_NUMBER) return [];\n\nconst celular = msg.from; // formato E.164: 549XXXXXXXXXX\nconst tipo = msg.type ?? 'text';\n\nlet messageType = 'text';\nlet userText = '';\nlet mediaUrl = null;\nlet mediaMime = null;\nlet mediaName = null;\n\nif (tipo === 'text') {\n  messageType = 'text';\n  userText = msg.text?.body ?? '';\n} else if (tipo === 'image') {\n  messageType = 'image';\n  mediaUrl = msg.image?.link ?? null;\n  mediaMime = msg.image?.mime_type ?? 'image/jpeg';\n  userText = '[El paciente envió una imagen]';\n} else if (tipo === 'audio') {\n  messageType = 'audio';\n  mediaUrl = msg.audio?.link ?? null;\n  mediaMime = msg.audio?.mime_type ?? 'audio/mpeg';\n} else if (tipo === 'document') {\n  messageType = 'document';\n  mediaUrl = msg.document?.link ?? null;\n  mediaMime = msg.document?.mime_type ?? 'application/pdf';\n  mediaName = msg.document?.filename ?? 'documento';\n  userText = `[El paciente envió un documento: ${mediaName}]`;\n} else if (tipo === 'video') {\n  messageType = 'text';\n  userText = '[El paciente envió un video — consultame por texto o imagen]';\n} else if (tipo === 'interactive' && msg.interactive?.type === 'button_reply') {\n  messageType = 'button_reply';\n  userText = msg.interactive.button_reply.title ?? '';\n} else if (tipo === 'button') {\n  messageType = 'button_reply';\n  userText = msg.button?.payload ?? msg.button?.text ?? '';\n} else {\n  return [];\n}\n\nif (!userText && messageType === 'text') return [];\n\nreturn [{ json: { celular, messageType, userText, mediaUrl, mediaMime, mediaName } }];"
       },
       "id": "node-parse",
       "name": "Parsear Mensaje YCloud",
@@ -54,6 +55,13 @@
                 "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
                 "combinator": "and",
                 "conditions": [{ "id": "4", "leftValue": "={{ $json.messageType }}", "rightValue": "document", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [{ "id": "5", "leftValue": "={{ $json.messageType }}", "rightValue": "button_reply", "operator": { "type": "string", "operation": "equals" } }]
               }
             }
           ]
@@ -99,7 +107,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env['SUPABASE_SERVICE_KEY'] }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -133,7 +141,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first();\nconst binaryData = item.binary?.data;\nif (!binaryData) return [];\nconst prev = $node['Parsear Mensaje YCloud'].json;\nconst base64 = binaryData.data;\nconst mime = prev.mediaMime ?? 'image/jpeg';\nreturn [{ json: { celular: prev.celular, userText: '[El paciente envió una imagen]', messageType: 'image', imageBase64: base64, imageMimetype: mime } }];"
+        "jsCode": "const item = $input.first();\nconst binaryData = item.binary?.data;\nif (!binaryData) return [];\nconst prev = $node['Parsear Mensaje YCloud'].json;\nconst base64 = binaryData.data;\nconst mime = prev.mediaMime ?? 'image/jpeg';\nconst dataUri = `data:${mime};base64,${base64}`;\nreturn [{ json: { celular: prev.celular, userText: '[El paciente envió una imagen]', messageType: 'image', mediaUrl: dataUri, imageBase64: base64, imageMimetype: mime } }];"
       },
       "id": "node-image-result",
       "name": "Preparar Imagen",
@@ -174,14 +182,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env['SUPABASE_SERVICE_KEY'] }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ celular: $json.celular, userText: $json.userText, messageType: $json.messageType, imageBase64: $json.imageBase64 ?? undefined, imageMimetype: $json.imageMimetype ?? undefined, documentBase64: $json.documentBase64 ?? undefined, documentMimetype: $json.documentMimetype ?? undefined, documentName: $json.documentName ?? undefined }) }}",
+        "body": "={{ JSON.stringify({ celular: $json.celular, userText: $json.userText, messageType: $json.messageType, mediaUrl: $json.mediaUrl ?? undefined, imageBase64: $json.imageBase64 ?? undefined, imageMimetype: $json.imageMimetype ?? undefined, documentBase64: $json.documentBase64 ?? undefined, documentMimetype: $json.documentMimetype ?? undefined, documentName: $json.documentName ?? undefined }) }}",
         "options": {}
       },
       "id": "node-wa-asistente",
@@ -202,6 +210,202 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $input.first().json;\nconst celular = prev.celular;\nconst titulo = prev.userText;\n\nlet accion = 'chat';\nif (titulo === 'Confirmo turno') accion = 'confirmar';\nelse if (titulo === 'Cancelo turno') accion = 'cancelar';\nelse if (titulo === 'Reagendar turno') accion = 'reagendar';\n\nlet userText = prev.userText;\nif (accion === 'reagendar') userText = 'Quiero reagendar mi turno';\n\nreturn [{ json: { celular, accion, userText, messageType: 'button_reply' } }];"
+      },
+      "id": "node-button-handler",
+      "name": "Manejar Botón Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 640]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.accion }}",
+        "rules": {
+          "rules": [
+            { "value2": "confirmar", "output": 0 },
+            { "value2": "cancelar", "output": 1 }
+          ]
+        },
+        "fallbackOutput": 2
+      },
+      "id": "node-switch-accion",
+      "name": "Switch Acción Botón",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1080, 640]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env['SUPABASE_URL'] }}/rest/v1/recordatorios_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "turno_id,centro_id" },
+            { "name": "telefono", "value": "=eq.{{ $json.celular }}" },
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-buscar-log-confirmar",
+      "name": "Buscar Log Confirmar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const logArr = $input.first().json;\nconst log = Array.isArray(logArr) ? logArr[0] : logArr;\nconst celular = $('Manejar Botón Respuesta').first().json.celular;\nif (!log?.turno_id) return [{ json: { celular, turno_id: null, error: 'no_log' } }];\nreturn [{ json: { celular, turno_id: log.turno_id } }];"
+      },
+      "id": "node-combine-confirmar",
+      "name": "Combinar Confirmar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 520]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env['SUPABASE_URL'] }}/rest/v1/turnos?id=eq.{{ $json.turno_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{\"estado\": \"confirmado\"}"
+      },
+      "id": "node-patch-confirmar",
+      "name": "PATCH Confirmar Turno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ycloud.com/v2/whatsapp/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $env['YCLOUD_API_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ from: '+5493625456570', to: $('Manejar Botón Respuesta').first().json.celular, type: 'text', text: { body: '✅ ¡Tu turno está confirmado! Te esperamos. Si necesitás hacer algún cambio, escribinos.' } }) }}"
+      },
+      "id": "node-wa-confirmar",
+      "name": "WA Confirmar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 520]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env['SUPABASE_URL'] }}/rest/v1/recordatorios_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "turno_id,centro_id" },
+            { "name": "telefono", "value": "=eq.{{ $json.celular }}" },
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-buscar-log-cancelar",
+      "name": "Buscar Log Cancelar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 720]
+    },
+    {
+      "parameters": {
+        "jsCode": "const logArr = $input.first().json;\nconst log = Array.isArray(logArr) ? logArr[0] : logArr;\nconst celular = $('Manejar Botón Respuesta').first().json.celular;\nif (!log?.turno_id) return [{ json: { celular, turno_id: null, error: 'no_log' } }];\nreturn [{ json: { celular, turno_id: log.turno_id } }];"
+      },
+      "id": "node-combine-cancelar",
+      "name": "Combinar Cancelar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 720]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env['SUPABASE_URL'] }}/rest/v1/turnos?id=eq.{{ $json.turno_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env['SUPABASE_SERVICE_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{\"estado\": \"cancelado\"}"
+      },
+      "id": "node-patch-cancelar",
+      "name": "PATCH Cancelar Turno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 720]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ycloud.com/v2/whatsapp/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $env['YCLOUD_API_KEY'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ from: '+5493625456570', to: $('Manejar Botón Respuesta').first().json.celular, type: 'text', text: { body: '❌ Tu turno fue cancelado. Si querés reagendar escribinos y te ayudamos.' } }) }}"
+      },
+      "id": "node-wa-cancelar",
+      "name": "WA Cancelar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 720]
     }
   ],
   "connections": {
@@ -216,8 +420,43 @@
         [{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }],
         [{ "node": "Descargar Audio", "type": "main", "index": 0 }],
         [{ "node": "Descargar Imagen", "type": "main", "index": 0 }],
-        [{ "node": "Descargar Documento", "type": "main", "index": 0 }]
+        [{ "node": "Descargar Documento", "type": "main", "index": 0 }],
+        [{ "node": "Manejar Botón Respuesta", "type": "main", "index": 0 }]
       ]
+    },
+    "Manejar Botón Respuesta": {
+      "main": [[{ "node": "Switch Acción Botón", "type": "main", "index": 0 }]]
+    },
+    "Switch Acción Botón": {
+      "main": [
+        [{ "node": "Buscar Log Confirmar", "type": "main", "index": 0 }],
+        [{ "node": "Buscar Log Cancelar", "type": "main", "index": 0 }],
+        [{ "node": "wa-asistente (Claude)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Buscar Log Confirmar": {
+      "main": [[{ "node": "Combinar Confirmar", "type": "main", "index": 0 }]]
+    },
+    "Combinar Confirmar": {
+      "main": [[{ "node": "PATCH Confirmar Turno", "type": "main", "index": 0 }]]
+    },
+    "PATCH Confirmar Turno": {
+      "main": [[{ "node": "WA Confirmar", "type": "main", "index": 0 }]]
+    },
+    "WA Confirmar": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    },
+    "Buscar Log Cancelar": {
+      "main": [[{ "node": "Combinar Cancelar", "type": "main", "index": 0 }]]
+    },
+    "Combinar Cancelar": {
+      "main": [[{ "node": "PATCH Cancelar Turno", "type": "main", "index": 0 }]]
+    },
+    "PATCH Cancelar Turno": {
+      "main": [[{ "node": "WA Cancelar", "type": "main", "index": 0 }]]
+    },
+    "WA Cancelar": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
     },
     "Descargar Audio": {
       "main": [[{ "node": "Preparar Audio GPT", "type": "main", "index": 0 }]]

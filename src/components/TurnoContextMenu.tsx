@@ -174,7 +174,6 @@ export function TurnoContextMenu({
           >
             <MessageCircle className="w-3.5 h-3.5 opacity-60" />
             Enviar recordatorio
-            <span className="ml-auto text-[10px] text-zinc-400 italic">próximamente</span>
           </button>
         </>
       )}

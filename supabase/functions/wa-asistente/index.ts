@@ -52,6 +52,21 @@ function json(data: unknown, status = 200) {
   });
 }
 
+/**
+ * Normaliza un celular argentino al formato +549XXXXXXXXXX (E.164 móvil AR).
+ * Acepta: 3624075957 / 03624075957 / +5493624075957 / 5493624075957 / 54903624075957
+ * Formato único del proyecto: +549 + 10 dígitos locales.
+ */
+function normalizarCelular(raw: string): string {
+  let n = String(raw ?? '').replace(/\D/g, '');
+  if (n.startsWith('549') && n.length === 13) return '+' + n;          // +5493624075957
+  if (n.startsWith('5490') && n.length === 14) return '+549' + n.slice(4); // 54903624075957
+  if (n.startsWith('54') && n.length === 12) return '+549' + n.slice(2);   // 543624075957
+  if (n.startsWith('0') && n.length === 11) return '+549' + n.slice(1);    // 03624075957
+  if (n.length === 10) return '+549' + n;                                   // 3624075957
+  return '+' + n; // fallback
+}
+
 /** Extrae URLs de un texto */
 function extraerUrls(texto: string): string[] {
   const re = /https?:\/\/[^\s\])"'>]+/g;
@@ -240,12 +255,15 @@ Deno.serve(async (req: Request) => {
   catch { return json({ error: 'bad_json' }, 400); }
 
   const {
-    celular, userText, messageType = 'text',
+    celular: celularRaw, userText, messageType = 'text',
     accion,
     mediaUrl,
     imageBase64, imageMimetype,
     documentBase64, documentMimetype, documentName,
   } = body;
+
+  // Formato único del proyecto: +549XXXXXXXXXX
+  const celular = normalizarCelular(celularRaw);
 
   // Resolver centro_id para multi-tenant
   let centroId: string = Deno.env.get('CENTRO_ID') || body.centro_id || '';
@@ -612,9 +630,10 @@ Si el servicio tiene cobro anticipado: informá el porcentaje y monto, y que nec
 Si no tiene cobro anticipado: agendá directamente.
 
 PASO 6 — CONFIRMAR ANTES DE EJECUTAR
-Mostrá resumen: profesional, servicio, fecha, hora, DNI, nombre. Preguntá "¿Confirmamos?" con action "message".
-SOLO cuando el paciente diga "sí / confirmo / dale / ok": emitir action "book_turno" o "cancel_turno".
-⚠️ NUNCA emitas "book_turno" como pregunta de confirmación. Primero preguntá, esperá el sí, DESPUÉS la acción.
+Mostrá UN resumen en texto plano (sin viñetas, sin listas): "Perfecto, te anoto para el martes 29/10 a las 14:00 con la Lic. Abraham — Kinesiología OS. DNI 36019867. ¿Confirmamos?"
+Usá action "message".
+⚠️ CRÍTICO: Si el paciente responde con "sí", "confirmo", "dale", "ok", "listo", "sí señor", "claro", "bueno" o cualquier afirmación — INMEDIATAMENTE emitir action "book_turno". NO volver a preguntar. NO mostrar el resumen de nuevo. EJECUTAR directamente.
+⚠️ NUNCA emitas "book_turno" como pregunta. Primero preguntá UNA SOLA VEZ, luego ejecutá al primer "sí".
 
 PASO 7 — CIERRE
 Tras agendar: "✅ Turno confirmado para el [fecha] a las [hora] con [profesional] — [servicio]. Un día antes recibirás un recordatorio por WhatsApp. ¡Importante que lo respondás para confirmar!"
@@ -657,6 +676,13 @@ REGLAS SEGÚN EL ESTADO:
 - No inventés datos que no estén en la información de arriba
 
 FECHA/HORA ACTUAL (Buenos Aires): ${now}
+
+═══ ESTILO DE ESCRITURA ═══
+- Escribí en texto plano, como si mandaras un WhatsApp real a un conocido.
+- PROHIBIDO: asteriscos (*texto*), viñetas (· • - al inicio de línea), numeración (1. 2. 3.), dos puntos seguidos de lista, "Resumen:", "Resumen del turno:".
+- Si necesitás mencionar varios datos, escribilos en una sola oración o en líneas simples sin símbolo al inicio.
+- Podés usar emojis con moderación (✅ 📅 👋), pero no en cada línea.
+- Mensajes cortos. Sin saludos largos ni despedidas formales.
 
 RESPONDÉ ÚNICAMENTE con JSON válido (sin markdown):
 {"action":"message|check_slots|book_turno|cancel_turno|reagendar|check_payment_status|escalate","reply":"texto para el paciente","data":{"profesional_id":"uuid","servicio_id":"uuid","fecha":"YYYY-MM-DD","hora":"HH:MM","nombre":"...","apellido":"...","dni":"..."}}
@@ -1017,14 +1043,16 @@ Solo incluí en "data" los campos relevantes.`;
       if (pacienteId) {
         query = query.eq('paciente_id', pacienteId);
       } else {
-        // Buscar por DNI (prioritario) o por celular
+        // Buscar por DNI (prioritario) o por celular (múltiples formatos posibles en DB)
+        const celularSinPrefijo = celular.replace(/^\+?549?/, '');  // 3624075957
+        const celularVariantes = [celular, celularSinPrefijo, '0' + celularSinPrefijo].join(',celular.eq.');
         const { data: pacs } = await sb
           .from('pacientes')
           .select('id')
           .eq('centro_id', centro_id)
           .or(dniCancelacion
-            ? `dni.eq.${dniCancelacion},celular.eq.${celular}`
-            : `celular.eq.${celular}`);
+            ? `dni.eq.${dniCancelacion},celular.eq.${celularVariantes}`
+            : `celular.eq.${celularVariantes}`);
         const pacIds = (pacs ?? []).map((p: any) => p.id);
         if (pacIds.length > 0) {
           query = query.in('paciente_id', pacIds);
@@ -1085,11 +1113,13 @@ Solo incluí en "data" los campos relevantes.`;
       if (pacienteId) {
         query = query.eq('paciente_id', pacienteId);
       } else {
+        const celularSinPrefijo = celular.replace(/^\+?549?/, '');
+        const celularVariantes = [celular, celularSinPrefijo, '0' + celularSinPrefijo].join(',celular.eq.');
         const { data: pacs } = await sb
           .from('pacientes')
           .select('id')
-          .eq('celular', celular)
-          .eq('centro_id', centro_id);
+          .eq('centro_id', centro_id)
+          .or(`celular.eq.${celularVariantes}`);
         const pacIds = (pacs ?? []).map((p: any) => p.id);
         if (pacIds.length > 0) query = query.in('paciente_id', pacIds);
       }

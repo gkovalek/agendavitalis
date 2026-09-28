@@ -33,6 +33,7 @@ const PagoResultado = lazy(() => import("@/pages/PagoResultado"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const SecretariaWhatsApp = lazy(() => import("@/pages/SecretariaWhatsApp"));
+const TurneroTV = lazy(() => import("@/pages/TurneroTV"));
 const FaqManager = lazy(() => import("@/pages/FaqManager"));
 const MiPerfil = lazy(() => import("@/pages/MiPerfil"));
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -129,6 +130,7 @@ function AppRoutes() {
         <Route path="/pago/failure" element={<PagoResultado tipo="failure" />} />
         <Route path="/pago/pending" element={<PagoResultado tipo="pending" />} />
         <Route path="/secretaria" element={<SecretariaWhatsApp />} />
+        <Route path="/turnero/:centroId" element={<TurneroTV />} />
 
         <Route path="/landing" element={<Landing />} />
         <Route path="/registro" element={<Registro />} />

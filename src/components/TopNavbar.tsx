@@ -5,7 +5,7 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
 import { useTutorialContext } from '@/contexts/TutorialContext';
-import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle, Menu, X, ChevronRight } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle, Menu, X, ChevronRight, MessageCircle, Monitor } from 'lucide-react';
 import { VitalisLogo } from './VitalisLogo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
@@ -139,7 +139,7 @@ function DropdownMenu({
 
 function MobileNavDrawer({
   open, onClose, navGroups, onNavigate, tieneFeature, planMinimoPara, onLocked,
-  perfil, esAdmin, esSecretario, signOut, startTutorial,
+  perfil, esAdmin, esSecretario, esSecretaria, signOut, startTutorial,
 }: {
   open: boolean;
   onClose: () => void;
@@ -151,6 +151,7 @@ function MobileNavDrawer({
   perfil: any;
   esAdmin: boolean;
   esSecretario: boolean;
+  esSecretaria: boolean;
   signOut: () => void;
   startTutorial: () => void;
 }) {
@@ -233,6 +234,17 @@ function MobileNavDrawer({
               </div>
             );
           })}
+
+          {esSecretaria && (
+            <button
+              onClick={() => go('/secretaria')}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-colors
+                ${location.pathname.startsWith('/secretaria') ? 'text-primary bg-primary/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Central de CHAT
+            </button>
+          )}
         </nav>
 
         {/* Bottom actions */}
@@ -286,6 +298,7 @@ export function TopNavbar() {
   const rol = perfil?.rol_nombre ?? 'admin';
   const esAdmin = rol === 'admin' || rol === 'administrador' || !perfil?.rol_nombre;
   const esSecretario = rol === 'secretario';
+  const esSecretaria = rol === 'secretaria';
   const esProfesional = rol === 'profesional';
 
   const navGroups = useMemo(() => {
@@ -371,6 +384,22 @@ export function TopNavbar() {
               />
             );
           })}
+          {esSecretaria && (
+            <button
+              onClick={() => navigate('/secretaria')}
+              className={`
+                flex items-center gap-1.5 px-3 h-full text-[13px] font-medium
+                transition-colors whitespace-nowrap border-none bg-transparent cursor-pointer
+                ${location.pathname.startsWith('/secretaria')
+                  ? 'text-primary bg-primary/20'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                }
+              `}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Central de CHAT
+            </button>
+          )}
         </nav>
 
         {/* Hamburger — solo mobile */}
@@ -431,6 +460,14 @@ export function TopNavbar() {
                     <Settings className="w-4 h-4 opacity-60" /> Configuración
                   </button>
                 )}
+                {mostrarConfig && perfil?.centro_id && (
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate(`/turnero/${perfil.centro_id}`); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                  >
+                    <Monitor className="w-4 h-4 opacity-60" /> Turnero
+                  </button>
+                )}
                 <button
                   onClick={() => { setUserMenuOpen(false); startTutorial(); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
@@ -461,6 +498,7 @@ export function TopNavbar() {
         perfil={perfil}
         esAdmin={esAdmin}
         esSecretario={esSecretario}
+        esSecretaria={esSecretaria}
         signOut={signOut}
         startTutorial={startTutorial}
       />
