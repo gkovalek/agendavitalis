@@ -23,7 +23,7 @@ const PLANES = [
   {
     key: 'starter',
     nombre: 'Starter',
-    precio: 40000,
+    precio: 40,
     descripcion: 'Para centros y profesionales que arrancan o quieren ordenar su operación.',
     destacado: false,
     features: [
@@ -44,7 +44,7 @@ const PLANES = [
   {
     key: 'profesional',
     nombre: 'Profesional',
-    precio: 50000,
+    precio: 55,
     descripcion: 'Para centros y profesionales en crecimiento que necesitan más herramientas.',
     destacado: true,
     features: [
@@ -65,7 +65,7 @@ const PLANES = [
   {
     key: 'premium',
     nombre: 'Premium',
-    precio: 80000,
+    precio: 80,
     descripcion: 'Para centros y profesionales consolidados que quieren control total.',
     destacado: false,
     features: [
@@ -140,16 +140,12 @@ function PreciosSection() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[.14em] text-blue-400">{plan.nombre}</p>
                 <div className="mt-3 flex items-end gap-1">
+                  <span className="text-xs font-bold text-slate-400 mb-1">USD</span>
                   <span className="text-4xl font-extrabold text-white">
-                    ${precioMostrar(plan.precio).toLocaleString('es-AR')}
+                    {precioMostrar(plan.precio)}
                   </span>
-                  <span className="mb-1 text-sm text-slate-400">/mes por profesional</span>
+                  <span className="mb-1 text-sm text-slate-400">/mes</span>
                 </div>
-                {semestral && (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Equivale a ${(precioMostrar(plan.precio) * 6).toLocaleString('es-AR')} por 6 meses
-                  </p>
-                )}
                 <p className="mt-3 text-sm leading-6 text-slate-400">{plan.descripcion}</p>
               </div>
 
@@ -197,7 +193,7 @@ function PreciosSection() {
         </div>
 
         <p className="mt-10 text-center text-xs text-slate-500">
-          Todos los precios en ARS. Sin cargos ocultos. Podés cambiar de plan cuando quieras.
+          Todos los precios en USD. Sin cargos ocultos. Podés cambiar de plan cuando quieras.
         </p>
       </div>
     </section>
