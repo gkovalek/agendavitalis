@@ -101,7 +101,9 @@ const MP_APP_ID  = import.meta.env.VITE_MP_APP_ID as string | undefined;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
 export default function Configuracion() {
-  const { centroId } = useAuth();
+  const { centroId, perfil } = useAuth();
+  const rol = perfil?.rol_nombre ?? 'admin';
+  const soloNL = rol === 'secretaria' || rol === 'secretario';
   const { get, getNumber, set, loading, tableExists } = useCentroConfig(centroId);
   const { toast } = useToast();
   const [saving, setSaving] = useState<string | null>(null);
@@ -336,7 +338,7 @@ export default function Configuracion() {
       </div>
 
       {/* Banner si la tabla no existe */}
-      {!tableExists && (
+      {!soloNL && !tableExists && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-start gap-2">
@@ -357,6 +359,8 @@ export default function Configuracion() {
         </Card>
       )}
 
+      {/* Secciones solo para admin */}
+      {!soloNL && <>
       {/* Info del centro */}
       <Section
         title="Información del centro"
@@ -449,6 +453,7 @@ export default function Configuracion() {
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </Section>
+      </>}
 
       {/* Días no laborales */}
       <Section
@@ -505,6 +510,8 @@ export default function Configuracion() {
         )}
       </Section>
 
+      {/* Resto solo para admin */}
+      {!soloNL && <>
       {/* Link del portal público */}
       <Section
         title="Portal público de reservas"
@@ -656,6 +663,7 @@ export default function Configuracion() {
           </div>
         )}
       </Section>
+      </>}
     </div>
   );
 }

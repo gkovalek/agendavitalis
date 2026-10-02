@@ -67,7 +67,7 @@ interface TurnoHistorial {
   servicio?: { nombre: string };
 }
 
-type FormaPago = 'efectivo' | 'transferencia' | 'obra_social' | 'mixto';
+type FormaPago = 'efectivo' | 'transferencia' | 'prepaga' | 'mixto';
 
 export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId: profesionalIdProp, profesionalNombre: profesionalNombreProp, preselectedAgendaId, editableFechaHora, onSuccess, onCancel }: Props) {
   const [fecha, setFecha] = useState(fechaProp);
@@ -288,7 +288,7 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
 
   const montoTotal = formaPago === 'efectivo' ? montoEfectivo
     : formaPago === 'transferencia' ? montoTransferencia
-    : formaPago === 'obra_social' ? montoPrepaga
+    : formaPago === 'prepaga' ? montoPrepaga
     : montoEfectivo + montoTransferencia + montoPrepaga;
 
   // Solo los tratamientos activos del paciente cuyo servicio coincide con el seleccionado
@@ -364,7 +364,7 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
         fecha,
         monto_efectivo: formaPago === 'efectivo' || formaPago === 'mixto' ? montoEfectivo : 0,
         monto_transferencia: formaPago === 'transferencia' || formaPago === 'mixto' ? montoTransferencia : 0,
-        monto_prepaga: formaPago === 'obra_social' || formaPago === 'mixto' ? montoPrepaga : 0,
+        monto_prepaga: formaPago === 'prepaga' || formaPago === 'mixto' ? montoPrepaga : 0,
       });
       if (cajaErr) console.error('[NuevoTurnoForm] Caja insert error:', cajaErr.message, cajaErr.details);
     }
@@ -549,9 +549,9 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
               <div className="space-y-2">
                 <Label>Forma de pago *</Label>
                 <div className="flex flex-wrap gap-1">
-                  {(['efectivo', 'transferencia', 'obra_social', 'mixto'] as FormaPago[]).map(fp => (
+                  {(['efectivo', 'transferencia', 'prepaga', 'mixto'] as FormaPago[]).map(fp => (
                     <Button key={fp} type="button" size="sm" variant={formaPago === fp ? 'default' : 'outline'} onClick={() => setFormaPago(fp)}>
-                      {fp === 'efectivo' ? 'Efectivo' : fp === 'transferencia' ? 'Transferencia' : fp === 'obra_social' ? 'Obra Social' : 'Mixto'}
+                      {fp === 'efectivo' ? 'Efectivo' : fp === 'transferencia' ? 'Transferencia' : fp === 'prepaga' ? 'Prepaga' : 'Mixto'}
                     </Button>
                   ))}
                 </div>
@@ -560,7 +560,7 @@ export function NuevoTurnoForm({ fecha: fechaProp, hora: horaProp, profesionalId
               <div className="grid grid-cols-2 gap-3">
                 {(formaPago === 'efectivo' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto efectivo</Label><Input type="number" value={montoEfectivo} onChange={e => setMontoEfectivo(Number(e.target.value))} min={0} /></div>)}
                 {(formaPago === 'transferencia' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto transferencia</Label><Input type="number" value={montoTransferencia} onChange={e => setMontoTransferencia(Number(e.target.value))} min={0} /></div>)}
-                {(formaPago === 'obra_social' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto prepaga</Label><Input type="number" value={montoPrepaga} onChange={e => setMontoPrepaga(Number(e.target.value))} min={0} /></div>)}
+                {(formaPago === 'prepaga' || formaPago === 'mixto') && (<div className="space-y-1"><Label className="text-xs">Monto prepaga</Label><Input type="number" value={montoPrepaga} onChange={e => setMontoPrepaga(Number(e.target.value))} min={0} /></div>)}
               </div>
               {formaPago === 'mixto' && <p className="text-sm font-medium text-foreground">Total: ${montoTotal}</p>}
 

@@ -539,15 +539,15 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <Label className="text-[11px] flex items-center gap-1"><Banknote className="w-3 h-3" />Efectivo</Label>
-                          <Input type="number" value={montoEfectivo} onChange={(e) => setMontoEfectivo(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                          <Input type="number" value={montoEfectivo} onChange={(e) => setMontoEfectivo(Number(e.target.value))} onFocus={(e) => { if (Number(e.target.value) === 0) e.target.value = ''; }} onBlur={(e) => { if (e.target.value === '') setMontoEfectivo(0); }} placeholder="0" className="h-8 text-[12px]" />
                         </div>
                         <div>
                           <Label className="text-[11px]">Transferencia</Label>
-                          <Input type="number" value={montoTransferencia} onChange={(e) => setMontoTransferencia(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                          <Input type="number" value={montoTransferencia} onChange={(e) => setMontoTransferencia(Number(e.target.value))} onFocus={(e) => { if (Number(e.target.value) === 0) e.target.value = ''; }} onBlur={(e) => { if (e.target.value === '') setMontoTransferencia(0); }} placeholder="0" className="h-8 text-[12px]" />
                         </div>
                         <div>
-                          <Label className="text-[11px]">Obra social</Label>
-                          <Input type="number" value={montoPrepaga} onChange={(e) => setMontoPrepaga(Number(e.target.value))} placeholder="0" className="h-8 text-[12px]" />
+                          <Label className="text-[11px]">Prepaga</Label>
+                          <Input type="number" value={montoPrepaga} onChange={(e) => setMontoPrepaga(Number(e.target.value))} onFocus={(e) => { if (Number(e.target.value) === 0) e.target.value = ''; }} onBlur={(e) => { if (e.target.value === '') setMontoPrepaga(0); }} placeholder="0" className="h-8 text-[12px]" />
                         </div>
                       </div>
                       {(montoEfectivo + montoTransferencia + montoPrepaga) > 0 && (
@@ -755,7 +755,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                           const rows: { monto: number; medio: string }[] = [];
                           if (p.monto_efectivo > 0) rows.push({ monto: p.monto_efectivo, medio: 'Efectivo' });
                           if (p.monto_transferencia > 0) rows.push({ monto: p.monto_transferencia, medio: 'Transferencia' });
-                          if (p.monto_prepaga > 0) rows.push({ monto: p.monto_prepaga, medio: 'Obra social' });
+                          if (p.monto_prepaga > 0) rows.push({ monto: p.monto_prepaga, medio: 'Prepaga' });
                           if (rows.length === 0) rows.push({ monto: 0, medio: '—' });
                           return rows.map((r, i) => (
                             <tr key={`${p.id}-${i}`} className="border-b border-border/40 hover:bg-muted/30">
@@ -768,7 +768,7 @@ export function TurnoDetailDialog({ turno, onClose, onUpdated }: Props) {
                                 <span className={`text-[11px] px-2 py-0.5 rounded-full
                                   ${r.medio === 'Efectivo' ? 'bg-emerald-50 text-emerald-700'
                                     : r.medio === 'Transferencia' ? 'bg-blue-50 text-blue-700'
-                                    : r.medio === 'Obra social' ? 'bg-purple-50 text-purple-700'
+                                    : r.medio === 'Prepaga' ? 'bg-purple-50 text-purple-700'
                                     : 'bg-muted text-muted-foreground'}`}>
                                   {r.medio}
                                 </span>

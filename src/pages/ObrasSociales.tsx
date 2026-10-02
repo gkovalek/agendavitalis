@@ -52,6 +52,7 @@ function getInitials(nombre: string, apellido: string): string {
 export default function ObrasSociales() {
   const { centroId, perfil } = useAuth();
   const esProfesional = perfil?.rol_nombre === 'profesional';
+  const esSecretaria = perfil?.rol_nombre === 'secretaria' || perfil?.rol_nombre === 'secretario';
   const { tiene, planMinimoPara } = usePlan();
   const [items, setItems] = useState<ObraSocial[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -240,7 +241,7 @@ export default function ObrasSociales() {
                     <p className="text-xs text-muted-foreground">
                       Cód. {os.codigo} · {(os.profesional as any)?.apellido ?? '—'} · ID: <span className="font-mono">{os.id_vitalis}</span>
                     </p>
-                    {os.valor_sesion > 0 && (
+                    {os.valor_sesion > 0 && !esSecretaria && (
                       <p className="text-xs text-emerald-600 font-medium">${os.valor_sesion.toFixed(2)} / sesión</p>
                     )}
                   </div>
@@ -264,7 +265,7 @@ export default function ObrasSociales() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Profesional</TableHead>
                   <TableHead className="w-28">ID Vitalis</TableHead>
-                  <TableHead className="w-28 text-right">$ / Sesión</TableHead>
+                  {!esSecretaria && <TableHead className="w-28 text-right">$ / Sesión</TableHead>}
                   <TableHead className="w-20 text-center">Activa</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
@@ -285,13 +286,15 @@ export default function ObrasSociales() {
                     <TableCell>
                       <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{os.id_vitalis}</span>
                     </TableCell>
-                    <TableCell className="text-right text-sm">
-                      {os.valor_sesion > 0 ? (
-                        <span className="text-emerald-600 font-medium">${os.valor_sesion.toFixed(2)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+                    {!esSecretaria && (
+                      <TableCell className="text-right text-sm">
+                        {os.valor_sesion > 0 ? (
+                          <span className="text-emerald-600 font-medium">${os.valor_sesion.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-center">
                       <Switch
                         checked={os.activa}

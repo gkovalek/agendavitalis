@@ -5,7 +5,7 @@ import { useCentroConfig } from '@/hooks/use-centro-config';
 import { usePlan, type Feature } from '@/hooks/use-plan';
 import { useToast } from '@/hooks/use-toast';
 import { useTutorialContext } from '@/contexts/TutorialContext';
-import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle, Menu, X, ChevronRight, MessageCircle, Monitor } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Lock, UserCircle, HelpCircle, Menu, X, ChevronRight, MessageCircle, Monitor, CalendarOff } from 'lucide-react';
 import { VitalisLogo } from './VitalisLogo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
@@ -237,9 +237,8 @@ function MobileNavDrawer({
 
           {esSecretaria && (
             <button
-              onClick={() => go('/secretaria')}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-colors
-                ${location.pathname.startsWith('/secretaria') ? 'text-primary bg-primary/10' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+              onClick={() => { setMobileMenuOpen(false); window.open('/secretaria', '_blank'); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-colors text-white/70 hover:text-white hover:bg-white/5"
             >
               <MessageCircle className="w-4 h-4" />
               Central de CHAT
@@ -306,17 +305,18 @@ export function TopNavbar() {
       .map(group => {
         let items = group.items;
         if (esProfesional) items = items.filter(i => i.href !== '/profesionales');
-        if (esSecretario) {
+        if (esSecretario || esSecretaria) {
           const verCaja = get('secretario_ver_caja') !== 'false';
           const verLiquidacion = get('secretario_ver_liquidacion') !== 'false';
           if (!verCaja && group.label === 'Caja') return null;
           if (!verLiquidacion) items = items.filter(i => i.href !== '/liquidacion-os');
+          items = items.filter(i => !['/eerr', '/reportes'].includes(i.href ?? ''));
         }
         if (items.length === 0) return null;
         return { ...group, items };
       })
       .filter(Boolean) as NavGroup[];
-  }, [rol, esSecretario, esProfesional, get]);
+  }, [rol, esSecretario, esSecretaria, esProfesional, get]);
 
   const mostrarConfig = esAdmin;
 
@@ -386,15 +386,8 @@ export function TopNavbar() {
           })}
           {esSecretaria && (
             <button
-              onClick={() => navigate('/secretaria')}
-              className={`
-                flex items-center gap-1.5 px-3 h-full text-[13px] font-medium
-                transition-colors whitespace-nowrap border-none bg-transparent cursor-pointer
-                ${location.pathname.startsWith('/secretaria')
-                  ? 'text-primary bg-primary/20'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-                }
-              `}
+              onClick={() => window.open('/secretaria', '_blank')}
+              className="flex items-center gap-1.5 px-3 h-full text-[13px] font-medium transition-colors whitespace-nowrap border-none bg-transparent cursor-pointer text-white/70 hover:text-white hover:bg-white/10"
             >
               <MessageCircle className="w-3.5 h-3.5" />
               Central de CHAT
@@ -460,7 +453,15 @@ export function TopNavbar() {
                     <Settings className="w-4 h-4 opacity-60" /> Configuración
                   </button>
                 )}
-                {mostrarConfig && perfil?.centro_id && (
+                {(esSecretaria || esSecretario) && (
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/configuracion'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"
+                  >
+                    <CalendarOff className="w-4 h-4 opacity-60" /> Días no laborales
+                  </button>
+                )}
+                {(mostrarConfig || esSecretaria || esSecretario) && perfil?.centro_id && (
                   <button
                     onClick={() => { setUserMenuOpen(false); navigate(`/turnero/${perfil.centro_id}`); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-popover-foreground hover:bg-accent text-left transition-colors"

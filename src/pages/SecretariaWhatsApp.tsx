@@ -78,6 +78,7 @@ export default function SecretariaWhatsApp() {
   const [newPregunta, setNewPregunta] = useState('');
   const [newRespuesta, setNewRespuesta] = useState('');
   const [savingFaq, setSavingFaq]   = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const centroId  = perfil?.centro_id as string | undefined;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -245,6 +246,24 @@ export default function SecretariaWhatsApp() {
   // ─── Layout ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100 font-sans">
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img
+            src={lightboxUrl}
+            alt="Imagen ampliada"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-4 text-white bg-black/50 rounded-full w-9 h-9 flex items-center justify-center text-xl hover:bg-black/80"
+            onClick={() => setLightboxUrl(null)}
+          >×</button>
+        </div>
+      )}
 
       {/* ── LEFT PANEL — Conversation list ──────────────────────────────────── */}
       <aside className="w-80 flex-shrink-0 flex flex-col bg-slate-900 border-r border-slate-700">
@@ -420,7 +439,12 @@ export default function SecretariaWhatsApp() {
                         <p className="text-[10px] font-medium opacity-50 mb-1 uppercase tracking-wide">Secretaria</p>
                       )}
                       {(msg.type === 'image' || msg.mediaUrl?.startsWith('data:')) && msg.mediaUrl && (
-                        <img src={msg.mediaUrl} alt="Imagen del paciente" className="rounded mb-1 max-w-[200px] max-h-[200px] object-cover" />
+                        <img
+                          src={msg.mediaUrl}
+                          alt="Imagen del paciente"
+                          className="rounded mb-1 max-w-[200px] max-h-[200px] object-cover cursor-zoom-in"
+                          onClick={() => setLightboxUrl(msg.mediaUrl!)}
+                        />
                       )}
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                       <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-slate-400' : 'text-green-600'} text-right`}>
