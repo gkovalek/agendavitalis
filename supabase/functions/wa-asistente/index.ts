@@ -1078,7 +1078,7 @@ Solo incluí en "data" los campos relevantes.`;
             ? `${profNombre.titulo ?? ''} ${profNombre.nombre} ${profNombre.apellido}`.trim()
             : 'el profesional';
 
-          finalReply = `✅ Listo, cancelé tu turno del ${turnoActivo.fecha} a las ${turnoActivo.hora_inicio.slice(0,5)} con ${nomProf}. Si querés sacar uno nuevo, avisame.`;
+          finalReply = `✅ Listo, cancelé tu turno del ${turnoActivo.fecha} a las ${(turnoActivo.hora_inicio ?? '').slice(0,5)} con ${nomProf}. Si querés sacar uno nuevo, avisame.`;
           action = 'message';
         } else {
           finalReply = 'No encontré turnos próximos activos con tu número. Si creés que hay un error, escribinos y lo revisamos.';
