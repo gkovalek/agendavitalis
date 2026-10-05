@@ -22,6 +22,7 @@ interface ObraSocial {
   nombre: string;
   valor_sesion: number;
   activa: boolean;
+  tiene_adicional: boolean;
   factura_con_token: boolean;
   id_vitalis: string;
   profesional_id: string;
@@ -39,6 +40,7 @@ const emptyForm = {
   nombre: '',
   valor_sesion: 0,
   activa: true,
+  tiene_adicional: false,
   factura_con_token: false,
   profesional_id: '',
 };
@@ -72,7 +74,7 @@ export default function ObrasSociales() {
     setLoading(true);
     let osQuery = supabase
       .from('obras_sociales')
-      .select('id, codigo, nombre, valor_sesion, activa, factura_con_token, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
+      .select('id, codigo, nombre, valor_sesion, activa, tiene_adicional, factura_con_token, id_vitalis, profesional_id, profesional:profesionales(nombre, apellido)')
       .eq('centro_id', centroId!)
       .order('nombre');
     if (esProfesional && perfil?.profesional_id) {
@@ -110,6 +112,7 @@ export default function ObrasSociales() {
       nombre: os.nombre,
       valor_sesion: os.valor_sesion,
       activa: os.activa,
+      tiene_adicional: os.tiene_adicional ?? false,
       factura_con_token: os.factura_con_token ?? false,
       profesional_id: os.profesional_id,
     });
@@ -129,6 +132,7 @@ export default function ObrasSociales() {
       nombre: form.nombre,
       valor_sesion: Number(form.valor_sesion) || 0,
       activa: form.activa,
+      tiene_adicional: form.tiene_adicional,
       factura_con_token: form.factura_con_token,
       profesional_id: form.profesional_id,
       id_vitalis,
@@ -266,6 +270,7 @@ export default function ObrasSociales() {
                   <TableHead>Profesional</TableHead>
                   <TableHead className="w-28">ID Vitalis</TableHead>
                   {!esSecretaria && <TableHead className="w-28 text-right">$ / Sesión</TableHead>}
+                  <TableHead className="w-24 text-center">Adicional</TableHead>
                   <TableHead className="w-20 text-center">Activa</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
@@ -295,6 +300,16 @@ export default function ObrasSociales() {
                         )}
                       </TableCell>
                     )}
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={os.tiene_adicional ?? false}
+                        onCheckedChange={async () => {
+                          await supabase.from('obras_sociales').update({ tiene_adicional: !os.tiene_adicional }).eq('id', os.id);
+                          fetchData();
+                        }}
+                        className="data-[state=checked]:bg-amber-500"
+                      />
+                    </TableCell>
                     <TableCell className="text-center">
                       <Switch
                         checked={os.activa}
@@ -384,6 +399,19 @@ export default function ObrasSociales() {
                 <span className="font-mono text-sm font-semibold text-[#0F6E56]">{previewIdVitalis}</span>
               </div>
             )}
+
+            {/* Adicional */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Cobra adicional al paciente</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">El paciente paga el precio particular como plus</p>
+              </div>
+              <Switch
+                checked={form.tiene_adicional}
+                onCheckedChange={v => setForm({ ...form, tiene_adicional: v })}
+                className="data-[state=checked]:bg-amber-500"
+              />
+            </div>
 
             {/* Factura con token */}
             <div className="flex items-center justify-between">

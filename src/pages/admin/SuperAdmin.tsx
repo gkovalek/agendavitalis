@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Building2, Users, CreditCard, ShieldAlert, Percent, AlertTriangle, Cpu, DollarSign, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Building2, Users, CreditCard, ShieldAlert, Percent, AlertTriangle, Cpu, DollarSign, UserPlus, ChevronDown, ChevronUp, Stethoscope, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SUPERADMIN_EMAIL = 'gkovalek@hotmail.com';
@@ -113,6 +113,8 @@ export default function SuperAdmin() {
   const [analizando, setAnalizando]         = useState<Record<string, boolean>>({});
   const [analisisResultado, setAnalisisResultado] = useState<Record<string, { causa: string; solucion: string }>>({});
   const [usuariosModal, setUsuariosModal] = useState<{ centroId: string; centroNombre: string } | null>(null);
+  const [profesionesPendientes, setProfesionesPendientes] = useState<{ id: string; nombre: string; tipo: string; centro_nombre?: string }[]>([]);
+  const [aprobando, setAprobando] = useState<Record<string, boolean>>({});
 
   const esSuperAdmin = perfil?.mail === SUPERADMIN_EMAIL;
 
@@ -123,8 +125,39 @@ export default function SuperAdmin() {
 
   async function cargarTodo() {
     setCargando(true);
-    await Promise.all([cargarCentros(), cargarPagos(), cargarTokens(), cargarErrorLogs()]);
+    await Promise.all([cargarCentros(), cargarPagos(), cargarTokens(), cargarErrorLogs(), cargarProfesionesPendientes()]);
     setCargando(false);
+  }
+
+  async function cargarProfesionesPendientes() {
+    const { data } = await supabase
+      .from('profesiones')
+      .select('id, nombre, tipo, centro_id_sugerido')
+      .eq('estado', 'pendiente')
+      .order('nombre');
+    if (!data) return;
+    const conCentro = await Promise.all(data.map(async (p) => {
+      if (!p.centro_id_sugerido) return { ...p, centro_nombre: '—' };
+      const { data: c } = await supabase.from('centros').select('nombre').eq('id', p.centro_id_sugerido).single();
+      return { ...p, centro_nombre: c?.nombre ?? '—' };
+    }));
+    setProfesionesPendientes(conCentro);
+  }
+
+  async function aprobarProfesion(id: string) {
+    setAprobando(a => ({ ...a, [id]: true }));
+    await supabase.from('profesiones').update({ estado: 'activo', centro_id_sugerido: null }).eq('id', id);
+    setProfesionesPendientes(p => p.filter(x => x.id !== id));
+    setAprobando(a => ({ ...a, [id]: false }));
+    toast({ title: 'Profesión aprobada', description: 'Ya está disponible para todos los centros.' });
+  }
+
+  async function rechazarProfesion(id: string) {
+    setAprobando(a => ({ ...a, [id]: true }));
+    await supabase.from('profesiones').update({ estado: 'rechazado' }).eq('id', id);
+    setProfesionesPendientes(p => p.filter(x => x.id !== id));
+    setAprobando(a => ({ ...a, [id]: false }));
+    toast({ title: 'Profesión rechazada' });
   }
 
   async function cargarCentros() {
@@ -304,6 +337,7 @@ export default function SuperAdmin() {
           <TabsTrigger value="pagos"   className="gap-1.5"><CreditCard className="w-3.5 h-3.5" /> Ingresos MP</TabsTrigger>
           <TabsTrigger value="tokens"  className="gap-1.5"><Cpu className="w-3.5 h-3.5" /> Tokens IA</TabsTrigger>
           <TabsTrigger value="errores" className="gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Errores {errorLogs.length > 0 && <Badge className="ml-1 h-4 px-1 text-[10px]">{errorLogs.length}</Badge>}</TabsTrigger>
+          <TabsTrigger value="profesiones" className="gap-1.5"><Stethoscope className="w-3.5 h-3.5" /> Profesiones {profesionesPendientes.length > 0 && <Badge className="ml-1 h-4 px-1 text-[10px] bg-orange-500">{profesionesPendientes.length}</Badge>}</TabsTrigger>
         </TabsList>
 
         {/* ── Centros ── */}
@@ -546,6 +580,51 @@ export default function SuperAdmin() {
                     </TableBody>
                   </Table>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ── Profesiones ── */}
+        <TabsContent value="profesiones">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium mb-3">Sugerencias pendientes de aprobación</p>
+              {profesionesPendientes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay sugerencias pendientes.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Sugerida por</TableHead>
+                      <TableHead className="w-32"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {profesionesPendientes.map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.nombre}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={p.tipo === 'generador' ? 'border-blue-300 text-blue-700' : 'border-green-300 text-green-700'}>
+                            {p.tipo === 'generador' ? 'Generador' : 'Receptor'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.centro_nombre}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50" disabled={aprobando[p.id]} onClick={() => aprobarProfesion(p.id)}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50" disabled={aprobando[p.id]} onClick={() => rechazarProfesion(p.id)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

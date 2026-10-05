@@ -19,7 +19,7 @@ interface Centro          { id: string; nombre: string; direccion: string | null
 interface Profesional     { id: string; titulo: string | null; nombre: string; apellido: string; mp_user_id: string | null; }
 interface Servicio        { id: string; nombre: string; duracion_minutos: number; agenda_id: string | null; }
 interface PCS             { id: string; profesional_id: string; servicio_id: string; capacidad_simultanea: number; agenda_id: string | null; cobro_anticipado: string; }
-interface PcsHorarioDia   { pcs_id: string; dia_semana: number; hora_inicio: string; hora_fin: string; }
+interface PcsHorarioDia   { pcs_id: string; dia_semana: number; hora_inicio: string; hora_fin: string; precio_particular?: number | null; }
 interface SlotInfo        { hora: string; disponible: boolean; ocupados: number; capacidad: number; }
 
 type Step = 'profesional' | 'servicio' | 'fecha_hora' | 'datos' | 'confirmado';
@@ -119,7 +119,7 @@ export default function PortalPublico() {
       if (pcs.length > 0) {
         const { data: horData } = await supabase
           .from('pcs_horario_dia')
-          .select('pcs_id, dia_semana, hora_inicio, hora_fin')
+          .select('pcs_id, dia_semana, hora_inicio, hora_fin, precio_particular')
           .in('pcs_id', pcs.map(p => p.id))
           .eq('activo', true);
         setHorarioDia((horData as PcsHorarioDia[]) ?? []);
@@ -484,12 +484,21 @@ export default function PortalPublico() {
                   ? <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748B', fontSize: 14 }}><Loader2 style={{ width: 24, height: 24, margin: '0 auto 8px', color: '#21C8C0' }} className="kine-spin" />Cargando...</div>
                   : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {servicios.map(s => (
-                        <button key={s.id} className="kine-svc" onClick={() => setSelectedServicioId(s.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 16, borderRadius: 14, border: `2px solid ${selectedServicioId === s.id ? '#21C8C0' : '#E2E8F0'}`, background: selectedServicioId === s.id ? 'rgba(33,200,192,.08)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .22s ease' }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', marginBottom: 4 }}>{s.nombre}</span>
-                          <span style={{ fontSize: 11, color: '#64748B' }}>{s.duracion_minutos} min{s.costo_base > 0 ? ` · $${s.costo_base}` : ''}</span>
-                        </button>
-                      ))}
+                      {servicios.map(s => {
+                        const pcsId = pcsRecords.find(p => p.profesional_id === selectedProfId && p.servicio_id === s.id)?.id;
+                        const precio = pcsId ? (horarioDia.find(h => h.pcs_id === pcsId && (h.precio_particular ?? 0) > 0)?.precio_particular ?? null) : null;
+                        return (
+                          <button key={s.id} className="kine-svc" onClick={() => setSelectedServicioId(s.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 16, borderRadius: 14, border: `2px solid ${selectedServicioId === s.id ? '#21C8C0' : '#E2E8F0'}`, background: selectedServicioId === s.id ? 'rgba(33,200,192,.08)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all .22s ease', position: 'relative' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', marginBottom: 4 }}>{s.nombre}</span>
+                            <span style={{ fontSize: 11, color: '#64748B' }}>{s.duracion_minutos} min</span>
+                            {precio && (
+                              <span style={{ position: 'absolute', bottom: 10, right: 12, fontSize: 11, fontWeight: 700, color: selectedServicioId === s.id ? '#1aada6' : '#94A3B8' }}>
+                                ${precio.toLocaleString('es-AR')}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 

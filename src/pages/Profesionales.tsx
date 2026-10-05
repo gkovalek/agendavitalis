@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +40,7 @@ interface Profesion {
   id: string;
   nombre: string;
   tipo: 'generador' | 'receptor';
+  estado?: string;
 }
 
 const emptyForm = { titulo: '', nombre: '', apellido: '', dni: '', mail: '', celular: '', activo: true, profesion_id: '', matricula: '' };
@@ -47,11 +49,35 @@ function ProfesionField({
   profesiones,
   value,
   onChange,
+  centroId,
+  onSugerida,
 }: {
   profesiones: Profesion[];
   value: string;
   onChange: (v: string) => void;
+  centroId: string | null;
+  onSugerida: (p: Profesion) => void;
 }) {
+  const [sugerirOpen, setSugerirOpen] = useState(false);
+  const [sugerirForm, setSugerirForm] = useState({ nombre: '', tipo: 'generador' as 'generador' | 'receptor' });
+  const [guardando, setGuardando] = useState(false);
+
+  const handleSugerir = async () => {
+    if (!sugerirForm.nombre.trim() || !centroId) return;
+    setGuardando(true);
+    const { data, error } = await supabase
+      .from('profesiones')
+      .insert({ nombre: sugerirForm.nombre.trim(), tipo: sugerirForm.tipo, estado: 'pendiente', centro_id_sugerido: centroId })
+      .select('id, nombre, tipo, estado')
+      .single();
+    setGuardando(false);
+    if (!error && data) {
+      onSugerida(data as Profesion);
+      setSugerirForm({ nombre: '', tipo: 'generador' });
+      setSugerirOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1">
@@ -73,13 +99,47 @@ function ProfesionField({
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
         <SelectContent>
-          {profesiones.map(p => (
+          {profesiones.filter(p => !p.estado || p.estado === 'activo').map(p => (
             <SelectItem key={p.id} value={p.id}>
               {p.nombre} ({p.tipo === 'generador' ? 'Generador' : 'Receptor'})
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+
+      {/* Sugerir nueva profesión */}
+      {!sugerirOpen ? (
+        <button
+          type="button"
+          onClick={() => setSugerirOpen(true)}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary mt-1"
+        >
+          <PlusCircle className="w-3 h-3" /> No encontrás la profesión? Sugerila
+        </button>
+      ) : (
+        <div className="border rounded-md p-3 space-y-2 mt-1 bg-muted/30">
+          <p className="text-xs text-muted-foreground font-medium">Sugerir profesión (quedará pendiente de aprobación)</p>
+          <Input
+            placeholder="Nombre de la profesión"
+            value={sugerirForm.nombre}
+            onChange={e => setSugerirForm(f => ({ ...f, nombre: e.target.value }))}
+            className="h-8 text-sm"
+          />
+          <Select value={sugerirForm.tipo} onValueChange={(v) => setSugerirForm(f => ({ ...f, tipo: v as 'generador' | 'receptor' }))}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="generador">Generador (emite pedidos)</SelectItem>
+              <SelectItem value="receptor">Receptor (ejecuta sesiones)</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs" onClick={handleSugerir} disabled={guardando || !sugerirForm.nombre.trim()}>
+              {guardando ? 'Enviando...' : 'Enviar sugerencia'}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSugerirOpen(false)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -105,7 +165,7 @@ export default function Profesionales() {
     setLoading(true);
     const [profRes, profesionRes] = await Promise.all([
       supabase.from('profesionales').select('*').eq('centro_id', centroId).order('apellido'),
-      supabase.from('profesiones').select('id, nombre, tipo').order('nombre'),
+      supabase.from('profesiones').select('id, nombre, tipo, estado').order('nombre'),
     ]);
     setProfesionales((profRes.data as Profesional[]) ?? []);
     setProfesiones((profesionRes.data as Profesion[]) ?? []);
@@ -241,7 +301,17 @@ export default function Profesionales() {
       </div>
       <div className="space-y-1"><Label>Mail</Label><Input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} /></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ProfesionField profesiones={profesiones} value={form.profesion_id} onChange={v => setForm({...form, profesion_id: v})} />
+        <ProfesionField
+          profesiones={profesiones}
+          value={form.profesion_id}
+          onChange={v => setForm({...form, profesion_id: v})}
+          centroId={centroId}
+          onSugerida={(p) => {
+            setProfesiones(prev => [...prev, p]);
+            setForm(f => ({ ...f, profesion_id: '' }));
+            toast({ title: 'Sugerencia enviada', description: 'La profesión quedará disponible una vez aprobada por el administrador.' });
+          }}
+        />
         <div className="space-y-1"><Label>Matrícula</Label><Input value={form.matricula} onChange={e => setForm({...form, matricula: e.target.value})} placeholder="Ej: MP 12345" /></div>
       </div>
       <div className="flex items-center gap-2">

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 function VitalisIsotipo({ size = 40 }: { size?: number }) {
   return (
@@ -25,6 +25,7 @@ export default function Login() {
   const [forgotMode, setForgotMode] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -105,7 +106,12 @@ export default function Login() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Contraseña</Label>
-                    <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <div className="relative">
+                      <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
+                      <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   {loginError && (
                     <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">

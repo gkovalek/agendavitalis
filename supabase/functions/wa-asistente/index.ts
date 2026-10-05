@@ -428,7 +428,7 @@ async function procesarMensaje(params: {
 
   const [centroRes, profesRes, servRes, faqRes, pcsRes, pcsHorarioRes, turnoActivoRes] = await Promise.all([
     sb.from('centros').select('id,nombre,mp_user_id').eq('id', centro_id).single(),
-    sb.from('profesionales').select('id,titulo,nombre,apellido,mp_user_id').eq('centro_id', centro_id).eq('activo', true),
+    sb.from('profesionales').select('id,titulo,nombre,apellido,mp_user_id,profesiones(nombre)').eq('centro_id', centro_id).eq('activo', true),
     sb.from('servicios').select('id,nombre,duracion_minutos').eq('centro_id', centro_id).eq('activo', true),
     sb.from('faq').select('pregunta,respuesta').eq('centro_id', centro_id).eq('activo', true).limit(50),
     sb.from('profesional_centro_servicio')
@@ -481,11 +481,11 @@ async function procesarMensaje(params: {
   for (const p of profs) profIds.push(p.id);
 
   // Cargar OS directamente desde obras_sociales (tiene profesional_id)
-  let osRows: Array<{ profesional_id: string; nombre: string; codigo: string }> = [];
+  let osRows: Array<{ profesional_id: string; nombre: string; codigo: string; tiene_adicional: boolean }> = [];
   if (profIds.length > 0) {
     const { data: osData } = await sb
       .from('obras_sociales')
-      .select('profesional_id,nombre,codigo')
+      .select('profesional_id,nombre,codigo,tiene_adicional')
       .in('profesional_id', profIds)
       .eq('activa', true);
     osRows = (osData ?? []) as typeof osRows;
@@ -511,10 +511,10 @@ async function procesarMensaje(params: {
   }
 
   // profId → lista de OS aceptadas
-  const osPorProf: Record<string, Array<{ nombre: string; codigo: string }>> = {};
+  const osPorProf: Record<string, Array<{ nombre: string; codigo: string; tiene_adicional: boolean }>> = {};
   for (const o of osRows) {
     if (!osPorProf[o.profesional_id]) osPorProf[o.profesional_id] = [];
-    osPorProf[o.profesional_id].push({ nombre: o.nombre, codigo: o.codigo });
+    osPorProf[o.profesional_id].push({ nombre: o.nombre, codigo: o.codigo, tiene_adicional: o.tiene_adicional ?? false });
   }
 
   // servId → duracion_minutos / nombre
@@ -532,7 +532,8 @@ async function procesarMensaje(params: {
   const DIAS_ORDEN = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
   const profsStr = profs.map((p: any) => {
-    const nombreCompleto = [p.titulo, p.nombre, p.apellido].filter(Boolean).join(' ');
+    const especialidad = (p.profesiones as any)?.nombre ?? null;
+    const nombreCompleto = [p.titulo, p.nombre, p.apellido].filter(Boolean).join(' ') + (especialidad ? ` — ${especialidad}` : '');
     const pcsDePeste = pcsRows.filter(pc => pc.profesional_id === p.id);
 
     // Servicios con detalle por día
@@ -566,7 +567,7 @@ async function procesarMensaje(params: {
     // OS que acepta este profesional
     const osList = osPorProf[p.id] ?? [];
     const osStr = osList.length > 0
-      ? osList.map(o => `    • ${o.nombre} (${o.codigo})`).join('\n')
+      ? osList.map(o => `    • ${o.nombre} (${o.codigo})${o.tiene_adicional ? ' — cobra adicional' : ' — sin adicional'}`).join('\n')
       : '    (no trabaja con obras sociales)';
 
     // FAQs específicas de este profesional
@@ -608,6 +609,8 @@ ${faqStr ? `BASE DE CONOCIMIENTO (FAQ DEL CENTRO):\n${faqStr}\n` : ''}
 PASO 1 — CON QUIÉN HABLO
 Si no sabés el nombre de quien escribe, preguntá: "¿Me podés decir tu nombre y apellido?"
 Guardá nombre y apellido en "data". Si la consulta es para otra persona (familiar, etc.), preguntá el nombre y apellido de ESA persona.
+⚠️ EXTRACCIÓN AUTOMÁTICA: Si el paciente manda todo junto en un solo mensaje (ej: "Abraham Eliana, 36115676, para el jueves"), extraé nombre, apellido, DNI y fecha SIN volver a pedirlos. En Argentina es frecuente dar apellido primero y nombre segundo. "Abraham Eliana" = apellido "Abraham", nombre "Eliana".
+⚠️ NO confundas el nombre del paciente con el nombre de un profesional. Si el paciente ya se identificó en un mensaje anterior, usá ese dato.
 
 PASO 2 — QUÉ NECESITA
 Entendé el motivo: sacar turno, cancelar, reagendar, consulta de horarios/precios/OS, otra consulta.
@@ -616,6 +619,7 @@ PASO 3 — DETALLES (según el motivo)
 Para turnos: profesional → servicio → fecha preferida → usá check_slots para mostrar horarios reales → el paciente elige hora.
 ⚠️ OBLIGATORIO: NUNCA emitas "book_turno" sin haber llamado "check_slots" primero en este mismo intercambio. Si el paciente eligió hora pero no llamaste check_slots aún, hacelo antes de confirmar.
 Para consultas: respondé con la info de arriba (horarios reales, precios_particular, qué OS acepta cada profesional).
+⚠️ FILTRO POR ESPECIALIDAD: Si preguntan "¿tienen ginecólogos?", "¿tienen traumatólogos?" o similar, listá SOLO los profesionales de esa especialidad (según el campo "— Especialidad" en su nombre). No menciones profesionales de otras especialidades en esa respuesta.
 
 PASO 4 — INFORMAR / ASESORAR
 Ejemplo: "La Lic. Abraham atiende lunes a viernes 14-20 hs y los jueves desde las 8. El RPG con OS cuesta $13.000 la sesión particular. ¿Querés sacar un turno?"
@@ -645,15 +649,22 @@ Cada día de cada servicio tiene su propio esquema. Leé el detalle por día en 
 - "OS + adicional $X" → el turno se factura a la OS y el paciente paga $X de adicional en el centro
 - "solo particular $X" → ese día NO trabaja con obras sociales, el paciente paga $X sea cual sea su cobertura
 
-Cuando el paciente menciona su OS, buscá el día que le interesa y respondé exactamente según esa combinación.
+Cuando el paciente menciona su OS:
+1. Primero verificá si esa OS aparece en la lista "Obras sociales" del profesional elegido.
+2. Si aparece:
+   - Si dice "cobra adicional" → el paciente paga el precio particular de ese día como adicional. Informá el monto.
+   - Si dice "sin adicional" → la OS cubre todo, el paciente no paga nada en el centro.
+3. Si NO aparece en la lista (o la lista está vacía) → NO confirmes que la aceptan. Usá action "escalate" con reply: "No tengo info de esa obra social para este profesional. Te comunico con alguien del centro para que te confirmen si trabajan con ella. ¿Está bien?"
 Si aún no eligió día, informá todos los esquemas disponibles para que elija con conciencia.
 
 Ejemplos de respuesta correcta:
-- OS + adicional: "Con INSSEP, el costo para vos es $13.000."
-- OS sin adicional: "Con OSDE, no tenés costo en el centro."
-- Solo particular ese día: "Los miércoles el costo es $60.000."
+- OS en lista + "cobra adicional": "Con [nombre OS], el costo para vos es $13.000 de adicional."
+- OS en lista + "sin adicional": "Con [nombre OS], no tenés costo en el centro."
+- Solo particular ese día: "Los miércoles el costo es $60.000 particular."
+- OS NO está en lista → escalate.
 
 NUNCA menciones valor_sesion ni aranceles internos.
+NUNCA confirmes una OS que no esté explícitamente en la lista del profesional.
 
 ═══ ESTADO DE PAGO / TURNO ACTIVO ═══
 ${turnoActivo
@@ -947,7 +958,7 @@ Solo incluí en "data" los campos relevantes.`;
           if (existingTurno.estado === 'confirmado' || existingTurno.estado === 'reservado') {
             finalReply = `✅ Ya tenés un turno registrado para el ${fecha} a las ${hora}. ¡Te esperamos!`;
           } else {
-            finalReply = `Ya tenés un turno pendiente de pago para el ${fecha} a las ${hora}. Si el link de pago venció, contactá directamente al centro.`;
+            finalReply = `Ya tenés un turno pendiente de pago para el ${fecha} a las ${hora}. Si el link de pago venció, avisame y te paso uno nuevo.`;
           }
           action = 'message';
           // saltar INSERT
@@ -1010,14 +1021,17 @@ Solo incluí en "data" los campos relevantes.`;
           if (mpUrl) {
             finalReply += `\n\n💳 *Link de pago:*\n${mpUrl}\n\n⏱ Tenés 30 minutos para pagar. Si no se completa, el turno se libera automáticamente.`;
           } else {
-            finalReply += '\n\n⚠️ No pudimos generar el link de pago. Contactá al centro para completar la reserva.';
+            // El turno quedó reservado pero el link falló — escalar al humano
+            action = 'escalate';
+            finalReply += '\n\nHubo un problema al generar el link de pago. Te comunico con alguien del centro para que te lo envíen. ¡Ya te contactan!';
           }
         }
       } catch (e: any) {
         if (e._duplicate) { /* turno duplicado — finalReply ya fue seteado arriba */ }
         else {
           await logError(centro_id, 'wa-asistente/book_turno', e.message, { celular, aData });
-          finalReply = 'Hubo un problema al registrar el turno. Contactá directamente al centro para confirmarlo.';
+          action = 'escalate';
+          finalReply = 'Hubo un problema al registrar el turno. Te comunico con alguien del centro para que te ayuden. ¡Ya te contactan!';
         }
       }
     }

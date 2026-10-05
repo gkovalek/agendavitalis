@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronUp, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePlan } from '@/hooks/use-plan';
@@ -91,6 +91,35 @@ export default function Servicios() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [faqServicio, setFaqServicio] = useState<{ id: string; nombre: string } | null>(null);
+
+  type SortKey = 'nombre' | 'agenda' | 'duracion_minutos' | 'es_tratamiento' | 'activo';
+  type SortDir = 'asc' | 'desc';
+  const [sortKey, setSortKey] = useState<SortKey>('nombre');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+  const sortedServicios = [...servicios].sort((a, b) => {
+    let av: string | number | boolean;
+    let bv: string | number | boolean;
+    if (sortKey === 'agenda') {
+      av = a.agenda?.nombre ?? '';
+      bv = b.agenda?.nombre ?? '';
+    } else {
+      av = a[sortKey] ?? '';
+      bv = b[sortKey] ?? '';
+    }
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   const fetchData = async () => {
     if (!centroId) return;
@@ -342,16 +371,16 @@ export default function Servicios() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Agenda</TableHead>
-                  <TableHead>Duración</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('nombre')}><span className="flex items-center">Nombre<SortIcon k="nombre" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('agenda')}><span className="flex items-center">Agenda<SortIcon k="agenda" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('duracion_minutos')}><span className="flex items-center">Duración<SortIcon k="duracion_minutos" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('es_tratamiento')}><span className="flex items-center">Tipo<SortIcon k="es_tratamiento" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('activo')}><span className="flex items-center">Estado<SortIcon k="activo" /></span></TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {servicios.map(s => (
+                {sortedServicios.map(s => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.nombre}</TableCell>
                     <TableCell>
